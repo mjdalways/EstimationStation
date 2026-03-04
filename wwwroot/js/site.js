@@ -1,42 +1,126 @@
 // ============================================================
 // Theme Management
 // ============================================================
-const THEMES = [
+const BASE_THEMES = [
     'classic', 'dark', 'forest', 'ocean', 'retro',
-    'floral', 'eighties', 'redyellow', 'blueyellow', 'myspace', 'geocities',
-    'custom'
+    'floral', 'eighties', 'redyellow', 'blueyellow', 'myspace', 'geocities'
 ];
 
+const CUSTOM_THEMES_KEY = 'es_customThemes';
+const LEGACY_CUSTOM_VARS_KEY = 'es_customThemeVars';
+
+function isBaseTheme(theme) {
+    return BASE_THEMES.includes(theme);
+}
+
+function closeCustomThemeModal() {
+    const modalEl = document.getElementById('customThemeModal');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+
+    if (modalEl.contains(document.activeElement)) {
+        document.activeElement.blur();
+    }
+
+    const modal = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.hide();
+
+    setTimeout(() => {
+        const focusTarget = document.getElementById('themeSelect');
+        if (focusTarget) focusTarget.focus();
+    }, 0);
+}
+
+function isCustomTheme(theme) {
+    return typeof theme === 'string' && theme.startsWith('custom_');
+}
+
+function getCustomThemes() {
+    return JSON.parse(localStorage.getItem(CUSTOM_THEMES_KEY) || '{}');
+}
+
+function saveCustomThemes(themes) {
+    localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));
+}
+
 function applyTheme(theme) {
-    if (!THEMES.includes(theme)) theme = 'classic';
-    document.getElementById('appBody').setAttribute('data-theme', theme);
+    const themes = getCustomThemes();
+    if (!isBaseTheme(theme) && !themes[theme]) theme = 'classic';
+
+    document.getElementById('appBody').setAttribute('data-theme', isCustomTheme(theme) ? 'custom' : theme);
+
+    if (isCustomTheme(theme) && themes[theme]?.vars) {
+        injectCustomThemeStyle(themes[theme].vars);
+    }
+
     localStorage.setItem('es_theme', theme);
     const sel = document.getElementById('themeSelect');
     if (sel) sel.value = theme;
+
+    const editBtn = document.getElementById('editCustomThemeBtn');
+    if (editBtn) editBtn.classList.toggle('d-none', !isCustomTheme(theme));
 }
 
-/** Called by the dropdown's onchange; opens the builder when "custom" is chosen. */
 function onThemeChange(theme) {
-    if (theme === 'custom') {
-        openCustomThemeModal();
+    if (theme === 'custom_new') {
+        openCustomThemeModalSafely();
     } else {
         applyTheme(theme);
     }
 }
 
-function loadTheme() {
-    const saved = localStorage.getItem('es_theme') || 'classic';
-    if (saved === 'custom') {
-        const vars = JSON.parse(localStorage.getItem('es_customThemeVars') || 'null');
-        if (vars) {
-            injectCustomThemeStyle(vars);
-            applyTheme('custom');
-        } else {
-            applyTheme('classic');
-        }
-    } else {
-        applyTheme(saved);
+function openCustomThemeModalSafely(themeId) {
+    const navContent = document.getElementById('mainNavContent');
+    if (navContent && navContent.classList.contains('show') && typeof bootstrap !== 'undefined') {
+        navContent.addEventListener('hidden.bs.collapse', () => openCustomThemeModal(themeId), { once: true });
+        bootstrap.Collapse.getOrCreateInstance(navContent).hide();
+        return;
     }
+
+    openCustomThemeModal(themeId);
+}
+
+function renderCustomThemeOptions() {
+    const group = document.getElementById('customThemeOptgroup');
+    if (!group) return;
+
+    group.innerHTML = '<option value="custom_new">➕ Create Custom…</option>';
+
+    const themes = getCustomThemes();
+    Object.entries(themes).forEach(([id, model]) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = `🖌️ ${model.name || 'Unnamed Theme'}`;
+        group.appendChild(option);
+    });
+}
+
+function migrateLegacyCustomTheme() {
+    const legacyVarsRaw = localStorage.getItem(LEGACY_CUSTOM_VARS_KEY);
+    if (!legacyVarsRaw) return;
+
+    try {
+        const legacyVars = JSON.parse(legacyVarsRaw);
+        const themes = getCustomThemes();
+        if (!themes.custom_legacy) {
+            themes.custom_legacy = { name: 'My Custom Theme', vars: legacyVars };
+            saveCustomThemes(themes);
+        }
+
+        if (localStorage.getItem('es_theme') === 'custom') {
+            localStorage.setItem('es_theme', 'custom_legacy');
+        }
+    } catch {
+    }
+
+    localStorage.removeItem(LEGACY_CUSTOM_VARS_KEY);
+}
+
+function loadTheme() {
+    migrateLegacyCustomTheme();
+    renderCustomThemeOptions();
+
+    const saved = localStorage.getItem('es_theme') || 'classic';
+    applyTheme(saved);
 }
 
 document.addEventListener('DOMContentLoaded', loadTheme);
@@ -92,6 +176,12 @@ const CUSTOM_DEFAULTS = {
     'border-radius':       '8'
 };
 
+function updateCustomFontPreview(fontFamily) {
+    const preview = document.getElementById('ct-font-preview');
+    if (!preview) return;
+    preview.style.fontFamily = fontFamily || CUSTOM_DEFAULTS['font-family'];
+}
+
 function injectCustomThemeStyle(vars) {
     let s = document.getElementById('customThemeStyle');
     if (!s) {
@@ -134,24 +224,52 @@ function injectCustomThemeStyle(vars) {
         `--timer-color:#dc3545;}`;
 }
 
-function openCustomThemeModal() {
-    const parsed = JSON.parse(localStorage.getItem('es_customThemeVars') || 'null');
-    const saved = parsed !== null ? parsed : { ...CUSTOM_DEFAULTS };
+function openCustomThemeModal(themeId) {
+    const themes = getCustomThemes();
+    const theme = themeId && themes[themeId]
+        ? themes[themeId]
+        : { name: '', vars: { ...CUSTOM_DEFAULTS } };
+
+    document.getElementById('ct-theme-id').value = themeId || '';
+    document.getElementById('ct-theme-name').value = theme.name || '';
+
     CUSTOM_COLOR_FIELDS.forEach(f => {
         const el = document.getElementById('ct-' + f);
-        if (el) el.value = saved[f] || CUSTOM_DEFAULTS[f];
+        if (el) el.value = theme.vars[f] || CUSTOM_DEFAULTS[f];
     });
+
     const fontEl = document.getElementById('ct-font-family');
-    if (fontEl) fontEl.value = saved['font-family'] || CUSTOM_DEFAULTS['font-family'];
+    if (fontEl) {
+        fontEl.value = theme.vars['font-family'] || CUSTOM_DEFAULTS['font-family'];
+        updateCustomFontPreview(fontEl.value);
+    }
+
     const radEl = document.getElementById('ct-border-radius');
     if (radEl) {
-        radEl.value = parseInt(saved['border-radius'], 10) || 8;
+        radEl.value = parseInt(theme.vars['border-radius'], 10) || 8;
         document.getElementById('ct-radius-label').textContent = radEl.value;
     }
+
+    const deleteBtn = document.getElementById('ct-delete-btn');
+    if (deleteBtn) deleteBtn.classList.toggle('d-none', !themeId);
+
     new bootstrap.Modal(document.getElementById('customThemeModal')).show();
 }
 
+function editCurrentCustomTheme() {
+    const current = localStorage.getItem('es_theme') || '';
+    if (isCustomTheme(current)) {
+        openCustomThemeModalSafely(current);
+    } else {
+        openCustomThemeModalSafely();
+    }
+}
+
 function saveCustomTheme() {
+    const name = (document.getElementById('ct-theme-name').value || '').trim() || 'My Custom Theme';
+    let themeId = document.getElementById('ct-theme-id').value;
+    if (!themeId) themeId = `custom_${Date.now()}`;
+
     const vars = {};
     CUSTOM_COLOR_FIELDS.forEach(f => {
         const el = document.getElementById('ct-' + f);
@@ -159,17 +277,99 @@ function saveCustomTheme() {
     });
     vars['font-family'] = document.getElementById('ct-font-family').value;
     vars['border-radius'] = document.getElementById('ct-border-radius').value;
-    localStorage.setItem('es_customThemeVars', JSON.stringify(vars));
-    injectCustomThemeStyle(vars);
-    bootstrap.Modal.getInstance(document.getElementById('customThemeModal')).hide();
-    applyTheme('custom');
+
+    const themes = getCustomThemes();
+    themes[themeId] = { name, vars };
+    saveCustomThemes(themes);
+    renderCustomThemeOptions();
+
+    closeCustomThemeModal();
+    applyTheme(themeId);
+}
+
+function deleteCustomTheme() {
+    const themeId = document.getElementById('ct-theme-id').value;
+    if (!themeId) return;
+    if (!confirm('Delete this custom theme?')) return;
+
+    const themes = getCustomThemes();
+    delete themes[themeId];
+    saveCustomThemes(themes);
+    renderCustomThemeOptions();
+
+    closeCustomThemeModal();
+    applyTheme('classic');
+}
+
+function exportCustomTheme() {
+    const name = (document.getElementById('ct-theme-name').value || 'custom-theme').trim();
+    const vars = {};
+    CUSTOM_COLOR_FIELDS.forEach(f => {
+        const el = document.getElementById('ct-' + f);
+        if (el) vars[f] = el.value;
+    });
+    vars['font-family'] = document.getElementById('ct-font-family').value;
+    vars['border-radius'] = document.getElementById('ct-border-radius').value;
+
+    const blob = new Blob([JSON.stringify({ name, vars }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'custom-theme'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importCustomTheme() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const data = JSON.parse(reader.result);
+                if (!data || !data.vars) {
+                    alert('Invalid theme file.');
+                    return;
+                }
+
+                document.getElementById('ct-theme-id').value = '';
+                document.getElementById('ct-theme-name').value = data.name || 'Imported Theme';
+
+                CUSTOM_COLOR_FIELDS.forEach(f => {
+                    const el = document.getElementById('ct-' + f);
+                    if (el && data.vars[f]) el.value = data.vars[f];
+                });
+
+                if (data.vars['font-family']) {
+                    document.getElementById('ct-font-family').value = data.vars['font-family'];
+                    updateCustomFontPreview(data.vars['font-family']);
+                }
+
+                if (data.vars['border-radius']) {
+                    const radius = parseInt(data.vars['border-radius'], 10) || 8;
+                    document.getElementById('ct-border-radius').value = radius;
+                    document.getElementById('ct-radius-label').textContent = radius;
+                }
+
+                const deleteBtn = document.getElementById('ct-delete-btn');
+                if (deleteBtn) deleteBtn.classList.add('d-none');
+            } catch {
+                alert('Could not read that theme file.');
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
 }
 
 /** Revert dropdown to the previously saved theme when user cancels. */
 function cancelCustomTheme() {
     const prev = localStorage.getItem('es_theme') || 'classic';
-    if (prev !== 'custom') {
-        const sel = document.getElementById('themeSelect');
-        if (sel) sel.value = prev;
-    }
+    const sel = document.getElementById('themeSelect');
+    if (sel) sel.value = prev;
 }

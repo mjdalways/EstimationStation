@@ -1,3 +1,6 @@
+/* Load additional web fonts (used by some themes) */
+@import url('https://fonts.googleapis.com/css2?family=Amatic+SC&family=Audiowide&family=Bangers&family=Berkshire+Swash&family=Bungee+Spice&family=Bungee+Tint&family=Butcherman&family=Caveat&family=Chewy&family=Cinzel&family=Comic+Neue&family=Creepster&family=Dancing+Script&family=Danfo&family=Eater&family=Emilys+Candy&family=Foldit&family=Fredoka&family=Great+Vibes&family=Honk&family=Indie+Flower&family=Lato&family=Lobster&family=Lora&family=Lovers+Quarrel&family=Luckiest+Guy&family=Merriweather&family=Montserrat&family=Mountains+of+Christmas&family=Nabla&family=Nosifer&family=Noto+Color+Emoji&family=Open+Sans&family=Orbitron:wght@400;700&family=Oswald&family=Pacifico&family=Parisienne&family=Permanent+Marker&family=Playfair+Display&family=Poppins&family=Press+Start+2P&family=Roboto&family=Roboto+Mono&family=Rocher&family=Rubik+Bubbles&family=Shadows+Into+Light&family=Share+Tech+Mono&family=Silkscreen&family=Sixtyfour&family=Tourney&family=VT323&display=swap');
+
 /* Import themes */
 @import url('/css/themes/classic.css');
 @import url('/css/themes/dark.css');
@@ -66,7 +69,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--navbar-text, #ffffff);
   border-color: rgba(255,255,255,0.25);
   font-size: 0.8rem;
-  max-width: 150px;
+  width: min(360px, 45vw);`r`n  max-width: 100%;
 }
 .nav-theme-select option,
 .nav-theme-select optgroup {
@@ -789,3 +792,4 @@ h1, h2, h3, h4, h5, h6 {
   .room-layout { height: auto; overflow: visible; }
   .main-content { min-height: calc(100vh - 52px - 56px); }
 }
+

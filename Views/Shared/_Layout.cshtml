@@ -44,10 +44,11 @@
                             <option value="myspace">💻 MySpace</option>
                             <option value="geocities">🌐 GeoCities</option>
                         </optgroup>
-                        <optgroup label="Custom">
-                            <option value="custom">✏️ Custom…</option>
+                        <optgroup label="Custom" id="customThemeOptgroup">
+                            <option value="custom_new">➕ Create Custom…</option>
                         </optgroup>
                     </select>
+                    <button class="btn btn-sm btn-outline-light d-none" id="editCustomThemeBtn" onclick="editCurrentCustomTheme()" title="Edit Custom Theme">✏️</button>
                     <button class="btn btn-sm btn-outline-light d-none" id="installAppBtn" onclick="installApp()" title="Add to Home Screen">📲 Install</button>
                 </div>
             </div>
@@ -68,6 +69,17 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
+                        <input type="hidden" id="ct-theme-id" />
+                        <div class="col-12 border-bottom pb-3 mb-2">
+                            <div class="d-flex justify-content-between align-items-end mb-2">
+                                <label class="form-label mb-0" for="ct-theme-name"><strong>Theme Name</strong></label>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportCustomTheme()" title="Save JSON to file">⬇️ Export</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="importCustomTheme()" title="Load JSON from file">⬆️ Import</button>
+                                </div>
+                            </div>
+                            <input type="text" class="form-control" id="ct-theme-name" placeholder="My Awesome Theme" />
+                        </div>
                         <div class="col-6 col-md-4">
                             <label class="form-label" for="ct-bg-primary">Page Background</label>
                             <input type="color" class="form-control form-control-color w-100" id="ct-bg-primary" value="#f8f9fa" />
@@ -102,15 +114,90 @@
                         </div>
                         <div class="col-6 col-md-4">
                             <label class="form-label" for="ct-font-family">Font</label>
-                            <select class="form-select" id="ct-font-family">
-                                <option value="system-ui, sans-serif">System Default</option>
-                                <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
-                                <option value="'Georgia', serif">Georgia (Serif)</option>
-                                <option value="'Courier New', monospace">Courier (Mono)</option>
-                                <option value="'Comic Sans MS', cursive">Comic Sans</option>
-                                <option value="'Impact', sans-serif">Impact</option>
-                                <option value="'Arial Black', sans-serif">Arial Black</option>
+                            <select class="form-select" id="ct-font-family" onchange="updateCustomFontPreview(this.value)">
+                                <optgroup label="System & Defaults">
+                                    <option value="system-ui, sans-serif">System Default</option>
+                                    <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+                                    <option value="'Georgia', serif">Georgia (Serif)</option>
+                                    <option value="'Courier New', monospace">Courier (Mono)</option>
+                                    <option value="'Comic Sans MS', cursive">Comic Sans</option>
+                                    <option value="'Impact', sans-serif">Impact</option>
+                                    <option value="'Arial Black', sans-serif">Arial Black</option>
+                                </optgroup>
+                                <optgroup label="Standard & Clean">
+                                    <option value="'Roboto', sans-serif">Roboto</option>
+                                    <option value="'Open Sans', sans-serif">Open Sans</option>
+                                    <option value="'Lato', sans-serif">Lato</option>
+                                    <option value="'Montserrat', sans-serif">Montserrat</option>
+                                    <option value="'Poppins', sans-serif">Poppins</option>
+                                    <option value="'Oswald', sans-serif">Oswald</option>
+                                </optgroup>
+                                <optgroup label="Elegant & Serif">
+                                    <option value="'Playfair Display', serif">Playfair Display</option>
+                                    <option value="'Merriweather', serif">Merriweather</option>
+                                    <option value="'Cinzel', serif">Cinzel</option>
+                                    <option value="'Lora', serif">Lora</option>
+                                </optgroup>
+                                <optgroup label="Tech, Robot & Pixel">
+                                    <option value="'Orbitron', sans-serif">Orbitron</option>
+                                    <option value="'Share Tech Mono', monospace">Share Tech Mono</option>
+                                    <option value="'Audiowide', sans-serif">Audiowide</option>
+                                    <option value="'Roboto Mono', monospace">Roboto Mono</option>
+                                    <option value="'VT323', monospace">VT323 (Terminal)</option>
+                                    <option value="'Press Start 2P', system-ui">Press Start 2P (8-bit)</option>
+                                    <option value="'Silkscreen', cursive">Silkscreen</option>
+                                </optgroup>
+                                <optgroup label="Playful & Casual">
+                                    <option value="'Comic Neue', cursive">Comic Neue</option>
+                                    <option value="'Fredoka', sans-serif">Fredoka</option>
+                                    <option value="'Chewy', cursive">Chewy</option>
+                                    <option value="'Luckiest Guy', cursive">Luckiest Guy</option>
+                                    <option value="'Bangers', cursive">Bangers</option>
+                                    <option value="'Lobster', cursive">Lobster</option>
+                                    <option value="'Rubik Bubbles', cursive">Rubik Bubbles</option>
+                                </optgroup>
+                                <optgroup label="Handwriting & Script">
+                                    <option value="'Caveat', cursive">Caveat</option>
+                                    <option value="'Shadows Into Light', cursive">Shadows Into Light</option>
+                                    <option value="'Indie Flower', cursive">Indie Flower</option>
+                                    <option value="'Permanent Marker', cursive">Permanent Marker</option>
+                                    <option value="'Amatic SC', cursive">Amatic SC</option>
+                                    <option value="'Pacifico', cursive">Pacifico</option>
+                                    <option value="'Great Vibes', cursive">Great Vibes</option>
+                                </optgroup>
+                                <optgroup label="Colors & Effects">
+                                    <option value="'Nabla', system-ui">Nabla (Isometric Color)</option>
+                                    <option value="'Bungee Spice', system-ui">Bungee Spice (Color)</option>
+                                    <option value="'Honk', system-ui">Honk!</option>
+                                    <option value="'Noto Color Emoji', sans-serif">Noto Color Emoji</option>
+                                    <option value="'Bungee Tint', system-ui">Bungee Tint</option>
+                                    <option value="'Foldit', system-ui">Foldit</option>
+                                    <option value="'Rocher', system-ui">Rocher</option>
+                                    <option value="'Danfo', system-ui">Danfo</option>
+                                    <option value="'Sixtyfour', system-ui">Sixtyfour</option>
+                                    <option value="'Tourney', system-ui">Tourney</option>
+                                </optgroup>
+                                <optgroup label="Holiday: Valentine's Day">
+                                    <option value="'Lovers Quarrel', cursive">Lovers Quarrel</option>
+                                    <option value="'Parisienne', cursive">Parisienne</option>
+                                    <option value="'Dancing Script', cursive">Dancing Script</option>
+                                </optgroup>
+                                <optgroup label="Holiday: Halloween">
+                                    <option value="'Creepster', cursive">Creepster</option>
+                                    <option value="'Nosifer', cursive">Nosifer</option>
+                                    <option value="'Butcherman', cursive">Butcherman</option>
+                                    <option value="'Eater', cursive">Eater</option>
+                                </optgroup>
+                                <optgroup label="Holiday: Christmas">
+                                    <option value="'Mountains of Christmas', cursive">Mountains of Christmas</option>
+                                    <option value="'Emilys Candy', cursive">Emilys Candy</option>
+                                    <option value="'Berkshire Swash', cursive">Berkshire Swash</option>
+                                </optgroup>
                             </select>
+                            <div class="form-text mt-2">Font preview</div>
+                            <div id="ct-font-preview" class="border rounded p-2" style="min-height: 48px;">
+                                The quick brown fox jumps over 13 lazy dogs. 🎨
+                            </div>
                         </div>
                         <div class="col-12">
                             <label class="form-label" for="ct-border-radius">
@@ -122,8 +209,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-danger me-auto d-none" id="ct-delete-btn" onclick="deleteCustomTheme()">🗑️ Delete</button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="cancelCustomTheme()">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="saveCustomTheme()">💾 Apply Theme</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCustomTheme()">💾 Save Theme</button>
                 </div>
             </div>
         </div>

@@ -1,5 +1,6 @@
 @{
     ViewData["Title"] = "Lobby";
+    var inviteRoom = ViewData["InviteRoom"] as string;
 }
 
 <div class="lobby-container">
@@ -7,6 +8,12 @@
         <div class="lobby-header">
             <h1 class="lobby-title">🃏 EstimationStation</h1>
             <p class="lobby-subtitle">Collaborative Planning Poker for your team</p>
+            @if (!string.IsNullOrWhiteSpace(inviteRoom))
+            {
+                <div class="alert alert-info py-2 mt-2 mb-0" role="alert">
+                    🔗 You've been invited to join room <strong>@inviteRoom</strong>. Enter your name to continue.
+                </div>
+            }
         </div>
 
         <div class="lobby-body">
@@ -57,6 +64,8 @@
 
 @section Scripts {
 <script>
+    const inviteRoom = @Json.Serialize(inviteRoom ?? "");
+
     function createRoom() {
         const name = document.getElementById('playerName').value.trim();
         const room = document.getElementById('createRoomName').value.trim();
@@ -111,6 +120,16 @@
     // Load on page start
     const savedName = localStorage.getItem('es_playerName');
     if (savedName) document.getElementById('playerName').value = savedName;
+
+    if (inviteRoom) {
+        document.getElementById('joinRoomName').value = inviteRoom;
+        const joinTab = document.getElementById('join-tab');
+        if (joinTab && typeof bootstrap !== 'undefined') {
+            bootstrap.Tab.getOrCreateInstance(joinTab).show();
+        }
+        document.getElementById('playerName').focus();
+    }
+
     loadRecentRooms();
 </script>
 }

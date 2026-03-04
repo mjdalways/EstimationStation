@@ -10,10 +10,13 @@ public class RoomController : Controller
         if (string.IsNullOrWhiteSpace(roomName))
             return RedirectToAction("Index", "Home");
 
+        if (string.IsNullOrWhiteSpace(name))
+            return RedirectToAction("Index", "Home", new { room = roomName });
+
         var model = new RoomViewModel
         {
             RoomName = roomName,
-            PlayerName = string.IsNullOrWhiteSpace(name) ? "Anonymous" : name
+            PlayerName = name
         };
 
         return View(model);
