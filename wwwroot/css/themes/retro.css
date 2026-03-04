@@ -1,0 +1,31 @@
+[data-theme="retro"] {
+  --bg-primary: #fdf6e3;
+  --bg-secondary: #fef9ed;
+  --text-primary: #3c2a14;
+  --text-secondary: #7d5a3c;
+  --accent: #d4770a;
+  --accent-hover: #b5620a;
+  --card-bg: #fef9ed;
+  --card-hover: #fde8c0;
+  --card-selected: #d4770a;
+  --card-selected-text: #ffffff;
+  --card-border: #e8c98a;
+  --card-voted: #6b8e23;
+  --btn-primary: #d4770a;
+  --btn-reveal: #6b8e23;
+  --btn-reset: #c0392b;
+  --font-family: 'Courier New', 'Courier', monospace;
+  --heading-font: 'Georgia', 'Times New Roman', serif;
+  --border-radius: 4px;
+  --shadow: 2px 2px 0 rgba(0,0,0,0.2);
+  --navbar-bg: #3c2a14;
+  --navbar-text: #fdf6e3;
+  --panel-bg: #fef9ed;
+  --panel-border: #e8c98a;
+  --stats-bg: #fde8c0;
+  --chat-bg: #fdf6e3;
+  --chat-bubble: #fde8c0;
+  --story-active: #fde8c0;
+  --story-completed: #dce8b8;
+  --timer-color: #c0392b;
+}

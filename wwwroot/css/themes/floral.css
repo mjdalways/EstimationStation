@@ -1,0 +1,31 @@
+[data-theme="floral"] {
+  --bg-primary: #fff0f5;
+  --bg-secondary: #fff8fb;
+  --text-primary: #4a1a2e;
+  --text-secondary: #9e5070;
+  --accent: #e91e8c;
+  --accent-hover: #c4186f;
+  --card-bg: #fff8fb;
+  --card-hover: #fce4ec;
+  --card-selected: #e91e8c;
+  --card-selected-text: #ffffff;
+  --card-border: #f8bbd0;
+  --card-voted: #7b1fa2;
+  --btn-primary: #e91e8c;
+  --btn-reveal: #7b1fa2;
+  --btn-reset: #ff9800;
+  --font-family: 'Georgia', 'Times New Roman', serif;
+  --heading-font: 'Georgia', serif;
+  --border-radius: 20px;
+  --shadow: 0 4px 16px rgba(233,30,140,0.15);
+  --navbar-bg: #ad1457;
+  --navbar-text: #ffffff;
+  --panel-bg: #fff8fb;
+  --panel-border: #f8bbd0;
+  --stats-bg: #fce4ec;
+  --chat-bg: #fff0f5;
+  --chat-bubble: #fce4ec;
+  --story-active: #fce4ec;
+  --story-completed: #e1bee7;
+  --timer-color: #c62828;
+}

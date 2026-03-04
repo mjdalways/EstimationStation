@@ -1,0 +1,31 @@
+[data-theme="eighties"] {
+  --bg-primary: #0d0d1a;
+  --bg-secondary: #1a0a2e;
+  --text-primary: #00fff0;
+  --text-secondary: #ff00cc;
+  --accent: #ff00cc;
+  --accent-hover: #cc00a3;
+  --card-bg: #1a0a2e;
+  --card-hover: #2d1a4e;
+  --card-selected: #ff00cc;
+  --card-selected-text: #ffffff;
+  --card-border: #00fff0;
+  --card-voted: #00ff88;
+  --btn-primary: #ff00cc;
+  --btn-reveal: #00ff88;
+  --btn-reset: #ffdd00;
+  --font-family: 'Courier New', monospace;
+  --heading-font: 'Impact', 'Arial Black', sans-serif;
+  --border-radius: 4px;
+  --shadow: 0 0 12px #ff00cc88, 0 0 24px #00fff033;
+  --navbar-bg: #0d0d1a;
+  --navbar-text: #00fff0;
+  --panel-bg: #1a0a2e;
+  --panel-border: #ff00cc;
+  --stats-bg: #2d004d;
+  --chat-bg: #0d0d1a;
+  --chat-bubble: #2d1a4e;
+  --story-active: #2d004d;
+  --story-completed: #003322;
+  --timer-color: #ffdd00;
+}

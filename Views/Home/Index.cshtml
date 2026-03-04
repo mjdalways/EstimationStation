@@ -1,0 +1,133 @@
+@{
+    ViewData["Title"] = "Lobby";
+}
+
+<div class="lobby-container">
+    <div class="lobby-card">
+        <div class="lobby-header">
+            <h1 class="lobby-title">🃏 EstimationStation</h1>
+            <p class="lobby-subtitle">Collaborative Planning Poker for your team</p>
+        </div>
+
+        <div class="lobby-body">
+            <!-- Player Name -->
+            <div class="form-section">
+                <label class="form-label" for="playerName">Your Name</label>
+                <input type="text" id="playerName" class="form-control form-control-lg" placeholder="Enter your name..." maxlength="50" />
+            </div>
+
+            <!-- Theme Selector -->
+            <div class="form-section">
+                <label class="form-label" for="themeSelect">Theme</label>
+                <select id="themeSelect" class="form-select" onchange="onThemeChange(this.value)">
+                    <optgroup label="Classic">
+                        <option value="classic">Classic</option>
+                        <option value="dark">Dark</option>
+                        <option value="forest">Forest</option>
+                        <option value="ocean">Ocean</option>
+                        <option value="retro">Retro</option>
+                    </optgroup>
+                    <optgroup label="Fun">
+                        <option value="floral">🌸 Floral</option>
+                        <option value="eighties">📼 1980s</option>
+                        <option value="redyellow">🔴 Red &amp; Yellow</option>
+                        <option value="blueyellow">🔵 Blue &amp; Yellow</option>
+                        <option value="myspace">💻 MySpace</option>
+                        <option value="geocities">🌐 GeoCities</option>
+                    </optgroup>
+                    <optgroup label="Custom">
+                        <option value="custom">✏️ Custom…</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <!-- Create / Join -->
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <div class="room-section">
+                        <h5 class="room-section-title">Create Room</h5>
+                        <input type="text" id="createRoomName" class="form-control mb-2" placeholder="Room name..." maxlength="50" />
+                        <button class="btn btn-primary w-100" id="createBtn" onclick="createRoom()">
+                            ✨ Create Room
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="room-section">
+                        <h5 class="room-section-title">Join Room</h5>
+                        <input type="text" id="joinRoomName" class="form-control mb-2" placeholder="Room name..." maxlength="50" />
+                        <button class="btn btn-secondary w-100" id="joinBtn" onclick="joinRoom()">
+                            🚪 Join Room
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Rooms -->
+            <div id="recentRoomsSection" class="mt-4" style="display:none;">
+                <label class="form-label">Recent Rooms</label>
+                <div id="recentRoomsList" class="recent-rooms-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function createRoom() {
+        const name = document.getElementById('playerName').value.trim();
+        const room = document.getElementById('createRoomName').value.trim();
+        if (!name) { alert('Please enter your name.'); return; }
+        if (!room) { alert('Please enter a room name.'); return; }
+        saveToLocalStorage(name, room);
+        window.location.href = `/room/${encodeURIComponent(room)}?name=${encodeURIComponent(name)}`;
+    }
+
+    function joinRoom() {
+        const name = document.getElementById('playerName').value.trim();
+        const room = document.getElementById('joinRoomName').value.trim();
+        if (!name) { alert('Please enter your name.'); return; }
+        if (!room) { alert('Please enter a room name.'); return; }
+        saveToLocalStorage(name, room);
+        window.location.href = `/room/${encodeURIComponent(room)}?name=${encodeURIComponent(name)}`;
+    }
+
+    function saveToLocalStorage(name, room) {
+        localStorage.setItem('es_playerName', name);
+        let rooms = JSON.parse(localStorage.getItem('es_recentRooms') || '[]');
+        rooms = rooms.filter(r => r !== room);
+        rooms.unshift(room);
+        rooms = rooms.slice(0, 5);
+        localStorage.setItem('es_recentRooms', JSON.stringify(rooms));
+    }
+
+    function loadRecentRooms() {
+        const rooms = JSON.parse(localStorage.getItem('es_recentRooms') || '[]');
+        if (rooms.length === 0) return;
+        const section = document.getElementById('recentRoomsSection');
+        const list = document.getElementById('recentRoomsList');
+        section.style.display = 'block';
+        list.innerHTML = rooms.map(r => `
+            <button class="recent-room-btn" onclick="quickJoin('${r.replace(/'/g, "\\'")}')">
+                🏠 ${r}
+            </button>
+        `).join('');
+    }
+
+    function quickJoin(room) {
+        const name = document.getElementById('playerName').value.trim();
+        if (!name) { alert('Please enter your name first.'); return; }
+        saveToLocalStorage(name, room);
+        window.location.href = `/room/${encodeURIComponent(room)}?name=${encodeURIComponent(name)}`;
+    }
+
+    // Keyboard shortcuts
+    document.getElementById('createRoomName').addEventListener('keypress', e => { if (e.key === 'Enter') createRoom(); });
+    document.getElementById('joinRoomName').addEventListener('keypress', e => { if (e.key === 'Enter') joinRoom(); });
+
+    // Load on page start
+    const savedName = localStorage.getItem('es_playerName');
+    if (savedName) document.getElementById('playerName').value = savedName;
+    loadRecentRooms();
+</script>
+}

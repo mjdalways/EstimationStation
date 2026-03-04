@@ -1,0 +1,177 @@
+@model EstimationStation.Models.RoomViewModel
+@{
+    ViewData["Title"] = Model.RoomName;
+}
+
+@section NavbarExtra {
+<div class="d-flex align-items-center gap-2 ms-auto">
+    <span class="navbar-text me-2" id="navRoomName">🏠 @Model.RoomName</span>
+    <span class="navbar-text me-2" id="navPlayerName">👤 <span id="displayName">@Model.PlayerName</span></span>
+    <button class="btn btn-sm btn-outline-light" onclick="promptRename()">✏️</button>
+    <button class="btn btn-sm btn-outline-warning" onclick="leaveRoom()">🚪 Leave</button>
+</div>
+}
+
+<div class="room-layout" id="roomLayout">
+    <!-- Left Panel: Stories -->
+    <div class="stories-panel" id="storiesPanel">
+        <div class="panel-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">📋 Stories</h6>
+            <button class="btn btn-sm btn-primary" onclick="toggleStoriesPanel()">◀</button>
+        </div>
+        <div class="add-story-form">
+            <input type="text" id="newStoryInput" class="form-control form-control-sm" placeholder="Add story..." maxlength="200" />
+            <button class="btn btn-sm btn-primary w-100 mt-1" onclick="addStory()">+ Add Story</button>
+        </div>
+        <div id="storiesList" class="stories-list"></div>
+    </div>
+
+    <!-- Stories collapsed toggle -->
+    <button class="stories-toggle-btn" id="storiesToggleBtn" onclick="toggleStoriesPanel()" style="display:none;" title="Show Stories">▶</button>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Current Story Bar -->
+        <div class="current-story-bar">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="story-label">Current Story:</span>
+                <span id="currentStoryDisplay" class="current-story-title">No story selected</span>
+                <div id="timerDisplay" class="timer-display" style="display:none;">
+                    <span id="timerIcon">⏱️</span> <span id="timerValue">0</span>s
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Bar (shown when votes revealed) -->
+        <div id="statsBar" class="stats-bar" style="display:none;">
+            <div class="stat-item">
+                <span class="stat-label">Average</span>
+                <span class="stat-value" id="statAverage">-</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Min</span>
+                <span class="stat-value" id="statMin">-</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Max</span>
+                <span class="stat-value" id="statMax">-</span>
+            </div>
+            <div id="consensusBadge" class="consensus-badge" style="display:none;">
+                🎉 Consensus!
+            </div>
+        </div>
+
+        <!-- Voting Cards -->
+        <div class="voting-section">
+            <h6 class="section-label">Your Vote</h6>
+            <div id="cardContainer" class="card-container"></div>
+        </div>
+
+        <!-- Participants -->
+        <div class="participants-section">
+            <h6 class="section-label">Participants</h6>
+            <div id="participantsContainer" class="participants-container"></div>
+        </div>
+    </div>
+
+    <!-- Right Controls Panel -->
+    <div class="controls-panel">
+        <div class="control-group">
+            <h6 class="control-title">🎮 Controls</h6>
+            <button class="btn btn-success w-100 mb-2" id="revealBtn" onclick="revealVotes()">👁️ Reveal</button>
+            <button class="btn btn-secondary w-100 mb-2" id="hideBtn" onclick="hideVotes()" style="display:none;">🙈 Hide</button>
+            <button class="btn btn-warning w-100 mb-2" onclick="resetVotes()">🔄 Reset</button>
+        </div>
+
+        <div class="control-group">
+            <h6 class="control-title">⚙️ Settings</h6>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="autoRevealCheck" onchange="toggleAutoReveal(this.checked)" />
+                <label class="form-check-label" for="autoRevealCheck">Auto-reveal</label>
+            </div>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="observerCheck" onchange="toggleObserver(this.checked)" />
+                <label class="form-check-label" for="observerCheck">Observer mode</label>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h6 class="control-title">🎯 Estimate Set</h6>
+            <select id="estimateSetSelect" class="form-select form-select-sm mb-2" onchange="changeEstimateSet(this.value)">
+                <option value="fibonacci">Fibonacci</option>
+                <option value="modified-fibonacci">Modified Fibonacci</option>
+                <option value="t-shirt">T-Shirt</option>
+                <option value="powers-of-2">Powers of 2</option>
+                <option value="custom">Custom</option>
+            </select>
+            <div id="customEstimatesDiv" style="display:none;">
+                <input type="text" id="customEstimatesInput" class="form-control form-control-sm mb-1" placeholder="1,2,3,5,8..." />
+                <button class="btn btn-sm btn-primary w-100" onclick="applyCustomEstimates()">Apply</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h6 class="control-title">⏱️ Timer</h6>
+            <div class="d-flex gap-1 flex-wrap mb-2">
+                <button class="btn btn-sm btn-outline-primary" onclick="startTimer(30)">30s</button>
+                <button class="btn btn-sm btn-outline-primary" onclick="startTimer(60)">1m</button>
+                <button class="btn btn-sm btn-outline-primary" onclick="startTimer(90)">90s</button>
+                <button class="btn btn-sm btn-outline-primary" onclick="startTimer(180)">3m</button>
+                <button class="btn btn-sm btn-outline-primary" onclick="startTimer(300)">5m</button>
+            </div>
+            <button class="btn btn-sm btn-outline-danger w-100" onclick="stopTimer()">⏹️ Stop Timer</button>
+        </div>
+
+        <div class="control-group">
+            <h6 class="control-title">🎨 Theme</h6>
+            <select id="themeSelect" class="form-select form-select-sm" onchange="onThemeChange(this.value)">
+                <optgroup label="Classic">
+                    <option value="classic">Classic</option>
+                    <option value="dark">Dark</option>
+                    <option value="forest">Forest</option>
+                    <option value="ocean">Ocean</option>
+                    <option value="retro">Retro</option>
+                </optgroup>
+                <optgroup label="Fun">
+                    <option value="floral">🌸 Floral</option>
+                    <option value="eighties">📼 1980s</option>
+                    <option value="redyellow">🔴 Red &amp; Yellow</option>
+                    <option value="blueyellow">🔵 Blue &amp; Yellow</option>
+                    <option value="myspace">💻 MySpace</option>
+                    <option value="geocities">🌐 GeoCities</option>
+                </optgroup>
+                <optgroup label="Custom">
+                    <option value="custom">✏️ Custom…</option>
+                </optgroup>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <button class="btn btn-sm btn-outline-secondary w-100" onclick="exportCSV()">📥 Export CSV</button>
+        </div>
+    </div>
+</div>
+
+<!-- Chat Panel (collapsible bottom) -->
+<div class="chat-panel" id="chatPanel">
+    <div class="chat-header" onclick="toggleChat()">
+        💬 Chat <span id="chatToggleIcon">▼</span>
+    </div>
+    <div class="chat-body" id="chatBody" style="display:none;">
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input-row">
+            <input type="text" id="chatInput" class="form-control form-control-sm" placeholder="Type a message..." maxlength="500" />
+            <button class="btn btn-sm btn-primary" onclick="sendChat()">Send</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const ROOM_CONFIG = {
+        roomName: @Json.Serialize(Model.RoomName),
+        playerName: @Json.Serialize(Model.PlayerName)
+    };
+</script>
+<script src="~/js/room.js" asp-append-version="true"></script>
+}
