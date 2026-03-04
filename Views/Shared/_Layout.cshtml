@@ -3,6 +3,13 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#343a40" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="EstStation" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
     <title>@ViewData["Title"] - EstimationStation</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -12,7 +19,38 @@
     <nav class="navbar navbar-expand-lg" id="mainNavbar">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">🃏 EstimationStation</a>
-            @RenderSection("NavbarExtra", required: false)
+
+            <!-- Bootstrap hamburger toggler -->
+            <button class="navbar-toggler ms-auto me-2" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavContent" aria-controls="mainNavContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon-custom">☰</span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="mainNavContent">
+                @RenderSection("NavbarExtra", required: false)
+                <div class="d-flex align-items-center gap-2 ms-auto py-1">
+                    <select id="themeSelect" class="form-select form-select-sm nav-theme-select" onchange="onThemeChange(this.value)" title="Change theme">
+                        <optgroup label="Classic">
+                            <option value="classic">Classic</option>
+                            <option value="dark">Dark</option>
+                            <option value="forest">Forest</option>
+                            <option value="ocean">Ocean</option>
+                            <option value="retro">Retro</option>
+                        </optgroup>
+                        <optgroup label="Fun">
+                            <option value="floral">🌸 Floral</option>
+                            <option value="eighties">📼 1980s</option>
+                            <option value="redyellow">🔴 Red &amp; Yellow</option>
+                            <option value="blueyellow">🔵 Blue &amp; Yellow</option>
+                            <option value="myspace">💻 MySpace</option>
+                            <option value="geocities">🌐 GeoCities</option>
+                        </optgroup>
+                        <optgroup label="Custom">
+                            <option value="custom">✏️ Custom…</option>
+                        </optgroup>
+                    </select>
+                    <button class="btn btn-sm btn-outline-light d-none" id="installAppBtn" onclick="installApp()" title="Add to Home Screen">📲 Install</button>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -96,5 +134,11 @@
     <script src="~/lib/signalr/signalr.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
+    <script>
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW registration failed:', err));
+        }
+    </script>
 </body>
 </html>
