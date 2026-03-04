@@ -144,63 +144,6 @@ function migrateLegacyCustomTheme() {
             saveCustomThemes(themes);
         }
 
-function setCustomizerFormValues(vars) {
-    CUSTOM_COLOR_FIELDS.forEach(f => {
-        const el = document.getElementById('ct-' + f);
-        if (el) el.value = vars[f] || CUSTOM_DEFAULTS[f];
-    });
-
-    const fontEl = document.getElementById('ct-font-family');
-    if (fontEl) {
-        fontEl.value = vars['font-family'] || CUSTOM_DEFAULTS['font-family'];
-        updateCustomFontPreview(fontEl.value);
-    }
-
-    const radEl = document.getElementById('ct-border-radius');
-    if (radEl) {
-        radEl.value = parseInt(vars['border-radius'], 10) || 8;
-        document.getElementById('ct-radius-label').textContent = radEl.value;
-    }
-}
-
-function readThemeVars(themeId) {
-    const themes = getCustomThemes();
-    if (isCustomTheme(themeId) && themes[themeId]?.vars) {
-        return { ...themes[themeId].vars };
-    }
-
-    const probe = document.createElement('div');
-    probe.setAttribute('data-theme', themeId);
-    probe.style.position = 'absolute';
-    probe.style.opacity = '0';
-    probe.style.pointerEvents = 'none';
-    document.body.appendChild(probe);
-
-    const styles = getComputedStyle(probe);
-    const vars = {
-        'bg-primary': styles.getPropertyValue('--bg-primary').trim() || CUSTOM_DEFAULTS['bg-primary'],
-        'bg-secondary': styles.getPropertyValue('--bg-secondary').trim() || CUSTOM_DEFAULTS['bg-secondary'],
-        'text-primary': styles.getPropertyValue('--text-primary').trim() || CUSTOM_DEFAULTS['text-primary'],
-        'accent': styles.getPropertyValue('--accent').trim() || CUSTOM_DEFAULTS['accent'],
-        'navbar-bg': styles.getPropertyValue('--navbar-bg').trim() || CUSTOM_DEFAULTS['navbar-bg'],
-        'navbar-text': styles.getPropertyValue('--navbar-text').trim() || CUSTOM_DEFAULTS['navbar-text'],
-        'card-selected': styles.getPropertyValue('--card-selected').trim() || CUSTOM_DEFAULTS['card-selected'],
-        'card-selected-text': styles.getPropertyValue('--card-selected-text').trim() || CUSTOM_DEFAULTS['card-selected-text'],
-        'font-family': styles.getPropertyValue('--font-family').trim() || CUSTOM_DEFAULTS['font-family'],
-        'border-radius': (styles.getPropertyValue('--border-radius').trim() || CUSTOM_DEFAULTS['border-radius']).replace('px', '')
-    };
-
-    document.body.removeChild(probe);
-    return vars;
-}
-
-function loadThemePresetForCustomization() {
-    const select = document.getElementById('ct-base-theme');
-    if (!select || !select.value) return;
-    const vars = readThemeVars(select.value);
-    setCustomizerFormValues(vars);
-}
-
         if (localStorage.getItem('es_theme') === 'custom') {
             localStorage.setItem('es_theme', 'custom_legacy');
         }
@@ -270,6 +213,63 @@ const CUSTOM_DEFAULTS = {
     'font-family':         'system-ui, sans-serif',
     'border-radius':       '8'
 };
+
+function setCustomizerFormValues(vars) {
+    CUSTOM_COLOR_FIELDS.forEach(f => {
+        const el = document.getElementById('ct-' + f);
+        if (el) el.value = vars[f] || CUSTOM_DEFAULTS[f];
+    });
+
+    const fontEl = document.getElementById('ct-font-family');
+    if (fontEl) {
+        fontEl.value = vars['font-family'] || CUSTOM_DEFAULTS['font-family'];
+        updateCustomFontPreview(fontEl.value);
+    }
+
+    const radEl = document.getElementById('ct-border-radius');
+    if (radEl) {
+        radEl.value = parseInt(vars['border-radius'], 10) || 8;
+        document.getElementById('ct-radius-label').textContent = radEl.value;
+    }
+}
+
+function readThemeVars(themeId) {
+    const themes = getCustomThemes();
+    if (isCustomTheme(themeId) && themes[themeId]?.vars) {
+        return { ...themes[themeId].vars };
+    }
+
+    const probe = document.createElement('div');
+    probe.setAttribute('data-theme', themeId);
+    probe.style.position = 'absolute';
+    probe.style.opacity = '0';
+    probe.style.pointerEvents = 'none';
+    document.body.appendChild(probe);
+
+    const styles = getComputedStyle(probe);
+    const vars = {
+        'bg-primary': styles.getPropertyValue('--bg-primary').trim() || CUSTOM_DEFAULTS['bg-primary'],
+        'bg-secondary': styles.getPropertyValue('--bg-secondary').trim() || CUSTOM_DEFAULTS['bg-secondary'],
+        'text-primary': styles.getPropertyValue('--text-primary').trim() || CUSTOM_DEFAULTS['text-primary'],
+        'accent': styles.getPropertyValue('--accent').trim() || CUSTOM_DEFAULTS['accent'],
+        'navbar-bg': styles.getPropertyValue('--navbar-bg').trim() || CUSTOM_DEFAULTS['navbar-bg'],
+        'navbar-text': styles.getPropertyValue('--navbar-text').trim() || CUSTOM_DEFAULTS['navbar-text'],
+        'card-selected': styles.getPropertyValue('--card-selected').trim() || CUSTOM_DEFAULTS['card-selected'],
+        'card-selected-text': styles.getPropertyValue('--card-selected-text').trim() || CUSTOM_DEFAULTS['card-selected-text'],
+        'font-family': styles.getPropertyValue('--font-family').trim() || CUSTOM_DEFAULTS['font-family'],
+        'border-radius': (styles.getPropertyValue('--border-radius').trim() || CUSTOM_DEFAULTS['border-radius']).replace('px', '')
+    };
+
+    document.body.removeChild(probe);
+    return vars;
+}
+
+function loadThemePresetForCustomization() {
+    const select = document.getElementById('ct-base-theme');
+    if (!select || !select.value) return;
+    const vars = readThemeVars(select.value);
+    setCustomizerFormValues(vars);
+}
 
 function updateCustomFontPreview(fontFamily) {
     const preview = document.getElementById('ct-font-preview');
