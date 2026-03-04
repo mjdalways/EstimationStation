@@ -42,6 +42,36 @@ function loadTheme() {
 document.addEventListener('DOMContentLoaded', loadTheme);
 
 // ============================================================
+// PWA Install
+// ============================================================
+let _pwaInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _pwaInstallPrompt = e;
+    const btn = document.getElementById('installAppBtn');
+    if (btn) btn.classList.remove('d-none');
+});
+
+window.addEventListener('appinstalled', () => {
+    _pwaInstallPrompt = null;
+    const btn = document.getElementById('installAppBtn');
+    if (btn) btn.classList.add('d-none');
+});
+
+function installApp() {
+    if (!_pwaInstallPrompt) return;
+    _pwaInstallPrompt.prompt();
+    _pwaInstallPrompt.userChoice.then(result => {
+        if (result.outcome === 'accepted') {
+            const btn = document.getElementById('installAppBtn');
+            if (btn) btn.classList.add('d-none');
+        }
+        _pwaInstallPrompt = null;
+    });
+}
+
+// ============================================================
 // Custom Theme Builder
 // ============================================================
 const CUSTOM_COLOR_FIELDS = [

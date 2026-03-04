@@ -4,9 +4,9 @@
 }
 
 @section NavbarExtra {
-<div class="d-flex align-items-center gap-2 ms-auto">
-    <span class="navbar-text me-2" id="navRoomName">🏠 @Model.RoomName</span>
-    <span class="navbar-text me-2" id="navPlayerName">👤 <span id="displayName">@Model.PlayerName</span></span>
+<div class="d-flex align-items-center gap-2 flex-wrap">
+    <span class="navbar-text" id="navRoomName">🏠 @Model.RoomName</span>
+    <span class="navbar-text" id="navPlayerName">👤 <span id="displayName">@Model.PlayerName</span></span>
     <button class="btn btn-sm btn-outline-light" onclick="promptRename()">✏️</button>
     <button class="btn btn-sm btn-outline-warning" onclick="leaveRoom()">🚪 Leave</button>
 </div>
@@ -123,30 +123,6 @@
         </div>
 
         <div class="control-group">
-            <h6 class="control-title">🎨 Theme</h6>
-            <select id="themeSelect" class="form-select form-select-sm" onchange="onThemeChange(this.value)">
-                <optgroup label="Classic">
-                    <option value="classic">Classic</option>
-                    <option value="dark">Dark</option>
-                    <option value="forest">Forest</option>
-                    <option value="ocean">Ocean</option>
-                    <option value="retro">Retro</option>
-                </optgroup>
-                <optgroup label="Fun">
-                    <option value="floral">🌸 Floral</option>
-                    <option value="eighties">📼 1980s</option>
-                    <option value="redyellow">🔴 Red &amp; Yellow</option>
-                    <option value="blueyellow">🔵 Blue &amp; Yellow</option>
-                    <option value="myspace">💻 MySpace</option>
-                    <option value="geocities">🌐 GeoCities</option>
-                </optgroup>
-                <optgroup label="Custom">
-                    <option value="custom">✏️ Custom…</option>
-                </optgroup>
-            </select>
-        </div>
-
-        <div class="control-group">
             <button class="btn btn-sm btn-outline-secondary w-100" onclick="exportCSV()">📥 Export CSV</button>
         </div>
     </div>
@@ -166,12 +142,55 @@
     </div>
 </div>
 
+<!-- Mobile Bottom Navigation Bar -->
+<nav class="mobile-bottom-nav d-lg-none" id="mobileBottomNav">
+    <button class="mobile-nav-btn" onclick="toggleMobilePanel('stories')" id="mobileStoriesBtn">
+        <span class="mobile-nav-icon">📋</span>
+        <span class="mobile-nav-label">Stories</span>
+    </button>
+    <button class="mobile-nav-btn mobile-nav-vote" onclick="scrollToCards()">
+        <span class="mobile-nav-icon">🃏</span>
+        <span class="mobile-nav-label">Vote</span>
+    </button>
+    <button class="mobile-nav-btn" onclick="toggleChat()" id="mobileChatBtn">
+        <span class="mobile-nav-icon">💬</span>
+        <span class="mobile-nav-label">Chat</span>
+    </button>
+    <button class="mobile-nav-btn" onclick="toggleMobilePanel('controls')" id="mobileControlsBtn">
+        <span class="mobile-nav-icon">⚙️</span>
+        <span class="mobile-nav-label">Controls</span>
+    </button>
+</nav>
+
 @section Scripts {
 <script>
     const ROOM_CONFIG = {
         roomName: @Json.Serialize(Model.RoomName),
         playerName: @Json.Serialize(Model.PlayerName)
     };
+
+    // Mobile panel toggling
+    function toggleMobilePanel(panel) {
+        const panels = {
+            stories: { el: document.getElementById('storiesPanel'), btn: document.getElementById('mobileStoriesBtn') },
+            controls: { el: document.querySelector('.controls-panel'), btn: document.getElementById('mobileControlsBtn') }
+        };
+        const target = panels[panel];
+        const isVisible = target.el.classList.contains('mobile-visible');
+
+        // Close all panels first
+        Object.values(panels).forEach(p => { p.el.classList.remove('mobile-visible'); p.btn.classList.remove('active'); });
+
+        // Toggle the requested one
+        if (!isVisible) {
+            target.el.classList.add('mobile-visible');
+            target.btn.classList.add('active');
+        }
+    }
+
+    function scrollToCards() {
+        document.getElementById('cardContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 </script>
 <script src="~/js/room.js" asp-append-version="true"></script>
 }

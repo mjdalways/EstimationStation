@@ -16,46 +16,29 @@
                 <input type="text" id="playerName" class="form-control form-control-lg" placeholder="Enter your name..." maxlength="50" />
             </div>
 
-            <!-- Theme Selector -->
-            <div class="form-section">
-                <label class="form-label" for="themeSelect">Theme</label>
-                <select id="themeSelect" class="form-select" onchange="onThemeChange(this.value)">
-                    <optgroup label="Classic">
-                        <option value="classic">Classic</option>
-                        <option value="dark">Dark</option>
-                        <option value="forest">Forest</option>
-                        <option value="ocean">Ocean</option>
-                        <option value="retro">Retro</option>
-                    </optgroup>
-                    <optgroup label="Fun">
-                        <option value="floral">🌸 Floral</option>
-                        <option value="eighties">📼 1980s</option>
-                        <option value="redyellow">🔴 Red &amp; Yellow</option>
-                        <option value="blueyellow">🔵 Blue &amp; Yellow</option>
-                        <option value="myspace">💻 MySpace</option>
-                        <option value="geocities">🌐 GeoCities</option>
-                    </optgroup>
-                    <optgroup label="Custom">
-                        <option value="custom">✏️ Custom…</option>
-                    </optgroup>
-                </select>
-            </div>
-
-            <!-- Create / Join -->
-            <div class="row g-3 mt-2">
-                <div class="col-md-6">
-                    <div class="room-section">
-                        <h5 class="room-section-title">Create Room</h5>
-                        <input type="text" id="createRoomName" class="form-control mb-2" placeholder="Room name..." maxlength="50" />
+            <!-- Create / Join Tabs -->
+            <div class="room-tabs-section">
+                <ul class="nav nav-tabs room-nav-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="create-tab" data-bs-toggle="tab" data-bs-target="#createPanel" type="button" role="tab">
+                            ✨ Create Room
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="join-tab" data-bs-toggle="tab" data-bs-target="#joinPanel" type="button" role="tab">
+                            🚪 Join Room
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content room-tab-content">
+                    <div class="tab-pane fade show active" id="createPanel" role="tabpanel">
+                        <input type="text" id="createRoomName" class="form-control mb-3" placeholder="Room name..." maxlength="50" />
                         <button class="btn btn-primary w-100" id="createBtn" onclick="createRoom()">
                             ✨ Create Room
                         </button>
                     </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="room-section">
-                        <h5 class="room-section-title">Join Room</h5>
-                        <input type="text" id="joinRoomName" class="form-control mb-2" placeholder="Room name..." maxlength="50" />
+                    <div class="tab-pane fade" id="joinPanel" role="tabpanel">
+                        <input type="text" id="joinRoomName" class="form-control mb-3" placeholder="Room name..." maxlength="50" />
                         <button class="btn btn-secondary w-100" id="joinBtn" onclick="joinRoom()">
                             🚪 Join Room
                         </button>
@@ -64,7 +47,7 @@
             </div>
 
             <!-- Recent Rooms -->
-            <div id="recentRoomsSection" class="mt-4" style="display:none;">
+            <div id="recentRoomsSection" class="mt-3" style="display:none;">
                 <label class="form-label">Recent Rooms</label>
                 <div id="recentRoomsList" class="recent-rooms-list"></div>
             </div>

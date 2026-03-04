@@ -472,8 +472,13 @@ function toggleChat() {
     body.style.display = isExpanded ? 'flex' : 'none';
     icon.textContent = isExpanded ? '▲' : '▼';
 
-    // Adjust room layout bottom padding
-    document.getElementById('roomLayout').style.paddingBottom = isExpanded ? '280px' : '48px';
+    const isMobile = window.innerWidth < 992;
+    const basePad = isMobile ? '56px' : '48px';
+    document.getElementById('roomLayout').style.paddingBottom = isExpanded ? '280px' : basePad;
+
+    // Highlight chat button on mobile
+    const chatBtn = document.getElementById('mobileChatBtn');
+    if (chatBtn) chatBtn.classList.toggle('active', isExpanded);
 }
 
 // ============================================================
@@ -522,5 +527,6 @@ function escHtml(str) {
 // ============================================================
 // Init
 // ============================================================
-document.getElementById('roomLayout').style.paddingBottom = '48px';
+const isMobile = window.innerWidth < 992;
+document.getElementById('roomLayout').style.paddingBottom = isMobile ? '56px' : '48px';
 initSignalR();
