@@ -317,6 +317,9 @@ public class PokerHub : Hub
 
     public async Task SendChat(string message)
     {
+        if (string.IsNullOrWhiteSpace(message)) return;
+        if (message.Length > 500) message = message[..500];
+
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
 

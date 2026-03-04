@@ -32,7 +32,7 @@ async function initSignalR() {
     try {
         await connection.start();
         myConnectionId = connection.connectionId;
-        await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, false);
+        await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver);
     } catch (err) {
         console.error('SignalR connection failed:', err);
         setTimeout(initSignalR, 3000);

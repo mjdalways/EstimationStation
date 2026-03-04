@@ -156,8 +156,8 @@
 @section Scripts {
 <script>
     const ROOM_CONFIG = {
-        roomName: '@Html.Raw(Model.RoomName.Replace("'", "\\'"))',
-        playerName: '@Html.Raw(Model.PlayerName.Replace("'", "\\'"))'
+        roomName: @Json.Serialize(Model.RoomName),
+        playerName: @Json.Serialize(Model.PlayerName)
     };
 </script>
 <script src="~/js/room.js" asp-append-version="true"></script>
