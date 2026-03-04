@@ -124,13 +124,13 @@
 
         <div class="control-group">
             <h6 class="control-title">🎨 Theme</h6>
-            <div class="theme-switcher-sm">
-                <button class="theme-btn-sm" data-theme="classic" title="Classic" style="background:#0d6efd;"></button>
-                <button class="theme-btn-sm" data-theme="dark" title="Dark" style="background:#6f42c1;"></button>
-                <button class="theme-btn-sm" data-theme="forest" title="Forest" style="background:#198754;"></button>
-                <button class="theme-btn-sm" data-theme="ocean" title="Ocean" style="background:#0dcaf0;"></button>
-                <button class="theme-btn-sm" data-theme="retro" title="Retro" style="background:#fd7e14;"></button>
-            </div>
+            <select id="themeSelect" class="form-select form-select-sm" onchange="applyTheme(this.value)">
+                <option value="classic">Classic</option>
+                <option value="dark">Dark</option>
+                <option value="forest">Forest</option>
+                <option value="ocean">Ocean</option>
+                <option value="retro">Retro</option>
+            </select>
         </div>
 
         <div class="control-group">

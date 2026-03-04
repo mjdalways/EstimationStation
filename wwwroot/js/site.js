@@ -6,10 +6,9 @@ function applyTheme(theme) {
     document.getElementById('appBody').setAttribute('data-theme', theme);
     localStorage.setItem('es_theme', theme);
 
-    // Update active state on all theme buttons
-    document.querySelectorAll('.theme-btn, .theme-btn-sm').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.theme === theme);
-    });
+    // Sync dropdown value if present
+    const sel = document.getElementById('themeSelect');
+    if (sel) sel.value = theme;
 }
 
 function loadTheme() {
@@ -17,10 +16,4 @@ function loadTheme() {
     applyTheme(saved);
 }
 
-// Attach theme button handlers
-document.addEventListener('DOMContentLoaded', () => {
-    loadTheme();
-    document.querySelectorAll('.theme-btn, .theme-btn-sm').forEach(btn => {
-        btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
-    });
-});
+document.addEventListener('DOMContentLoaded', loadTheme);

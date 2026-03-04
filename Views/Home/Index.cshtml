@@ -18,24 +18,14 @@
 
             <!-- Theme Selector -->
             <div class="form-section">
-                <label class="form-label">Theme</label>
-                <div class="theme-switcher">
-                    <button class="theme-btn" data-theme="classic" title="Classic" style="background:#0d6efd;">
-                        <span>C</span>
-                    </button>
-                    <button class="theme-btn" data-theme="dark" title="Dark" style="background:#6f42c1;">
-                        <span>D</span>
-                    </button>
-                    <button class="theme-btn" data-theme="forest" title="Forest" style="background:#198754;">
-                        <span>F</span>
-                    </button>
-                    <button class="theme-btn" data-theme="ocean" title="Ocean" style="background:#0dcaf0;">
-                        <span>O</span>
-                    </button>
-                    <button class="theme-btn" data-theme="retro" title="Retro" style="background:#fd7e14;">
-                        <span>R</span>
-                    </button>
-                </div>
+                <label class="form-label" for="themeSelect">Theme</label>
+                <select id="themeSelect" class="form-select" onchange="applyTheme(this.value)">
+                    <option value="classic">Classic</option>
+                    <option value="dark">Dark</option>
+                    <option value="forest">Forest</option>
+                    <option value="ocean">Ocean</option>
+                    <option value="retro">Retro</option>
+                </select>
             </div>
 
             <!-- Create / Join -->
