@@ -48,6 +48,7 @@
                             <option value="custom_new">➕ Create Custom…</option>
                         </optgroup>
                     </select>
+                    <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#recentChangesModal" title="Recent changes">📝</button>
                     <button class="btn btn-sm btn-outline-light d-none" id="editCustomThemeBtn" onclick="editCurrentCustomTheme()" title="Edit Custom Theme">✏️</button>
                     <button class="btn btn-sm btn-outline-light d-none" id="installAppBtn" onclick="installApp()" title="Add to Home Screen">📲 Install</button>
                 </div>
@@ -79,6 +80,15 @@
                                 </div>
                             </div>
                             <input type="text" class="form-control" id="ct-theme-name" placeholder="My Awesome Theme" />
+                            <div class="row g-2 mt-2">
+                                <div class="col-8">
+                                    <label class="form-label mb-1" for="ct-base-theme">Start from existing theme</label>
+                                    <select id="ct-base-theme" class="form-select form-select-sm"></select>
+                                </div>
+                                <div class="col-4 d-flex align-items-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="loadThemePresetForCustomization()">Load</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-6 col-md-4">
                             <label class="form-label" for="ct-bg-primary">Page Background</label>
@@ -212,6 +222,29 @@
                     <button type="button" class="btn btn-danger me-auto d-none" id="ct-delete-btn" onclick="deleteCustomTheme()">🗑️ Delete</button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="cancelCustomTheme()">Cancel</button>
                     <button type="button" class="btn btn-primary" onclick="saveCustomTheme()">💾 Save Theme</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="recentChangesModal" tabindex="-1" aria-labelledby="recentChangesModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="recentChangesModalLabel">Recent changes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2"><strong>3/4/2026</strong></p>
+                    <ul class="mb-0">
+                        <li>Share room invite links more easily.</li>
+                        <li>People joining from a link are guided to enter their name first.</li>
+                        <li>You can now create, edit, save, import, and export custom themes.</li>
+                        <li>The theme picker is easier to use with your saved themes listed.</li>
+                        <li>Custom theme setup now includes live font preview and more font choices.</li>
+                        <li>You can start a custom theme from any existing theme.</li>
+                        <li>Added a quick Recent Changes button in the top bar.</li>
+                    </ul>
                 </div>
             </div>
         </div>

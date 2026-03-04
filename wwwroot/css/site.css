@@ -69,7 +69,8 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--navbar-text, #ffffff);
   border-color: rgba(255,255,255,0.25);
   font-size: 0.8rem;
-  width: min(360px, 45vw);`r`n  max-width: 100%;
+  width: min(360px, 45vw);
+  max-width: 100%;
 }
 .nav-theme-select option,
 .nav-theme-select optgroup {
@@ -792,4 +793,5 @@ h1, h2, h3, h4, h5, h6 {
   .room-layout { height: auto; overflow: visible; }
   .main-content { min-height: calc(100vh - 52px - 56px); }
 }
+
 
