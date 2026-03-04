@@ -1,0 +1,31 @@
+[data-theme="myspace"] {
+  --bg-primary: #d4e8f0;
+  --bg-secondary: #ffffff;
+  --text-primary: #000066;
+  --text-secondary: #0000cc;
+  --accent: #ff69b4;
+  --accent-hover: #ff1493;
+  --card-bg: #ffffff;
+  --card-hover: #ffe4f0;
+  --card-selected: #ff69b4;
+  --card-selected-text: #ffffff;
+  --card-border: #0000cc;
+  --card-voted: #339900;
+  --btn-primary: #ff69b4;
+  --btn-reveal: #339900;
+  --btn-reset: #ff9900;
+  --font-family: 'Comic Sans MS', 'Chalkboard SE', cursive;
+  --heading-font: 'Comic Sans MS', cursive;
+  --border-radius: 12px;
+  --shadow: 2px 2px 4px rgba(0,0,204,0.3);
+  --navbar-bg: #336699;
+  --navbar-text: #ffffff;
+  --panel-bg: #ffffff;
+  --panel-border: #99ccff;
+  --stats-bg: #e6f2ff;
+  --chat-bg: #d4e8f0;
+  --chat-bubble: #e6f2ff;
+  --story-active: #ffe4f0;
+  --story-completed: #e6ffe6;
+  --timer-color: #cc0000;
+}

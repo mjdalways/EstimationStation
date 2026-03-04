@@ -124,12 +124,25 @@
 
         <div class="control-group">
             <h6 class="control-title">🎨 Theme</h6>
-            <select id="themeSelect" class="form-select form-select-sm" onchange="applyTheme(this.value)">
-                <option value="classic">Classic</option>
-                <option value="dark">Dark</option>
-                <option value="forest">Forest</option>
-                <option value="ocean">Ocean</option>
-                <option value="retro">Retro</option>
+            <select id="themeSelect" class="form-select form-select-sm" onchange="onThemeChange(this.value)">
+                <optgroup label="Classic">
+                    <option value="classic">Classic</option>
+                    <option value="dark">Dark</option>
+                    <option value="forest">Forest</option>
+                    <option value="ocean">Ocean</option>
+                    <option value="retro">Retro</option>
+                </optgroup>
+                <optgroup label="Fun">
+                    <option value="floral">🌸 Floral</option>
+                    <option value="eighties">📼 1980s</option>
+                    <option value="redyellow">🔴 Red &amp; Yellow</option>
+                    <option value="blueyellow">🔵 Blue &amp; Yellow</option>
+                    <option value="myspace">💻 MySpace</option>
+                    <option value="geocities">🌐 GeoCities</option>
+                </optgroup>
+                <optgroup label="Custom">
+                    <option value="custom">✏️ Custom…</option>
+                </optgroup>
             </select>
         </div>
 

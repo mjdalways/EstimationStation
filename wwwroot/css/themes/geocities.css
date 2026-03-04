@@ -1,0 +1,31 @@
+[data-theme="geocities"] {
+  --bg-primary: #000080;
+  --bg-secondary: #000000;
+  --text-primary: #00ff00;
+  --text-secondary: #ffff00;
+  --accent: #ff00ff;
+  --accent-hover: #cc00cc;
+  --card-bg: #000044;
+  --card-hover: #000088;
+  --card-selected: #ff00ff;
+  --card-selected-text: #ffff00;
+  --card-border: #00ffff;
+  --card-voted: #00ff00;
+  --btn-primary: #ff00ff;
+  --btn-reveal: #00ff00;
+  --btn-reset: #ff6600;
+  --font-family: 'Comic Sans MS', 'Times New Roman', serif;
+  --heading-font: 'Impact', 'Arial Black', sans-serif;
+  --border-radius: 0px;
+  --shadow: 3px 3px 0 #ff00ff;
+  --navbar-bg: #000000;
+  --navbar-text: #ff00ff;
+  --panel-bg: #000044;
+  --panel-border: #00ffff;
+  --stats-bg: #000066;
+  --chat-bg: #000080;
+  --chat-bubble: #000044;
+  --story-active: #000066;
+  --story-completed: #004400;
+  --timer-color: #ff0000;
+}

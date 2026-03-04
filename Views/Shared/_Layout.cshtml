@@ -20,6 +20,77 @@
         @RenderBody()
     </div>
 
+    <!-- Custom Theme Builder Modal -->
+    <div class="modal fade" id="customThemeModal" tabindex="-1" aria-labelledby="customThemeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="customThemeModalLabel">🎨 Build Your Custom Theme</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="cancelCustomTheme()"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-bg-primary">Page Background</label>
+                            <input type="color" class="form-control form-control-color w-100" id="ct-bg-primary" value="#f8f9fa" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-bg-secondary">Panel Background</label>
+                            <input type="color" class="form-control form-control-color w-100" id="ct-bg-secondary" value="#ffffff" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-text-primary">Text Color</label>
+                            <input type="color" class="form-control form-control-color w-100" id="ct-text-primary" value="#212529" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-accent">Accent / Button Color</label>
+                            <input type="color" class="form-control form-control-color w-100" id="ct-accent" value="#0d6efd" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-navbar-bg">Navbar Background</label>
+                            <input type="color" class="form-control form-control-color w-100" id="ct-navbar-bg" value="#343a40" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-navbar-text">Navbar Text</label>
+                            <input type="color" class="form-control form-control-color w-100" id="ct-navbar-text" value="#ffffff" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-card-selected">Selected Card Color</label>
+                            <input type="color" class="form-control form-control-color w-100" id="ct-card-selected" value="#0d6efd" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-card-selected-text">Selected Card Text</label>
+                            <input type="color" class="form-control form-control-color w-100" id="ct-card-selected-text" value="#ffffff" />
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="ct-font-family">Font</label>
+                            <select class="form-select" id="ct-font-family">
+                                <option value="system-ui, sans-serif">System Default</option>
+                                <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+                                <option value="'Georgia', serif">Georgia (Serif)</option>
+                                <option value="'Courier New', monospace">Courier (Mono)</option>
+                                <option value="'Comic Sans MS', cursive">Comic Sans</option>
+                                <option value="'Impact', sans-serif">Impact</option>
+                                <option value="'Arial Black', sans-serif">Arial Black</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="ct-border-radius">
+                                Corner Roundness: <strong><span id="ct-radius-label">8</span>px</strong>
+                            </label>
+                            <input type="range" class="form-range" id="ct-border-radius" min="0" max="24" value="8"
+                                   oninput="document.getElementById('ct-radius-label').textContent=this.value" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="cancelCustomTheme()">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCustomTheme()">💾 Apply Theme</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/lib/signalr/signalr.min.js"></script>

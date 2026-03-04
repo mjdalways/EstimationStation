@@ -4,6 +4,12 @@
 @import url('/css/themes/forest.css');
 @import url('/css/themes/ocean.css');
 @import url('/css/themes/retro.css');
+@import url('/css/themes/floral.css');
+@import url('/css/themes/eighties.css');
+@import url('/css/themes/redyellow.css');
+@import url('/css/themes/blueyellow.css');
+@import url('/css/themes/myspace.css');
+@import url('/css/themes/geocities.css');
 
 /* Base Styles */
 * { box-sizing: border-box; }
