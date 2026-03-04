@@ -1,0 +1,32 @@
+@{
+    var signalrCdnUrl = "https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - EstimationStation</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @RenderSection("HeadStyles", required: false)
+</head>
+<body data-theme="classic" id="appBody">
+    <nav class="navbar navbar-expand-lg" id="mainNavbar">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">🃏 EstimationStation</a>
+            @RenderSection("NavbarExtra", required: false)
+        </div>
+    </nav>
+
+    <div class="container-fluid px-0">
+        @RenderBody()
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="@signalrCdnUrl"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,31 @@
+[data-theme="dark"] {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0b0;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --card-bg: #0f3460;
+  --card-hover: #1a4a7a;
+  --card-selected: #7c3aed;
+  --card-selected-text: #ffffff;
+  --card-border: #2d3561;
+  --card-voted: #059669;
+  --btn-primary: #7c3aed;
+  --btn-reveal: #059669;
+  --btn-reset: #d97706;
+  --font-family: 'Segoe UI', system-ui, sans-serif;
+  --heading-font: 'Rajdhani', 'Segoe UI', sans-serif;
+  --border-radius: 10px;
+  --shadow: 0 4px 16px rgba(0,0,0,0.4);
+  --navbar-bg: #0d0d1a;
+  --navbar-text: #e0e0e0;
+  --panel-bg: #16213e;
+  --panel-border: #2d3561;
+  --stats-bg: #1a2a4a;
+  --chat-bg: #16213e;
+  --chat-bubble: #1e2d4a;
+  --story-active: #1e3a5f;
+  --story-completed: #1a3a2a;
+  --timer-color: #f87171;
+}

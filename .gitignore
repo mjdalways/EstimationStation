@@ -1,0 +1,50 @@
+## .NET gitignore
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# Environment
+.env
+.env.local
+appsettings.Production.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test results
+TestResults/

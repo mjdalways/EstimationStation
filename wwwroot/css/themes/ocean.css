@@ -1,0 +1,31 @@
+[data-theme="ocean"] {
+  --bg-primary: #e8f4f8;
+  --bg-secondary: #ffffff;
+  --text-primary: #0d2137;
+  --text-secondary: #2980b9;
+  --accent: #0077b6;
+  --accent-hover: #005f8d;
+  --card-bg: #ffffff;
+  --card-hover: #caf0f8;
+  --card-selected: #0077b6;
+  --card-selected-text: #ffffff;
+  --card-border: #90e0ef;
+  --card-voted: #00b4d8;
+  --btn-primary: #0077b6;
+  --btn-reveal: #00b4d8;
+  --btn-reset: #f4a261;
+  --font-family: 'Trebuchet MS', 'Arial', sans-serif;
+  --heading-font: 'Trebuchet MS', sans-serif;
+  --border-radius: 16px;
+  --shadow: 0 4px 16px rgba(0,119,182,0.15);
+  --navbar-bg: #023e8a;
+  --navbar-text: #caf0f8;
+  --panel-bg: #f0f9ff;
+  --panel-border: #90e0ef;
+  --stats-bg: #caf0f8;
+  --chat-bg: #e8f4f8;
+  --chat-bubble: #d0ebf5;
+  --story-active: #ade8f4;
+  --story-completed: #b7e4c7;
+  --timer-color: #d62828;
+}
