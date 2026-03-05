@@ -56,6 +56,12 @@ function saveCustomThemes(themes) {
     localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));
 }
 
+function themeOptionExists(theme) {
+    const sel = document.getElementById('themeSelect');
+    if (!sel) return false;
+    return Array.from(sel.options).some(o => o.value === theme);
+}
+
 function applyTheme(theme) {
     const themes = getCustomThemes();
     if (!isBaseTheme(theme) && !themes[theme]) theme = 'classic';
@@ -68,7 +74,12 @@ function applyTheme(theme) {
 
     localStorage.setItem('es_theme', theme);
     const sel = document.getElementById('themeSelect');
-    if (sel) sel.value = theme;
+    if (sel) {
+        sel.value = theme;
+        if (sel.value !== theme) {
+            sel.value = 'classic';
+        }
+    }
 
     const editBtn = document.getElementById('editCustomThemeBtn');
     if (editBtn) editBtn.classList.toggle('d-none', !isCustomTheme(theme));
@@ -106,6 +117,13 @@ function renderCustomThemeOptions() {
         option.textContent = `🖌️ ${model.name || 'Unnamed Theme'}`;
         group.appendChild(option);
     });
+
+
+    const current = localStorage.getItem('es_theme') || 'classic';
+    const sel = document.getElementById('themeSelect');
+    if (sel) {
+        sel.value = themeOptionExists(current) ? current : 'classic';
+    }
 
     populateCustomizationThemeSources();
 }
@@ -222,8 +240,10 @@ function setCustomizerFormValues(vars) {
 
     const fontEl = document.getElementById('ct-font-family');
     if (fontEl) {
-        fontEl.value = vars['font-family'] || CUSTOM_DEFAULTS['font-family'];
-        updateCustomFontPreview(fontEl.value);
+        const targetFont = vars['font-family'] || CUSTOM_DEFAULTS['font-family'];
+        const matchedValue = findBestFontOptionValue(fontEl, targetFont);
+        fontEl.value = matchedValue;
+        updateCustomFontPreview(matchedValue);
     }
 
     const radEl = document.getElementById('ct-border-radius');
@@ -231,6 +251,28 @@ function setCustomizerFormValues(vars) {
         radEl.value = parseInt(vars['border-radius'], 10) || 8;
         document.getElementById('ct-radius-label').textContent = radEl.value;
     }
+}
+
+function normalizePrimaryFont(fontFamily) {
+    if (!fontFamily) return '';
+    return fontFamily
+        .split(',')[0]
+        .replace(/['"]/g, '')
+        .trim()
+        .toLowerCase();
+}
+
+function findBestFontOptionValue(selectEl, targetFont) {
+    if (!selectEl) return CUSTOM_DEFAULTS['font-family'];
+
+    const exact = Array.from(selectEl.options).find(o => o.value === targetFont);
+    if (exact) return exact.value;
+
+    const targetPrimary = normalizePrimaryFont(targetFont);
+    const primaryMatch = Array.from(selectEl.options).find(o => normalizePrimaryFont(o.value) === targetPrimary);
+    if (primaryMatch) return primaryMatch.value;
+
+    return CUSTOM_DEFAULTS['font-family'];
 }
 
 function readThemeVars(themeId) {
@@ -321,12 +363,19 @@ function injectCustomThemeStyle(vars) {
 
 function openCustomThemeModal(themeId) {
     const themes = getCustomThemes();
+    const currentThemeForNew = localStorage.getItem('es_theme') || 'classic';
     const theme = themeId && themes[themeId]
         ? themes[themeId]
-        : { name: '', vars: { ...CUSTOM_DEFAULTS } };
+        : { name: '', vars: readThemeVars(currentThemeForNew) };
 
     document.getElementById('ct-theme-id').value = themeId || '';
     document.getElementById('ct-theme-name').value = theme.name || '';
+
+    const current = localStorage.getItem('es_theme') || 'classic';
+    const sel = document.getElementById('themeSelect');
+    if (sel) {
+        sel.value = themeOptionExists(current) ? current : 'classic';
+    }
 
     populateCustomizationThemeSources();
     const baseSelect = document.getElementById('ct-base-theme');
@@ -457,3 +506,7 @@ function cancelCustomTheme() {
     const sel = document.getElementById('themeSelect');
     if (sel) sel.value = prev;
 }
+
+
+
+
