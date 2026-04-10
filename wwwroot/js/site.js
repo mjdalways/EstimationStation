@@ -371,6 +371,11 @@ function openCustomThemeModal(themeId) {
     document.getElementById('ct-theme-id').value = themeId || '';
     document.getElementById('ct-theme-name').value = theme.name || '';
 
+    const ctConfettiColors = document.getElementById('ct-confetti-colors');
+    if (ctConfettiColors) {
+        ctConfettiColors.value = (theme.celebration?.confettiColors || []).join(',');
+    }
+
     const current = localStorage.getItem('es_theme') || 'classic';
     const sel = document.getElementById('themeSelect');
     if (sel) {
@@ -412,7 +417,11 @@ function saveCustomTheme() {
     vars['border-radius'] = document.getElementById('ct-border-radius').value;
 
     const themes = getCustomThemes();
-    themes[themeId] = { name, vars };
+    const ctConfettiColorsEl = document.getElementById('ct-confetti-colors');
+    const confettiColors = ctConfettiColorsEl
+        ? ctConfettiColorsEl.value.split(',').map(c => c.trim()).filter(c => c.startsWith('#'))
+        : [];
+    themes[themeId] = { name, vars, celebration: { confettiColors } };
     saveCustomThemes(themes);
     renderCustomThemeOptions();
 
@@ -444,7 +453,12 @@ function exportCustomTheme() {
     vars['font-family'] = document.getElementById('ct-font-family').value;
     vars['border-radius'] = document.getElementById('ct-border-radius').value;
 
-    const blob = new Blob([JSON.stringify({ name, vars }, null, 2)], { type: 'application/json' });
+    const ctConfettiColorsEl = document.getElementById('ct-confetti-colors');
+    const confettiColors = ctConfettiColorsEl
+        ? ctConfettiColorsEl.value.split(',').map(c => c.trim()).filter(c => c.startsWith('#'))
+        : [];
+
+    const blob = new Blob([JSON.stringify({ name, vars, celebration: { confettiColors } }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -491,6 +505,11 @@ function importCustomTheme() {
 
                 const deleteBtn = document.getElementById('ct-delete-btn');
                 if (deleteBtn) deleteBtn.classList.add('d-none');
+
+                const ctConfettiColorsEl = document.getElementById('ct-confetti-colors');
+                if (ctConfettiColorsEl && data.celebration?.confettiColors) {
+                    ctConfettiColorsEl.value = data.celebration.confettiColors.join(',');
+                }
             } catch {
                 alert('Could not read that theme file.');
             }

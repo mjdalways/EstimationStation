@@ -109,7 +109,7 @@ function registerHandlers() {
         document.getElementById('revealBtn').style.display = 'none';
         document.getElementById('hideBtn').style.display = 'block';
         renderParticipants();
-        showStats(votes, stats);
+        showStats(votes, stats, true);
     });
 
     connection.on('VotesHidden', () => {
@@ -273,7 +273,7 @@ function updateCurrentStoryDisplay() {
     }
 }
 
-function showStats(votes, stats) {
+function showStats(votes, stats, fresh = false) {
     const bar = document.getElementById('statsBar');
     bar.style.display = 'flex';
 
@@ -283,6 +283,9 @@ function showStats(votes, stats) {
         document.getElementById('statMax').textContent = stats.max !== null ? stats.max : '-';
         const badge = document.getElementById('consensusBadge');
         badge.style.display = stats.isConsensus ? 'inline-block' : 'none';
+        if (fresh && stats.isConsensus && typeof triggerCelebration === 'function') {
+            triggerCelebration();
+        }
     } else {
         // Calculate locally if no stats provided
         const numericVotes = Object.values(votes)
@@ -297,6 +300,9 @@ function showStats(votes, stats) {
             document.getElementById('statMin').textContent = min;
             document.getElementById('statMax').textContent = max;
             document.getElementById('consensusBadge').style.display = isConsensus ? 'inline-block' : 'none';
+            if (fresh && isConsensus && typeof triggerCelebration === 'function') {
+                triggerCelebration();
+            }
         }
     }
 }

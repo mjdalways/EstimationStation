@@ -49,6 +49,7 @@
                         </optgroup>
                     </select>
                     <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#recentChangesModal" title="Recent changes">📝</button>
+                    <button class="btn btn-sm btn-outline-light" onclick="openCelebrationSettings()" title="Celebration settings">🎉</button>
                     <button class="btn btn-sm btn-outline-light d-none" id="editCustomThemeBtn" onclick="editCurrentCustomTheme()" title="Edit Custom Theme">✏️</button>
                     <button class="btn btn-sm btn-outline-light d-none" id="installAppBtn" onclick="installApp()" title="Add to Home Screen">📲 Install</button>
                 </div>
@@ -216,12 +217,164 @@
                             <input type="range" class="form-range" id="ct-border-radius" min="0" max="24" value="8"
                                    oninput="document.getElementById('ct-radius-label').textContent=this.value" />
                         </div>
+                        <div class="col-12 border-top pt-3 mt-1">
+                            <h6 class="mb-1">🎊 Celebration Colors</h6>
+                            <label class="form-label small" for="ct-confetti-colors">Confetti colors for this theme (hex, comma-separated)</label>
+                            <input type="text" class="form-control form-control-sm" id="ct-confetti-colors"
+                                   placeholder="#0d6efd,#198754,#ffc107,#dc3545,#ffffff" />
+                            <div class="form-text">Used when "Use theme colors" is enabled in Celebration Settings.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-danger me-auto d-none" id="ct-delete-btn" onclick="deleteCustomTheme()">🗑️ Delete</button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="cancelCustomTheme()">Cancel</button>
                     <button type="button" class="btn btn-primary" onclick="saveCustomTheme()">💾 Save Theme</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Celebration Settings Modal -->
+    <div class="modal fade" id="celebrationSettingsModal" tabindex="-1" aria-labelledby="celebrationSettingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="celebrationSettingsModalLabel">🎉 Celebration Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Enable / Disable toggles -->
+                    <div class="d-flex gap-4 mb-3 flex-wrap">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cel-enable-confetti" />
+                            <label class="form-check-label fw-semibold" for="cel-enable-confetti">🎊 Confetti</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cel-enable-fireworks" />
+                            <label class="form-check-label fw-semibold" for="cel-enable-fireworks">🎆 Fireworks</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="cel-enable-balloons" />
+                            <label class="form-check-label fw-semibold" for="cel-enable-balloons">🎈 Balloons</label>
+                        </div>
+                    </div>
+
+                    <!-- ── Confetti ── -->
+                    <h6 class="text-muted border-bottom pb-1 mb-2">🎊 Confetti</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1" for="cel-confetti-type">Particle type</label>
+                            <select id="cel-confetti-type" class="form-select form-select-sm"
+                                    onchange="_updateEmojiVisibility(this.value==='emoji')">
+                                <option value="default">Default</option>
+                                <option value="stars">⭐ Stars</option>
+                                <option value="hearts">❤️ Hearts</option>
+                                <option value="snow">❄️ Snow</option>
+                                <option value="emoji">😀 Custom Emoji</option>
+                                <option value="christmasHoliday">🎄 Christmas</option>
+                                <option value="halloweenHoliday">🎃 Halloween</option>
+                                <option value="valentineHoliday">💕 Valentine's</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1" for="cel-confetti-duration">Duration</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" id="cel-confetti-duration" class="form-control" min="1000" max="15000" step="500" value="4000" />
+                                <span class="input-group-text">ms</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Particles: <span id="cel-particles-val">150</span></label>
+                            <input type="range" id="cel-confetti-particles" class="form-range" min="20" max="500" step="10" value="150"
+                                   oninput="document.getElementById('cel-particles-val').textContent=this.value" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Spread: <span id="cel-spread-val">70</span>°</label>
+                            <input type="range" id="cel-confetti-spread" class="form-range" min="20" max="180" step="5" value="70"
+                                   oninput="document.getElementById('cel-spread-val').textContent=this.value+'°'" />
+                        </div>
+                        <div class="col-md-4 d-flex align-items-center">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="cel-confetti-use-theme"
+                                       onchange="_updateCustomColorsVisibility(!this.checked)" />
+                                <label class="form-check-label small" for="cel-confetti-use-theme">Use theme colors</label>
+                            </div>
+                        </div>
+                        <div id="cel-custom-colors-group" class="col-12" style="display:none;">
+                            <label class="form-label small mb-1" for="cel-confetti-colors">Custom colors (hex, comma-separated)</label>
+                            <input type="text" id="cel-confetti-colors" class="form-control form-control-sm"
+                                   placeholder="#ff0000,#00cc00,#0000ff,#ffcc00,#ff00ff" />
+                        </div>
+                        <div id="cel-emoji-group" class="col-12" style="display:none;">
+                            <label class="form-label small mb-1" for="cel-confetti-emojis">Custom emojis (comma-separated)</label>
+                            <input type="text" id="cel-confetti-emojis" class="form-control form-control-sm"
+                                   placeholder="🎉,🎊,✨,🎈" />
+                        </div>
+                    </div>
+
+                    <!-- ── Fireworks ── -->
+                    <h6 class="text-muted border-bottom pb-1 mb-2">🎆 Fireworks</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1" for="cel-fireworks-duration">Duration</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" id="cel-fireworks-duration" class="form-control" min="1000" max="30000" step="1000" value="5000" />
+                                <span class="input-group-text">ms</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Intensity: <span id="cel-intensity-val">30</span></label>
+                            <input type="range" id="cel-fireworks-intensity" class="form-range" min="5" max="100" step="5" value="30"
+                                   oninput="document.getElementById('cel-intensity-val').textContent=this.value" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Particles: <span id="cel-fw-particles-val">50</span></label>
+                            <input type="range" id="cel-fireworks-particles" class="form-range" min="10" max="200" step="10" value="50"
+                                   oninput="document.getElementById('cel-fw-particles-val').textContent=this.value" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Explosion spread: <span id="cel-explosion-val">5</span></label>
+                            <input type="range" id="cel-fireworks-explosion" class="form-range" min="1" max="20" step="1" value="5"
+                                   oninput="document.getElementById('cel-explosion-val').textContent=this.value" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Launch point: <span id="cel-rockets-val">50%</span></label>
+                            <input type="range" id="cel-fireworks-rockets" class="form-range" min="0" max="100" step="5" value="50"
+                                   oninput="document.getElementById('cel-rockets-val').textContent=this.value+'%'" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Color hue range</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <input type="number" id="cel-fireworks-hue-min" class="form-control form-control-sm" min="0" max="360" value="0" style="width:70px" />
+                                <span class="small">–</span>
+                                <input type="number" id="cel-fireworks-hue-max" class="form-control form-control-sm" min="0" max="360" value="360" style="width:70px" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Balloons ── -->
+                    <h6 class="text-muted border-bottom pb-1 mb-2">🎈 Balloons</h6>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Count: <span id="cel-balloon-count-val">10</span></label>
+                            <input type="range" id="cel-balloon-count" class="form-range" min="1" max="30" step="1" value="10"
+                                   oninput="document.getElementById('cel-balloon-count-val').textContent=this.value" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1" for="cel-balloon-duration">Duration</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" id="cel-balloon-duration" class="form-control" min="2000" max="20000" step="1000" value="6000" />
+                                <span class="input-group-text">ms</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary me-auto" onclick="resetCelebrationSettings()">↩ Reset defaults</button>
+                    <button type="button" class="btn btn-outline-success" onclick="testCelebration()">🎉 Test</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCelebrationSettingsFromForm()">💾 Save</button>
                 </div>
             </div>
         </div>
@@ -235,6 +388,17 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <p class="mb-2"><strong>3/4/2026</strong></p>
+                    <p class="mb-2"><strong>@DateTime.Now.ToString("M/d/yyyy")</strong></p>
+                    <ul class="mb-2">
+                        <li>🎉 Consensus now triggers a full celebration — confetti, fireworks, and balloons!</li>
+                        <li>All celebration effects are independently toggleable and fully configurable via the 🎉 button in the toolbar.</li>
+                        <li>Confetti supports theme-matched colors, holiday modes (Christmas, Halloween, Valentine's), emoji, stars, snow, and custom colors.</li>
+                        <li>Fireworks intensity, particles, explosion, hue range, launch point, and duration are all adjustable.</li>
+                        <li>Balloons are rendered in pure CSS — no images — with count and duration controls.</li>
+                        <li>Custom themes can now specify their own confetti colors in the theme builder.</li>
+                        <li>Fixed a too-many-redirects issue for users on shared hosting (IONOS).</li>
+                    </ul>
                     <p class="mb-2"><strong>3/4/2026</strong></p>
                     <ul class="mb-0">
                         <li>Creating a new custom theme now starts with your current theme automatically.</li>
@@ -260,6 +424,10 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/lib/signalr/signalr.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <!-- Celebration libraries (canvas-confetti + fireworks-js) loaded from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fireworks-js@2/dist/index.umd.js"></script>
+    <script src="~/js/celebration.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
     <script>
         // Register service worker for PWA

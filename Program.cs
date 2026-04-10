@@ -19,15 +19,25 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-var options = new ForwardedHeadersOptions
+var forwardedOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
 };
-options.KnownIPNetworks.Clear();
-options.KnownProxies.Clear();
-app.UseForwardedHeaders(options);
+forwardedOptions.KnownIPNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
 
-app.UseHttpsRedirection();
+// On IONOS shared Windows hosting (and similar reverse-proxy environments), SSL is terminated
+// at the proxy layer and requests arrive at the app as plain HTTP.  Calling UseHttpsRedirection()
+// unconditionally causes an infinite redirect loop because the browser keeps sending HTTPS
+// requests that the proxy strips back to HTTP before forwarding.
+// We only redirect to HTTPS when the request is NOT coming through a proxy (i.e. no
+// X-Forwarded-For / X-Forwarded-Proto headers), which covers direct local development.
+// In production the hosting provider's IIS/proxy handles the HTTPS upgrade.
+app.UseWhen(
+    ctx => !ctx.Request.Headers.ContainsKey("X-Forwarded-For") &&
+           !ctx.Request.Headers.ContainsKey("X-Forwarded-Proto"),
+    branch => branch.UseHttpsRedirection());
 app.UseRouting();
 
 app.UseAuthorization();

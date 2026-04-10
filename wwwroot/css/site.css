@@ -693,6 +693,75 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--accent) !important;
   border-color: var(--accent) !important;
 }
+
+/* ============================================================
+   Celebration – Balloons (pure CSS, no images)
+   ============================================================ */
+
+/* The balloon-riser wrapper translates upward (the rise).      */
+/* The celebration-balloon inside handles the side sway.        */
+.balloon-riser {
+  position: absolute;
+  bottom: -180px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Oval balloon body */
+.celebration-balloon {
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Shine highlight (::before) */
+.celebration-balloon::before {
+  content: '';
+  position: absolute;
+  top: 16%;
+  left: 16%;
+  width: 28%;
+  height: 18%;
+  background: rgba(255, 255, 255, 0.52);
+  border-radius: 50%;
+  transform: rotate(-35deg);
+  pointer-events: none;
+}
+
+/* Small round knot at bottom of balloon */
+.balloon-knot {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Thin string */
+.balloon-string {
+  width: 1.5px;
+  flex-shrink: 0;
+  opacity: 0.65;
+}
+
+/* Rise: balloon floats from bottom to above the viewport */
+@keyframes balloon-rise {
+  0%   { transform: translateY(0);              opacity: 0; }
+  7%   { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(calc(-100vh - 320px)); opacity: 0; }
+}
+
+/* Gentle left/right sway */
+@keyframes balloon-sway-left {
+  0%, 100% { transform: rotate(-3deg); }
+  50%       { transform: translateX(-18px) rotate(3deg); }
+}
+
+@keyframes balloon-sway-right {
+  0%, 100% { transform: rotate(3deg); }
+  50%       { transform: translateX(18px) rotate(-3deg); }
+}
 .btn-primary:hover {
   background-color: var(--accent-hover) !important;
   border-color: var(--accent-hover) !important;
