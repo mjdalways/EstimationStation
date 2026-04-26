@@ -6,6 +6,7 @@ let connection = null;
 let myConnectionId = null;
 let isObserver = false;
 let selectedVote = null;
+let skipVoteEnabled = false;
 let currentEstimateValues = ['0','1','2','3','5','8','13','21','34','55','89','?','☕'];
 let timerInterval = null;
 let timerSeconds = 0;
@@ -15,7 +16,8 @@ let roomState = {
     votesRevealed: false,
     autoReveal: false,
     currentStoryId: null,
-    estimateSet: 'fibonacci'
+    estimateSet: 'fibonacci',
+    history: []   // last 5 rounds: { story, votes, stats }
 };
 
 // ============================================================
@@ -110,6 +112,14 @@ function registerHandlers() {
         document.getElementById('hideBtn').style.display = 'block';
         renderParticipants();
         showStats(votes, stats, true);
+
+        // Record in history
+        const storyTitle = roomState.currentStoryId
+            ? (roomState.stories.find(s => s.id === roomState.currentStoryId)?.title || 'Unnamed')
+            : 'Unnamed';
+        roomState.history.unshift({ story: storyTitle, votes, stats });
+        if (roomState.history.length > 5) roomState.history.pop();
+        renderVoteHistory();
     });
 
     connection.on('VotesHidden', () => {
@@ -199,7 +209,8 @@ function registerHandlers() {
 function renderCards() {
     const container = document.getElementById('cardContainer');
     container.innerHTML = '';
-    currentEstimateValues.forEach(val => {
+    const values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
+    values.forEach(val => {
         const card = document.createElement('div');
         card.className = 'poker-card' + (selectedVote === val ? ' selected' : '') + (isObserver ? ' disabled' : '');
         card.setAttribute('data-value', val);
@@ -327,12 +338,18 @@ function appendChat(author, message, timestamp) {
 // ============================================================
 async function castVote(val) {
     if (isObserver) return;
-    selectedVote = val === selectedVote ? null : val;
+    const wasSelected = selectedVote === val;
+    selectedVote = wasSelected ? null : val;
     renderCards();
 
-    if (selectedVote !== null) {
-        try { await connection.invoke('CastVote', selectedVote); } catch(e) { console.error(e); }
-    }
+    try {
+        if (selectedVote !== null) {
+            await connection.invoke('CastVote', selectedVote);
+        } else {
+            // Unselect: reset vote for this user only
+            await connection.invoke('CastVote', null);
+        }
+    } catch(e) { console.error(e); }
 }
 
 async function revealVotes() {
@@ -344,6 +361,11 @@ async function hideVotes() {
 }
 
 async function resetVotes() {
+    // Only confirm if votes haven't been revealed yet AND at least one person has voted
+    const anyVoteCast = roomState.participants.some(p => p.hasVoted);
+    if (!roomState.votesRevealed && anyVoteCast) {
+        if (!confirm('Are you sure? This will reset all votes for everyone.')) return;
+    }
     try { await connection.invoke('ResetVotes'); } catch(e) { console.error(e); }
 }
 
@@ -385,6 +407,11 @@ async function changeEstimateSet(setName) {
     const customDiv = document.getElementById('customEstimatesDiv');
     if (setName === 'custom') {
         customDiv.style.display = 'block';
+        return;
+    }
+    if (!confirm('Are you sure? Changing the estimate set will reset all votes for everyone.')) {
+        // Revert the dropdown to the currently active estimate set
+        document.getElementById('estimateSetSelect').value = roomState.estimateSet || 'fibonacci';
         return;
     }
     customDiv.style.display = 'none';
@@ -506,12 +533,84 @@ function exportCSV() {
 }
 
 // ============================================================
+// Vote History
+// ============================================================
+function renderVoteHistory() {
+    const section = document.getElementById('voteHistorySection');
+    const list = document.getElementById('voteHistoryList');
+    if (!section || !list) return;
+
+    if (roomState.history.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = '';
+    list.innerHTML = '';
+    roomState.history.forEach(entry => {
+        const div = document.createElement('div');
+        div.className = 'vote-history-entry';
+        const avg = entry.stats?.average ?? '-';
+        const min = entry.stats?.min ?? '-';
+        const max = entry.stats?.max ?? '-';
+        const consensus = entry.stats?.isConsensus ? ' 🎉' : '';
+        div.innerHTML = `
+            <span class="vote-history-story" title="${escHtml(entry.story)}">${escHtml(entry.story)}</span>
+            <span class="vote-history-stats">
+                <span title="Average">avg: <strong>${avg}</strong></span>
+                <span title="Min/Max">${min}–${max}</span>
+                ${consensus ? `<span>${consensus}</span>` : ''}
+            </span>`;
+        list.appendChild(div);
+    });
+}
+
+function toggleVoteHistory() {
+    const list = document.getElementById('voteHistoryList');
+    const chevron = document.getElementById('voteHistoryChevron');
+    if (!list) return;
+    const isHidden = list.style.display === 'none';
+    list.style.display = isHidden ? '' : 'none';
+    if (chevron) chevron.textContent = isHidden ? '▴' : '▾';
+}
+
+// ============================================================
+// Story Import
+// ============================================================
+async function importStories() {
+    const input = document.getElementById('importStoriesInput');
+    if (!input) return;
+    const lines = input.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return;
+    for (const line of lines) {
+        try { await connection.invoke('AddStory', line); } catch(e) { console.error(e); }
+    }
+    input.value = '';
+    const details = input.closest('details');
+    if (details) details.removeAttribute('open');
+}
+
+// ============================================================
+// Skip Vote Toggle
+// ============================================================
+function toggleSkipVoteCard(enabled) {
+    skipVoteEnabled = enabled;
+    renderCards();
+}
+
+// ============================================================
 // Keyboard Shortcuts
 // ============================================================
 document.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    // Don't fire shortcuts when typing or when any modal is open
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+    if (document.querySelector('.modal.show')) return;
+
     if (e.code === 'Space' && !roomState.votesRevealed) { e.preventDefault(); revealVotes(); }
     if (e.code === 'KeyR' && !e.ctrlKey) resetVotes();
+    // 1–9: select nth card by position
+    const numMatch = e.code.match(/^Digit([1-9])$/);
+    if (numMatch && !e.ctrlKey && !e.altKey) {
+        const idx = parseInt(numMatch[1], 10) - 1;
+        const values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
+        if (idx < values.length) castVote(values[idx]);
+    }
 });
 
 document.getElementById('newStoryInput').addEventListener('keypress', e => { if (e.key === 'Enter') addStory(); });

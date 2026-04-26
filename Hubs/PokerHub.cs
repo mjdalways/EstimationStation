@@ -119,14 +119,15 @@ public class PokerHub : Hub
             if (participant == null || participant.IsObserver) return;
             participant.Vote = vote;
 
-            if (room.AutoReveal && !room.VotesRevealed)
+            if (room.AutoReveal && !room.VotesRevealed && vote != null)
             {
                 var voters = room.Participants.Where(p => !p.IsObserver).ToList();
                 shouldAutoReveal = voters.Count > 0 && voters.All(p => p.Vote != null);
             }
         }
 
-        await Clients.Group(roomName).SendAsync("VoteCast", Context.ConnectionId, true);
+        // Broadcast whether this participant now has a vote (false when they unselected)
+        await Clients.Group(roomName).SendAsync("VoteCast", Context.ConnectionId, vote != null);
 
         if (shouldAutoReveal)
         {

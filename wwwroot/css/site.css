@@ -17,6 +17,53 @@
 /* Base Styles */
 * { box-sizing: border-box; }
 
+/* ── Bootstrap Modal: respect active theme ── */
+[data-theme] .modal-content {
+    /* --- FALLBACKS for older browsers --- */
+    --bs-modal-bg: var(--bg-secondary);
+    --bs-modal-header-border-color: var(--panel-border);
+    --bs-modal-footer-border-color: var(--panel-border);
+    --bs-modal-color: var(--text-primary);
+    /* --- MODERN ENHANCEMENTS (Safari 16.4+, Chrome 121+, Firefox 128+) --- */
+    @supports (color: oklch(from white l c h)) {
+        /* Lighter Background: Adding 5% to lightness (0.05) */
+        --bs-modal-bg: oklch(from var(--bg-secondary) calc(l + 0.05) c h);
+        --bs-table-bg: oklch(from var(--bg-secondary) calc(l + 0.05) c h);
+        --bs-table-active-bg: oklch(from var(--bg-secondary) calc(l + 0.1) c h);
+        /* Bolder Border: Subtracting 15% from lightness (0.15) */
+        --bs-modal-header-border-color: oklch(from var(--panel-border) calc(l - 0.15) c h);
+        --bs-modal-footer-border-color: oklch(from var(--panel-border) calc(l - 0.15) c h);
+    }
+
+    background-color: var(--bs-modal-bg);
+    color: var(--bs-modal-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start !important; /* Forces content to top */
+    min-height: 400px; /* Optional: sets a consistent starting height for mobile */
+}
+
+/* Update header and footer to use the newly calculated bolder variables */
+[data-theme] .modal-header,
+[data-theme] .modal-footer {
+    border-color: var(--bs-modal-header-border-color);
+}
+
+[data-theme] .modal-content table {
+    --bs-table-bg: var(--bg-secondary);
+    --bs-table-color: var(--text-primary);
+    --bs-table-border-color: var(--panel-border);
+
+    @supports (color: oklch(from white l c h)) {
+        --bs-table-bg: oklch(from var(--bg-secondary) calc(l + 0.15) c h);
+        --bs-table-border-color: oklch(from var(--panel-border) calc(l - 0.15) c h);
+    }
+
+    border: 1px solid var(--bs-table-border-color);
+    background-color: var(--bs-table-bg) !important;
+    color: var(--bs-table-color);
+}
+
 body {
   background-color: var(--bg-primary, #f8f9fa);
   color: var(--text-primary, #212529);
@@ -474,7 +521,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 64px;
   height: 90px;
   background-color: var(--card-bg);
-  border: 2px solid var(--card-border);
+  border: var(--card-border-width, 2px) solid var(--card-border);
   border-radius: var(--border-radius);
   display: flex;
   align-items: center;
@@ -540,7 +587,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .participant-badge {
   background-color: var(--card-bg);
-  border: 1.5px solid var(--panel-border);
+  border: var(--card-border-width, 1.5px) solid var(--card-border, var(--panel-border));
   border-radius: var(--border-radius);
   padding: 0.6rem 0.9rem;
   display: flex;
@@ -555,6 +602,14 @@ h1, h2, h3, h4, h5, h6 {
 .participant-badge.revealed { border-color: var(--card-selected); }
 .participant-badge.observer { opacity: 0.65; border-style: dashed; }
 .participant-badge.me { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent), 0.2); }
+
+/* Ensure that voted/revealed state is visible for the current user as well.
+   .me currently sets the border to the accent color which can hide the voted
+   indicator because the .me rule appears after .voted. Add combined selectors
+   so 'me' + 'voted' or 'me' + 'revealed' show the proper state while keeping
+   the "you" box shadow visual. */
+.participant-badge.me.voted { border-color: var(--card-voted); }
+.participant-badge.me.revealed { border-color: var(--card-selected); }
 
 .participant-name {
   font-size: 0.8rem;
@@ -862,5 +917,292 @@ h1, h2, h3, h4, h5, h6 {
   .room-layout { height: auto; overflow: visible; }
   .main-content { min-height: calc(100vh - 52px - 56px); }
 }
+
+/* ============================================================
+   Settings Modal
+   ============================================================ */
+
+.settings-modal-dialog {
+  max-width: 960px;
+}
+
+/* Full-screen on small screens */
+@media (max-width: 767px) {
+  .settings-modal-dialog {
+    margin: 0;
+    max-width: 100%;
+    width: 100%;
+    /* Use dvh for iOS address-bar-aware height */
+    min-height: 100dvh;
+    min-height: 100svh;
+    min-height: 100vh; /* fallback */
+  }
+  .settings-modal-dialog .modal-content {
+    min-height: 100dvh;
+    min-height: 100svh;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+  .settings-tabs .settings-tab-btn {
+    font-size: 0.68rem;
+    padding: 0.3rem 0.4rem;
+  }
+  /* On very narrow phones, hide tab text and show only emoji */
+  @media (max-width: 400px) {
+    .settings-tab-btn .tab-label { display: none; }
+  }
+}
+
+/* Tab bar */
+.settings-tabs {
+  gap: 2px;
+  background: var(--bg-secondary, #fff);
+  border-bottom: 1px solid var(--panel-border, #dee2e6) !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 1rem !important; /* Add space below tabs */
+  border-bottom-width: 2px !important; /* Make the border more visible */
+  z-index: 2;
+  position: relative;  
+  flex-wrap: nowrap;
+  flex-shrink: 0; /* Prevents the tabs from squishing */
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-tab-btn {
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-bottom: none !important;
+  border-radius: 8px 8px 0 0 !important;
+  white-space: nowrap;
+  color: var(--text-secondary, #6c757d);
+  background: transparent;
+  border-color: transparent !important;
+  transition: background 0.15s, color 0.15s;
+}
+
+.settings-tab-btn:hover {
+  color: var(--accent, #0d6efd);
+  background: var(--card-hover, #e7f1ff);
+}
+
+.settings-tab-btn.active {
+  color: var(--accent, #0d6efd) !important;
+  background: var(--bg-primary, #f8f9fa) !important;
+  border-color: var(--panel-border, #dee2e6) !important;
+  border-bottom-color: var(--bg-primary, #f8f9fa) !important;
+}
+
+/* Tab content fills available height */
+#settingsTabContent {
+  margin-top: 0rem; /* Add a little space above content */
+  position: relative;
+  z-index: 1;
+  /*display: flex;*/
+  /*flex-direction: column;*/
+  flex-grow: 1;
+  display: block; /* Ensure it behaves as a standard block */
+  width: 100%;  
+  min-height: 0;
+}
+
+#settingsTabContent .tab-pane {
+  flex: 1;
+}
+
+/* Vote history */
+.vote-history-section {
+  padding: 0.5rem 1.25rem;
+  border-top: 1px solid var(--panel-border);
+}
+
+.vote-history-toggle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.vote-history-toggle:hover { color: var(--accent); }
+
+.vote-history-list {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.vote-history-entry {
+  background: var(--card-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--border-radius);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.vote-history-story {
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vote-history-stats {
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   Theme Builder Modal — compact, grouped, modern
+   ============================================================ */
+
+/* Accordion group headers */
+.ct-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  background: var(--bg-secondary, #fff);
+  border: 1px solid var(--panel-border, #dee2e6);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent, #0d6efd);
+  user-select: none;
+  margin-bottom: 0;
+  transition: background 0.15s;
+}
+.ct-section-header:hover { background: var(--card-hover, #e7f1ff); }
+.ct-section-chevron { margin-left: auto; transition: transform 0.2s; font-style: normal; }
+.ct-section-header.collapsed .ct-section-chevron { transform: rotate(-90deg); }
+
+/* Swatch strip - tiny inline preview of a color value */
+.ct-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+}
+.ct-swatch-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.65rem;
+  color: var(--text-secondary, #6c757d);
+  min-width: 44px;
+}
+.ct-swatch-item input[type="color"] {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  border: 1.5px solid var(--panel-border, #dee2e6);
+  cursor: pointer;
+  padding: 2px;
+}
+
+@media (max-width: 767px) {
+  /* Remove fixed min-height so landscape doesn't double-scroll */
+  #tab-theme .d-flex { min-height: unset !important; }
+}
+
+/* Live mini preview strip */
+#ct-live-preview {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid var(--panel-border, #dee2e6);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  font-size: 0.78rem;
+  user-select: none;
+}
+.ct-preview-navbar {
+  padding: 0.4rem 0.75rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ct-preview-body {
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.ct-preview-card {
+  width: 40px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.ct-preview-participants {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.ct-preview-badge {
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ct-preview-chat {
+  margin-top: 0.4rem;
+  border-radius: 5px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.7rem;
+}
+.ct-preview-btn {
+  display: inline-block;
+  border-radius: 5px;
+  padding: 2px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-top: 0.35rem;
+  margin-right: 3px;
+}
+
+/* Compact field labels inside sections */
+.ct-field-label {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #6c757d);
+  margin-bottom: 1px;
+  display: block;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ct-section-body { padding: 0.65rem 0.1rem 0.25rem 0.1rem; }
 
 

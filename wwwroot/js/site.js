@@ -28,20 +28,13 @@ function isBaseTheme(theme) {
 }
 
 function closeCustomThemeModal() {
-    const modalEl = document.getElementById('customThemeModal');
+    _settingsSaved = true; // flag: this hide is intentional, don't revert
+    const modalEl = document.getElementById('settingsModal');
     if (!modalEl || typeof bootstrap === 'undefined') return;
-
-    if (modalEl.contains(document.activeElement)) {
-        document.activeElement.blur();
-    }
-
+    if (modalEl.contains(document.activeElement)) document.activeElement.blur();
     const modal = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
     modal.hide();
-
-    setTimeout(() => {
-        const focusTarget = document.getElementById('themeSelect');
-        if (focusTarget) focusTarget.focus();
-    }, 0);
+    setTimeout(() => { const f = document.getElementById('themeSelect'); if (f) f.focus(); }, 0);
 }
 
 function isCustomTheme(theme) {
@@ -81,8 +74,84 @@ function applyTheme(theme) {
         }
     }
 
-    const editBtn = document.getElementById('editCustomThemeBtn');
-    if (editBtn) editBtn.classList.toggle('d-none', !isCustomTheme(theme));
+}
+
+// ── Settings Modal ──────────────────────────────────────────
+function openSettingsModal(tab) {
+    const modalEl = document.getElementById('settingsModal');
+    if (!modalEl) return;
+
+    // Populate profile fields if available
+    const nameEl = document.getElementById('profile-display-name');
+    if (nameEl && typeof ROOM_CONFIG !== 'undefined') {
+        nameEl.value = ROOM_CONFIG.playerName || localStorage.getItem('es_playerName') || '';
+    }
+    const observerEl = document.getElementById('profile-observer-mode');
+    if (observerEl && typeof isObserver !== 'undefined') {
+        observerEl.checked = isObserver;
+    }
+
+    // Pre-populate theme tab from current theme
+    populateThemeTab();
+
+    if (typeof populateCelebrationTab === 'function') populateCelebrationTab();
+
+    _settingsSaved = false; // reset the save flag for this session
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+
+    if (tab) {
+        const btn = document.getElementById('tab-' + tab + '-btn');
+        if (btn) btn.click();
+    }
+}
+
+function populateThemeTab() {
+    const currentTheme = localStorage.getItem('es_theme') || 'classic';
+    const themes = getCustomThemes();
+
+    renderCustomThemeOptions();
+    populateCustomizationThemeSources();
+
+    const themeId = isCustomTheme(currentTheme) && themes[currentTheme] ? currentTheme : null;
+
+    document.getElementById('ct-theme-id').value = themeId || '';
+    document.getElementById('ct-theme-name').value = themeId ? (themes[themeId]?.name || '') : (() => {
+        // Suggest a name when starting from a base theme
+        const sourceLabel = BASE_THEME_LABELS[currentTheme] || currentTheme;
+        const now = new Date();
+        const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+        return `${sourceLabel} - Customized - ${ts}`;
+    })();
+
+    const ctConfettiColors = document.getElementById('ct-confetti-colors');
+    const savedColors = themeId ? themes[themeId]?.celebration?.confettiColors : [];
+    const colorsCsv = (savedColors || []).join(',');
+    if (ctConfettiColors) ctConfettiColors.value = colorsCsv;
+    syncFieldToConfettiSwatches(colorsCsv);
+
+    const baseSelect = document.getElementById('ct-base-theme');
+    if (baseSelect) baseSelect.value = currentTheme;
+
+    // Always load vars from the current active theme
+    const vars = readThemeVars(currentTheme);
+    setCustomizerFormValues(vars);
+    updateThemePreview();
+
+    // Show delete only for custom themes
+    ['ct-delete-btn', 'ct-delete-btn-preview', 'ct-delete-btn-mobile'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.toggle('d-none', !themeId);
+    });
+    // Restore original theme when the modal closes without an explicit save
+    const _settingsModalEl = document.getElementById('settingsModal');
+    if (_settingsModalEl) {
+        _settingsModalEl.addEventListener('hide.bs.modal', () => {
+            if (!_settingsSaved) cancelCustomTheme();
+            _settingsSaved = false;
+        });
+    }
 }
 
 function onThemeChange(theme) {
@@ -96,12 +165,11 @@ function onThemeChange(theme) {
 function openCustomThemeModalSafely(themeId) {
     const navContent = document.getElementById('mainNavContent');
     if (navContent && navContent.classList.contains('show') && typeof bootstrap !== 'undefined') {
-        navContent.addEventListener('hidden.bs.collapse', () => openCustomThemeModal(themeId), { once: true });
+        navContent.addEventListener('hidden.bs.collapse', () => openSettingsModal('theme'), { once: true });
         bootstrap.Collapse.getOrCreateInstance(navContent).hide();
         return;
     }
-
-    openCustomThemeModal(themeId);
+    openSettingsModal('theme');
 }
 
 function renderCustomThemeOptions() {
@@ -215,42 +283,64 @@ function installApp() {
 // Custom Theme Builder
 // ============================================================
 const CUSTOM_COLOR_FIELDS = [
-    'bg-primary', 'bg-secondary', 'text-primary', 'accent',
-    'navbar-bg', 'navbar-text', 'card-selected', 'card-selected-text'
+    'bg-primary', 'bg-secondary', 'text-primary', 'text-secondary', 'accent', 'accent-hover',
+    'card-bg', 'card-hover', 'card-selected', 'card-selected-text', 'card-border', 'card-border-width', 'card-voted',
+    'btn-primary', 'btn-reveal', 'btn-reset',
+    'font-family', 'heading-font', 'border-radius', 'shadow',
+    'navbar-bg', 'navbar-text',
+    'panel-bg', 'panel-border',
+    'stats-bg', 'chat-bg', 'chat-bubble',
+    'story-active', 'story-completed', 'timer-color'
 ];
 
 const CUSTOM_DEFAULTS = {
     'bg-primary':          '#f8f9fa',
     'bg-secondary':        '#ffffff',
     'text-primary':        '#212529',
+    'text-secondary':      '#6c757d',
     'accent':              '#0d6efd',
-    'navbar-bg':           '#343a40',
-    'navbar-text':         '#ffffff',
+    'accent-hover':        '#0b5ed7',
+    'card-bg':             '#ffffff',
+    'card-hover':          '#e7f1ff',
     'card-selected':       '#0d6efd',
     'card-selected-text':  '#ffffff',
+    'card-border':         '#dee2e6',
+    'card-border-width':   '1.5',
+    'card-voted':          '#198754',
+    'btn-primary':         '#0d6efd',
+    'btn-reveal':          '#198754',
+    'btn-reset':           '#ffc107',
     'font-family':         'system-ui, sans-serif',
-    'border-radius':       '8'
+    'heading-font':        "'Segoe UI', system-ui, sans-serif",
+    'border-radius':       '8',
+    'shadow':              '0 2px 8px rgba(0,0,0,0.1)',
+    'navbar-bg':           '#343a40',
+    'navbar-text':         '#ffffff',
+    'panel-bg':            '#ffffff',
+    'panel-border':        '#dee2e6',
+    'stats-bg':            '#e7f1ff',
+    'chat-bg':             '#f8f9fa',
+    'chat-bubble':         '#e9ecef',
+    'story-active':        '#cfe2ff',
+    'story-completed':     '#d1e7dd',
+    'timer-color':         '#dc3545'
 };
 
 function setCustomizerFormValues(vars) {
     CUSTOM_COLOR_FIELDS.forEach(f => {
         const el = document.getElementById('ct-' + f);
-        if (el) el.value = vars[f] || CUSTOM_DEFAULTS[f];
+        if (el) {
+            if (f === 'border-radius') {
+                el.value = parseInt(vars[f] || CUSTOM_DEFAULTS[f], 10);
+                document.getElementById('ct-radius-label').textContent = el.value;
+            } else if (f === 'font-family' || f === 'heading-font') {
+                el.value = vars[f] || CUSTOM_DEFAULTS[f];
+                if (f === 'font-family') updateCustomFontPreview(el.value);
+            } else {
+                el.value = vars[f] || CUSTOM_DEFAULTS[f];
+            }
+        }
     });
-
-    const fontEl = document.getElementById('ct-font-family');
-    if (fontEl) {
-        const targetFont = vars['font-family'] || CUSTOM_DEFAULTS['font-family'];
-        const matchedValue = findBestFontOptionValue(fontEl, targetFont);
-        fontEl.value = matchedValue;
-        updateCustomFontPreview(matchedValue);
-    }
-
-    const radEl = document.getElementById('ct-border-radius');
-    if (radEl) {
-        radEl.value = parseInt(vars['border-radius'], 10) || 8;
-        document.getElementById('ct-radius-label').textContent = radEl.value;
-    }
 }
 
 function normalizePrimaryFont(fontFamily) {
@@ -289,18 +379,13 @@ function readThemeVars(themeId) {
     document.body.appendChild(probe);
 
     const styles = getComputedStyle(probe);
-    const vars = {
-        'bg-primary': styles.getPropertyValue('--bg-primary').trim() || CUSTOM_DEFAULTS['bg-primary'],
-        'bg-secondary': styles.getPropertyValue('--bg-secondary').trim() || CUSTOM_DEFAULTS['bg-secondary'],
-        'text-primary': styles.getPropertyValue('--text-primary').trim() || CUSTOM_DEFAULTS['text-primary'],
-        'accent': styles.getPropertyValue('--accent').trim() || CUSTOM_DEFAULTS['accent'],
-        'navbar-bg': styles.getPropertyValue('--navbar-bg').trim() || CUSTOM_DEFAULTS['navbar-bg'],
-        'navbar-text': styles.getPropertyValue('--navbar-text').trim() || CUSTOM_DEFAULTS['navbar-text'],
-        'card-selected': styles.getPropertyValue('--card-selected').trim() || CUSTOM_DEFAULTS['card-selected'],
-        'card-selected-text': styles.getPropertyValue('--card-selected-text').trim() || CUSTOM_DEFAULTS['card-selected-text'],
-        'font-family': styles.getPropertyValue('--font-family').trim() || CUSTOM_DEFAULTS['font-family'],
-        'border-radius': (styles.getPropertyValue('--border-radius').trim() || CUSTOM_DEFAULTS['border-radius']).replace('px', '')
-    };
+    const vars = {};
+    CUSTOM_COLOR_FIELDS.forEach(f => {
+        let v = styles.getPropertyValue('--' + f).trim();
+        if (!v) v = CUSTOM_DEFAULTS[f];
+        if (f === 'border-radius' || f === 'card-border-width') v = v.replace('px', '');
+        vars[f] = v;
+    });
 
     document.body.removeChild(probe);
     return vars;
@@ -309,14 +394,114 @@ function readThemeVars(themeId) {
 function loadThemePresetForCustomization() {
     const select = document.getElementById('ct-base-theme');
     if (!select || !select.value) return;
-    const vars = readThemeVars(select.value);
+    const sourceId = select.value;
+    const vars = readThemeVars(sourceId);
     setCustomizerFormValues(vars);
+    updateThemePreview();
+
+    // Auto-generate a name based on the source theme + timestamp
+    const nameEl = document.getElementById('ct-theme-name');
+    if (nameEl && !nameEl.value.trim()) {
+        const sourceLabel = BASE_THEME_LABELS[sourceId]
+            || (getCustomThemes()[sourceId]?.name)
+            || sourceId;
+        const now = new Date();
+        const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+        nameEl.value = `${sourceLabel} - Customized - ${ts}`;
+    }
+
+    // Clear theme id so saving creates a new theme rather than overwriting
+    const idEl = document.getElementById('ct-theme-id');
+    if (idEl) idEl.value = '';
 }
 
 function updateCustomFontPreview(fontFamily) {
     const preview = document.getElementById('ct-font-preview');
     if (!preview) return;
     preview.style.fontFamily = fontFamily || CUSTOM_DEFAULTS['font-family'];
+}
+
+// ── Confetti swatch helpers ───────────────────────────────────
+/** Read swatches → write comma list to hidden field. */
+function syncConfettiSwatchesToField() {
+    const swatches = document.querySelectorAll('.ct-confetti-swatch');
+    const colors = Array.from(swatches).map(s => s.value);
+    const field = document.getElementById('ct-confetti-colors');
+    if (field) field.value = colors.join(',');
+}
+
+/** Write a comma-separated color list → populate swatches. */
+function syncFieldToConfettiSwatches(colorsCsv) {
+    const colors = (colorsCsv || '').split(',').map(c => c.trim()).filter(c => c.startsWith('#'));
+    const swatches = document.querySelectorAll('.ct-confetti-swatch');
+    swatches.forEach((s, i) => {
+        if (colors[i]) s.value = colors[i];
+    });
+    syncConfettiSwatchesToField();
+}
+
+// ── Accordion toggle ──────────────────────────────────────────
+function ctToggleSection(sectionId, headerEl) {
+    const body = document.getElementById(sectionId);
+    if (!body) return;
+    const isCollapsed = body.style.display === 'none';
+    body.style.display = isCollapsed ? '' : 'none';
+    if (headerEl) headerEl.classList.toggle('collapsed', !isCollapsed);
+}
+
+// ── Live preview ──────────────────────────────────────────────
+function updateThemePreview() {
+    const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+
+    const bgPrimary     = g('ct-bg-primary')   || '#f8f9fa';
+    const bgSecondary   = g('ct-bg-secondary')  || '#ffffff';
+    const textPrimary   = g('ct-text-primary')  || '#212529';
+    const accent        = g('ct-accent')        || '#0d6efd';
+    const navbarBg      = g('ct-navbar-bg')     || '#343a40';
+    const navbarText    = g('ct-navbar-text')   || '#ffffff';
+    const cardBg        = g('ct-card-bg')       || bgSecondary;
+    const cardBorder    = g('ct-card-border')   || '#dee2e6';
+    const cardSelected  = g('ct-card-selected') || accent;
+    const cardSelText   = g('ct-card-selected-text') || '#ffffff';
+    const cardVoted     = g('ct-card-voted')    || '#198754';
+    const btnReveal     = g('ct-btn-reveal')    || '#198754';
+    const btnReset      = g('ct-btn-reset')     || '#ffc107';
+    const chatBg        = g('ct-chat-bg')       || bgPrimary;
+    const chatBubble    = g('ct-chat-bubble')   || '#e9ecef';
+    const storyActive   = g('ct-story-active')  || '#cfe2ff';
+    const storyDone     = g('ct-story-completed') || '#d1e7dd';
+    const borderWidthEl = document.getElementById('ct-card-border-width');
+    const bw            = (borderWidthEl ? borderWidthEl.value : '1.5') + 'px';
+    const fontEl        = document.getElementById('ct-font-family');
+    const font          = fontEl ? fontEl.value : 'system-ui, sans-serif';
+    const radEl         = document.getElementById('ct-border-radius');
+    const rad           = (radEl ? radEl.value : '8') + 'px';
+
+    const set = (id, styles) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        Object.assign(el.style, styles);
+    };
+
+    // Apply font across preview
+    const preview = document.getElementById('ct-live-preview');
+    if (preview) preview.style.fontFamily = font;
+
+    set('pv-navbar',       { backgroundColor: navbarBg, color: navbarText });
+    set('pv-brand',        { color: navbarText });
+    set('pv-body',         { backgroundColor: bgPrimary });
+    set('pv-card-normal',  { backgroundColor: cardBg, border: `${bw} solid ${cardBorder}`, borderRadius: rad, color: textPrimary });
+    set('pv-card-selected',{ backgroundColor: cardSelected, border: `${bw} solid ${cardSelected}`, borderRadius: rad, color: cardSelText });
+    set('pv-badge-default',{ backgroundColor: cardBg, border: `${bw} solid ${cardBorder}`, borderRadius: rad, color: textPrimary });
+    set('pv-badge-voted',  { backgroundColor: cardBg, border: `${bw} solid ${cardVoted}`, borderRadius: rad, color: textPrimary });
+    set('pv-badge-me',     { backgroundColor: cardBg, border: `${bw} solid ${accent}`, borderRadius: rad, color: textPrimary });
+    set('pv-btn-reveal',   { backgroundColor: btnReveal, color: '#fff', borderRadius: rad });
+    set('pv-btn-reset',    { backgroundColor: btnReset, color: '#212529', borderRadius: rad });
+    set('pv-chat',         { backgroundColor: chatBg });
+    set('pv-chat-author',  { color: accent });
+    set('pv-chat-bubble',  { backgroundColor: chatBubble, borderRadius: rad, color: textPrimary });
+    set('pv-story-active', { backgroundColor: storyActive, color: textPrimary, border: `1px solid ${accent}` });
+    set('pv-story-done',   { backgroundColor: storyDone, color: textPrimary });
 }
 
 function injectCustomThemeStyle(vars) {
@@ -326,39 +511,15 @@ function injectCustomThemeStyle(vars) {
         s.id = 'customThemeStyle';
         document.head.appendChild(s);
     }
-    const a = vars['accent'];
-    const r = vars['border-radius'];
-    s.textContent =
-        `[data-theme="custom"]{` +
-        `--bg-primary:${vars['bg-primary']};` +
-        `--bg-secondary:${vars['bg-secondary']};` +
-        `--text-primary:${vars['text-primary']};` +
-        `--text-secondary:${vars['text-primary']}99;` +
-        `--accent:${a};` +
-        `--accent-hover:${a};` +
-        `--card-bg:${vars['bg-secondary']};` +
-        `--card-hover:${a}22;` +
-        `--card-selected:${vars['card-selected']};` +
-        `--card-selected-text:${vars['card-selected-text']};` +
-        `--card-border:${vars['text-primary']}44;` +
-        `--card-voted:#198754;` +
-        `--btn-primary:${a};` +
-        `--btn-reveal:#198754;` +
-        `--btn-reset:#ffc107;` +
-        `--font-family:${vars['font-family']};` +
-        `--heading-font:${vars['font-family']};` +
-        `--border-radius:${r}px;` +
-        `--shadow:0 2px 8px rgba(0,0,0,0.1);` +
-        `--navbar-bg:${vars['navbar-bg']};` +
-        `--navbar-text:${vars['navbar-text']};` +
-        `--panel-bg:${vars['bg-secondary']};` +
-        `--panel-border:${vars['text-primary']}33;` +
-        `--stats-bg:${a}22;` +
-        `--chat-bg:${vars['bg-primary']};` +
-        `--chat-bubble:${vars['bg-secondary']};` +
-        `--story-active:${a}22;` +
-        `--story-completed:#d1e7dd;` +
-        `--timer-color:#dc3545;}`;
+    let css = '[data-theme="custom"]{';
+    CUSTOM_COLOR_FIELDS.forEach(f => {
+        let v = vars[f] || CUSTOM_DEFAULTS[f];
+        if (f === 'border-radius') v = v + 'px';
+        if (f === 'card-border-width') v = v + 'px';
+        css += `--${f}:${v};`;
+    });
+    css += '}';
+    s.textContent = css;
 }
 
 function openCustomThemeModal(themeId) {
@@ -373,7 +534,9 @@ function openCustomThemeModal(themeId) {
 
     const ctConfettiColors = document.getElementById('ct-confetti-colors');
     if (ctConfettiColors) {
-        ctConfettiColors.value = (theme.celebration?.confettiColors || []).join(',');
+        const csv = (theme.celebration?.confettiColors || []).join(',');
+        ctConfettiColors.value = csv;
+        syncFieldToConfettiSwatches(csv);
     }
 
     const current = localStorage.getItem('es_theme') || 'classic';
@@ -386,21 +549,14 @@ function openCustomThemeModal(themeId) {
     const baseSelect = document.getElementById('ct-base-theme');
     if (baseSelect) baseSelect.value = (themeId && (isBaseTheme(themeId) || isCustomTheme(themeId))) ? themeId : (localStorage.getItem('es_theme') || 'classic');
 
-    setCustomizerFormValues(theme.vars);
+    setCustomizerFormValues(theme.vars || {});
+    updateThemePreview();
 
-    const deleteBtn = document.getElementById('ct-delete-btn');
-    if (deleteBtn) deleteBtn.classList.toggle('d-none', !themeId);
-
-    new bootstrap.Modal(document.getElementById('customThemeModal')).show();
+    // openCustomThemeModal is now handled via openSettingsModal/populateThemeTab
 }
 
 function editCurrentCustomTheme() {
-    const current = localStorage.getItem('es_theme') || '';
-    if (isCustomTheme(current)) {
-        openCustomThemeModalSafely(current);
-    } else {
-        openCustomThemeModalSafely();
-    }
+    openSettingsModal('theme');
 }
 
 function saveCustomTheme() {
@@ -413,8 +569,6 @@ function saveCustomTheme() {
         const el = document.getElementById('ct-' + f);
         if (el) vars[f] = el.value;
     });
-    vars['font-family'] = document.getElementById('ct-font-family').value;
-    vars['border-radius'] = document.getElementById('ct-border-radius').value;
 
     const themes = getCustomThemes();
     const ctConfettiColorsEl = document.getElementById('ct-confetti-colors');
@@ -427,6 +581,34 @@ function saveCustomTheme() {
 
     closeCustomThemeModal();
     applyTheme(themeId);
+}
+
+// ── Profile Tab ───────────────────────────────────────────────
+function saveProfileName() {
+    const nameEl = document.getElementById('profile-display-name');
+    if (!nameEl) return;
+    const newName = nameEl.value.trim();
+    if (!newName) return;
+    // Delegate to room.js handler if available, else just store locally
+    if (typeof promptRename === 'function') {
+        ROOM_CONFIG.playerName = newName;
+        localStorage.setItem('es_playerName', newName);
+        if (typeof connection !== 'undefined' && connection) {
+            connection.invoke('UpdateName', newName).catch(e => console.error(e));
+        }
+        const disp = document.getElementById('displayName');
+        if (disp) disp.textContent = newName;
+    } else {
+        localStorage.setItem('es_playerName', newName);
+    }
+}
+
+function onProfileObserverChange(enabled) {
+    if (typeof toggleObserver === 'function') {
+        toggleObserver(enabled);
+        const obs = document.getElementById('observerCheck');
+        if (obs) obs.checked = enabled;
+    }
 }
 
 function deleteCustomTheme() {
@@ -450,8 +632,6 @@ function exportCustomTheme() {
         const el = document.getElementById('ct-' + f);
         if (el) vars[f] = el.value;
     });
-    vars['font-family'] = document.getElementById('ct-font-family').value;
-    vars['border-radius'] = document.getElementById('ct-border-radius').value;
 
     const ctConfettiColorsEl = document.getElementById('ct-confetti-colors');
     const confettiColors = ctConfettiColorsEl
@@ -509,6 +689,7 @@ function importCustomTheme() {
                 const ctConfettiColorsEl = document.getElementById('ct-confetti-colors');
                 if (ctConfettiColorsEl && data.celebration?.confettiColors) {
                     ctConfettiColorsEl.value = data.celebration.confettiColors.join(',');
+                    syncFieldToConfettiSwatches(ctConfettiColorsEl.value);
                 }
             } catch {
                 alert('Could not read that theme file.');
@@ -519,11 +700,43 @@ function importCustomTheme() {
     input.click();
 }
 
-/** Revert dropdown to the previously saved theme when user cancels. */
+/** Revert dropdown and re-apply the persisted theme to undo any live preview changes. */
 function cancelCustomTheme() {
     const prev = localStorage.getItem('es_theme') || 'classic';
-    const sel = document.getElementById('themeSelect');
-    if (sel) sel.value = prev;
+    applyTheme(prev);
+}
+
+// openCelebrationSettings now just opens the Settings modal on the Celebration tab
+function openCelebrationSettings() {
+    const s = getCelebrationSettings();
+
+    _celSet('cel-enable-confetti',   'checked', s.enableConfetti);
+    _celSet('cel-enable-fireworks',  'checked', s.enableFireworks);
+    _celSet('cel-enable-balloons',   'checked', s.enableBalloons);
+
+    _celSet('cel-confetti-type',     'value',   s.confettiType);
+    _celSet('cel-confetti-duration', 'value',   s.confettiDuration);
+    _celSetRange('cel-confetti-particles', 'cel-particles-val',  s.confettiParticleCount);
+    _celSetRange('cel-confetti-spread',    'cel-spread-val',     s.confettiSpread, '°');
+    _celSet('cel-confetti-use-theme','checked', s.confettiUseThemeColors);
+    _celSet('cel-confetti-colors',   'value',   (s.confettiColors || []).join(','));
+    _celSet('cel-confetti-emojis',   'value',   (s.confettiEmojis || []).join(','));
+
+    _celSetRange('cel-fireworks-intensity',  'cel-intensity-val',    s.fireworksIntensity);
+    _celSetRange('cel-fireworks-particles',  'cel-fw-particles-val', s.fireworksParticles);
+    _celSetRange('cel-fireworks-explosion',  'cel-explosion-val',    s.fireworksExplosion);
+    _celSetRange('cel-fireworks-rockets',    'cel-rockets-val',      s.fireworksRocketsPoint, '%');
+    _celSet('cel-fireworks-duration',        'value',                s.fireworksDuration);
+    _celSet('cel-fireworks-hue-min',         'value',                s.fireworksHueMin);
+    _celSet('cel-fireworks-hue-max',         'value',                s.fireworksHueMax);
+
+    _celSetRange('cel-balloon-count',    'cel-balloon-count-val', s.balloonCount);
+    _celSet('cel-balloon-duration',      'value',                 s.balloonDuration);
+
+    _updateCustomColorsVisibility(!s.confettiUseThemeColors);
+    _updateEmojiVisibility(s.confettiType === 'emoji');
+
+    openSettingsModal('celebration');
 }
 
 

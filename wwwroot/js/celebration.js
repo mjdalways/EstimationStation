@@ -340,7 +340,7 @@ function stopBalloons() {
 // ============================================================
 
 /** Opens the Celebration Settings modal and populates all fields. */
-function openCelebrationSettings() {
+function populateCelebrationTab() {
     const s = getCelebrationSettings();
 
     _celSet('cel-enable-confetti',   'checked', s.enableConfetti);
@@ -368,8 +368,6 @@ function openCelebrationSettings() {
 
     _updateCustomColorsVisibility(!s.confettiUseThemeColors);
     _updateEmojiVisibility(s.confettiType === 'emoji');
-
-    new bootstrap.Modal(document.getElementById('celebrationSettingsModal')).show();
 }
 
 /** Reads the modal form and persists settings. */
@@ -400,12 +398,24 @@ function saveCelebrationSettingsFromForm() {
     if (modal) modal.hide();
 }
 
-/** Saves settings then fires a test celebration. */
+/** Saves settings then fires a test celebration (hides modal first). */
+let _testCelebrationPending = false;
 function testCelebration() {
-    saveCelebrationSettingsFromForm();
+    //saveCelebrationSettingsFromForm();
     stopCelebration();
     triggerCelebration();
 }
+
+// When the settings modal is opened (by user OR re-opened after test), clear the pending flag
+// so a manual close during the wait period doesn't re-fire a stale celebration.
+document.addEventListener('DOMContentLoaded', () => {
+    const modalEl = document.getElementById('settingsModal');
+    if (!modalEl) return;
+    modalEl.addEventListener('show.bs.modal', () => {
+        _testCelebrationPending = false;
+        if (typeof _settingsSaved !== 'undefined') _settingsSaved = false;
+    });
+});
 
 /** Resets to defaults and refreshes the form. */
 function resetCelebrationSettings() {

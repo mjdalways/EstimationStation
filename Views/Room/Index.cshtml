@@ -23,6 +23,12 @@
         <div class="add-story-form">
             <input type="text" id="newStoryInput" class="form-control form-control-sm" placeholder="Add story..." maxlength="200" />
             <button class="btn btn-sm btn-primary w-100 mt-1" onclick="addStory()">+ Add Story</button>
+            <details class="mt-2">
+                <summary class="small text-muted" style="cursor:pointer;">📋 Import multiple stories…</summary>
+                <textarea id="importStoriesInput" class="form-control form-control-sm mt-1" rows="4"
+                          placeholder="Paste one story per line..."></textarea>
+                <button class="btn btn-sm btn-outline-primary w-100 mt-1" onclick="importStories()">Import All</button>
+            </details>
         </div>
         <div id="storiesList" class="stories-list"></div>
     </div>
@@ -73,6 +79,14 @@
             <h6 class="section-label">Participants</h6>
             <div id="participantsContainer" class="participants-container"></div>
         </div>
+
+        <!-- Vote History (populated by JS after each reveal) -->
+        <div class="vote-history-section" id="voteHistorySection" style="display:none;">
+            <button class="vote-history-toggle" onclick="toggleVoteHistory()">
+                📜 Vote History <span id="voteHistoryChevron">▾</span>
+            </button>
+            <div id="voteHistoryList" class="vote-history-list" style="display:none;"></div>
+        </div>
     </div>
 
     <!-- Right Controls Panel -->
@@ -93,6 +107,10 @@
             <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="observerCheck" onchange="toggleObserver(this.checked)" />
                 <label class="form-check-label" for="observerCheck">Observer mode</label>
+            </div>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="skipVoteCheck" onchange="toggleSkipVoteCard(this.checked)" />
+                <label class="form-check-label" for="skipVoteCheck">🚫 Skip card</label>
             </div>
         </div>
 
