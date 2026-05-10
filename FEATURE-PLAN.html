@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EstimationStation — Feature Implementation Plan</title>
+<style>
+  :root {
+    --bg: #0f1117; --bg2: #1a1d27; --bg3: #22263a;
+    --border: #2e3350; --accent: #5b8dee; --accent2: #a78bfa;
+    --green: #34d399; --red: #f87171; --yellow: #fbbf24; --orange: #fb923c;
+    --text: #e2e8f0; --muted: #8892a4; --code-bg: #0d1117;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text);
+         line-height: 1.7; font-size: 15px; }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+  nav.sidebar { width: 280px; min-width: 280px; background: var(--bg2);
+                border-right: 1px solid var(--border); position: sticky;
+                top: 0; height: 100vh; overflow-y: auto; padding: 24px 0; }
+  nav.sidebar .logo { padding: 0 20px 20px; border-bottom: 1px solid var(--border);
+                      margin-bottom: 16px; }
+  nav.sidebar .logo h2 { font-size: 1rem; color: var(--accent); }
+  nav.sidebar .logo p  { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+  nav.sidebar a { display: block; padding: 6px 20px; color: var(--muted);
+                  text-decoration: none; font-size: 0.82rem; border-left: 3px solid transparent;
+                  transition: all 0.15s; }
+  nav.sidebar a:hover, nav.sidebar a.active
+    { color: var(--text); border-left-color: var(--accent); background: rgba(91,141,238,0.08); }
+  nav.sidebar .nav-section { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+                              color: var(--muted); padding: 14px 20px 4px; }
+  main { flex: 1; max-width: 1100px; padding: 48px 56px; overflow-x: hidden; }
+
+  /* Typography */
+  h1 { font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2));
+       -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  h2 { font-size: 1.5rem; font-weight: 700; color: var(--accent); margin: 48px 0 16px;
+       padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 1.15rem; font-weight: 700; color: var(--accent2); margin: 32px 0 12px; }
+  h4 { font-size: 1rem; font-weight: 600; color: var(--yellow); margin: 24px 0 8px; }
+  h5 { font-size: 0.9rem; font-weight: 600; color: var(--green); margin: 18px 0 6px; }
+  p  { margin-bottom: 12px; color: var(--text); }
+
+  /* Hero */
+  .hero { background: linear-gradient(135deg, #1a1d2e, #252a40);
+          border: 1px solid var(--border); border-radius: 16px;
+          padding: 32px 36px; margin-bottom: 40px; }
+  .hero h1 { margin-bottom: 12px; }
+  .hero .meta { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; }
+  .hero .meta span { font-size: 0.82rem; color: var(--muted);
+                     background: var(--bg3); border: 1px solid var(--border);
+                     padding: 4px 12px; border-radius: 20px; }
+  .hero .meta span b { color: var(--text); }
+
+  /* Callout boxes */
+  .callout { border-radius: 10px; padding: 16px 20px; margin: 20px 0;
+             border-left: 4px solid; }
+  .callout.info  { background: rgba(91,141,238,0.08); border-color: var(--accent); }
+  .callout.warn  { background: rgba(251,191,36,0.08);  border-color: var(--yellow); }
+  .callout.good  { background: rgba(52,211,153,0.08);  border-color: var(--green); }
+  .callout.note  { background: rgba(167,139,250,0.08); border-color: var(--accent2); }
+  .callout strong { display: block; margin-bottom: 4px; font-size: 0.85rem;
+                    text-transform: uppercase; letter-spacing: 0.05em; }
+  .callout.info  strong { color: var(--accent); }
+  .callout.warn  strong { color: var(--yellow); }
+  .callout.good  strong { color: var(--green); }
+  .callout.note  strong { color: var(--accent2); }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; margin: 16px 0; border-radius: 10px;
+                border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: var(--bg3); color: var(--accent); font-size: 0.8rem;
+       text-transform: uppercase; letter-spacing: 0.06em;
+       padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 16px; border-bottom: 1px solid var(--border);
+       vertical-align: top; font-size: 0.88rem; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* Code blocks */
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px;
+        padding: 20px; overflow-x: auto; margin: 16px 0; font-size: 0.82rem; line-height: 1.6; }
+  code { font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; }
+  pre code { color: #c9d1d9; }
+  :not(pre) > code { background: var(--bg3); color: var(--accent2);
+                     padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+
+  /* Syntax colour helpers (used with spans inside pre) */
+  .kw  { color: #ff7b72; } /* keywords: const, function, async */
+  .str { color: #a5d6ff; } /* strings */
+  .cm  { color: #8b949e; } /* comments */
+  .fn  { color: #d2a8ff; } /* function names */
+  .num { color: #79c0ff; } /* numbers */
+  .op  { color: #e3b341; } /* operators, property names */
+  .cs  { color: #ffa657; } /* C# types / keywords */
+
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 12px;
+           font-size: 0.75rem; font-weight: 600; margin: 2px; }
+  .badge-blue   { background: rgba(91,141,238,0.2); color: var(--accent); border: 1px solid rgba(91,141,238,0.4); }
+  .badge-purple { background: rgba(167,139,250,0.2); color: var(--accent2); border: 1px solid rgba(167,139,250,0.4); }
+  .badge-green  { background: rgba(52,211,153,0.2);  color: var(--green);   border: 1px solid rgba(52,211,153,0.4); }
+  .badge-yellow { background: rgba(251,191,36,0.2);  color: var(--yellow);  border: 1px solid rgba(251,191,36,0.4); }
+  .badge-red    { background: rgba(248,113,113,0.2); color: var(--red);     border: 1px solid rgba(248,113,113,0.4); }
+  .badge-orange { background: rgba(251,146,60,0.2);  color: var(--orange);  border: 1px solid rgba(251,146,60,0.4); }
+
+  /* Phase timeline */
+  .timeline { margin: 20px 0; }
+  .phase { display: flex; gap: 16px; margin-bottom: 0; }
+  .phase-dot { display: flex; flex-direction: column; align-items: center; }
+  .phase-dot .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent);
+                    flex-shrink: 0; margin-top: 4px; }
+  .phase-dot .line { width: 2px; flex: 1; background: var(--border); margin-top: 4px; min-height: 30px; }
+  .phase:last-child .phase-dot .line { display: none; }
+  .phase-body { padding-bottom: 24px; flex: 1; }
+  .phase-body .phase-title { font-weight: 700; color: var(--text); }
+  .phase-body .phase-duration { font-size: 0.78rem; color: var(--accent); margin-bottom: 4px; }
+  .phase-body p { margin: 4px 0; font-size: 0.88rem; color: var(--muted); }
+
+  /* Weapon grid */
+  .weapon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+  .weapon-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+                 padding: 12px; text-align: center; }
+  .weapon-card .icon { font-size: 1.8rem; display: block; margin-bottom: 6px; }
+  .weapon-card .name { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+  .weapon-card .words { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+
+  /* Steps list */
+  ol.steps { counter-reset: step; list-style: none; margin: 16px 0; }
+  ol.steps li { counter-increment: step; display: flex; gap: 14px; margin-bottom: 14px;
+                align-items: flex-start; }
+  ol.steps li::before { content: counter(step); background: var(--accent);
+                         color: #fff; font-weight: 700; font-size: 0.78rem;
+                         width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+                         display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+
+  /* SVG preview boxes */
+  .svg-demo { background: #fff; border-radius: 10px; padding: 20px;
+              display: inline-flex; gap: 24px; align-items: flex-end;
+              margin: 12px 0; flex-wrap: wrap; }
+
+  /* Misc */
+  hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+  ul { margin: 10px 0 10px 24px; }
+  ul li { margin-bottom: 6px; font-size: 0.9rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+
+  /* Settings UI mockup */
+  .settings-mockup { background: var(--bg3); border: 1px solid var(--border);
+                     border-radius: 12px; padding: 20px; font-family: monospace;
+                     font-size: 0.8rem; color: var(--text); line-height: 1.9;
+                     white-space: pre; overflow-x: auto; }
+
+  @media (max-width: 900px) {
+    nav.sidebar { display: none; }
+    main { padding: 24px 20px; }
+    .weapon-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ═══════════════════════════════════════ SIDEBAR ═══════════════════════════════════════ -->
+<nav class="sidebar">
+  <div class="logo">
+    <h2>🃏 EstimationStation</h2>
+    <p>Feature Implementation Plan</p>
+  </div>
+  <div class="nav-section">Overview</div>
+  <a href="#architecture">1. Architecture</a>
+  <a href="#settings">2. Behavior Settings Tab</a>
+  <div class="nav-section">Features</div>
+  <a href="#shame">3. Shame Feature</a>
+  <a href="#avatars">4. User Avatars</a>
+  <a href="#battle">5. Avatar Battle</a>
+  <div class="nav-section">Weapons</div>
+  <a href="#weapons-classic">Classic Weapons</a>
+  <a href="#weapons-tech">Tech Arsenal</a>
+  <a href="#weapons-toast">🍞 Toast</a>
+  <a href="#weapons-keyboard">⌨️ Keyboard</a>
+  <a href="#weapons-monitor">🖥️ Monitor</a>
+  <a href="#weapons-nunchuk">🖱️🖱️ Mouse Nunchuks</a>
+  <a href="#weapons-flail">🖱️ Mouse Flail</a>
+  <a href="#weapons-card">💳 Credit Card</a>
+  <a href="#weapons-pos">🧾 POS Terminal</a>
+  <a href="#weapons-usb">🔌 USB Drive</a>
+  <a href="#weapons-ethernet">🪢 Ethernet Whip</a>
+  <a href="#weapons-floppy">💾 Floppy Disk</a>
+  <div class="nav-section">Delivery</div>
+  <a href="#attribution">7. Attribution</a>
+  <a href="#manifest">8. File Manifest</a>
+  <a href="#order">9. Implementation Order</a>
+</nav>
+
+<!-- ═══════════════════════════════════════ MAIN ══════════════════════════════════════════ -->
+<main>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>EstimationStation — Feature Plan</h1>
+  <p>Three new features: <b>Shame</b>, <b>User Avatars</b>, and <b>Avatar Battle</b> — all fully configurable, all integrated into the existing post-reveal consensus flow.</p>
+  <div class="meta">
+    <span>📅 <b>2026-05-10</b></span>
+    <span>🌿 Branch: <b>claude/plan-consensus-features-RNEKZ</b></span>
+    <span>🔧 Stack: <b>ASP.NET Core 10 / C# / SignalR / Bootstrap 5 / Vanilla JS</b></span>
+    <span>💾 Storage: <b>In-memory (no database)</b></span>
+  </div>
+</div>
+
+<!-- ═══ 1. ARCHITECTURE ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="architecture">1. Architecture Overview</h2>
+
+<h3>Existing Stack (Unchanged)</h3>
+<div class="table-wrap"><table>
+  <tr><th>Layer</th><th>Technology</th></tr>
+  <tr><td>Backend</td><td>ASP.NET Core 10, C#, SignalR Hub (<code>PokerHub.cs</code>)</td></tr>
+  <tr><td>Storage</td><td>In-memory <code>ConcurrentDictionary</code> in <code>RoomService.cs</code> — no database</td></tr>
+  <tr><td>Frontend</td><td>Vanilla JS + jQuery, Bootstrap 5</td></tr>
+  <tr><td>Real-time</td><td>SignalR groups per room</td></tr>
+  <tr><td>Theming</td><td>CSS custom properties, 11 base themes + custom editor</td></tr>
+  <tr><td>Celebrations</td><td><code>canvas-confetti</code> + <code>fireworks-js</code> (CDN) via <code>celebration.js</code></td></tr>
+  <tr><td>Libraries</td><td>All vendored in <code>wwwroot/lib/</code> — <b>no npm, no bundler</b></td></tr>
+</table></div>
+
+<h3>New JS Module Pattern</h3>
+<p>Each new feature gets a self-contained JS file mirroring the <code>celebration.js</code> convention:</p>
+<pre><code><span class="cm">// Every new feature module exposes these functions:</span>
+<span class="fn">getXSettings</span>()        <span class="cm">// reads localStorage, merges with DEFAULT_X</span>
+<span class="fn">saveXSettings</span>(s)      <span class="cm">// persists to localStorage as JSON</span>
+<span class="fn">populateXTab</span>()        <span class="cm">// populates settings form from stored values</span>
+<span class="fn">saveXFromForm</span>()       <span class="cm">// reads form DOM → calls saveXSettings()</span>
+<span class="fn">testX</span>()               <span class="cm">// fires the effect with fake/sample data</span>
+<span class="fn">resetXSettings</span>()      <span class="cm">// restores all defaults</span></code></pre>
+
+<h3>New localStorage Keys</h3>
+<div class="table-wrap"><table>
+  <tr><th>Key</th><th>Feature</th><th>Type</th></tr>
+  <tr><td><code>es_postRevealBehavior</code></td><td>Master behavior toggles &amp; priority</td><td>Object</td></tr>
+  <tr><td><code>es_shameSettings</code></td><td>Shame animation config</td><td>Object</td></tr>
+  <tr><td><code>es_battleSettings</code></td><td>Battle animation config</td><td>Object</td></tr>
+  <tr><td><code>es_avatarSettings</code></td><td>Avatar source &amp; style preferences</td><td>Object</td></tr>
+</table></div>
+
+<h3>Updated Script Include Order (<code>_Layout.cshtml</code>)</h3>
+<pre><code><span class="cm">&lt;!-- Existing --&gt;</span>
+&lt;script src="~/lib/jquery/dist/jquery.min.js"&gt;&lt;/script&gt;
+&lt;script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"&gt;&lt;/script&gt;
+&lt;script src="~/lib/signalr/signalr.min.js"&gt;&lt;/script&gt;
+
+<span class="cm">&lt;!-- New: Avatar libraries (vendored UMD builds) --&gt;</span>
+&lt;script src="~/lib/dicebear/core.umd.min.js"&gt;&lt;/script&gt;
+&lt;script src="~/lib/dicebear/collection.umd.min.js"&gt;&lt;/script&gt;
+&lt;script src="~/lib/boring-avatars/boring-avatars.umd.min.js"&gt;&lt;/script&gt;
+
+&lt;script src="~/js/site.js" asp-append-version="true"&gt;&lt;/script&gt;
+
+<span class="cm">&lt;!-- Existing CDN celebrations --&gt;</span>
+&lt;script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1/dist/confetti.browser.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://cdn.jsdelivr.net/npm/fireworks-js@2/dist/index.umd.js"&gt;&lt;/script&gt;
+
+<span class="cm">&lt;!-- New feature scripts --&gt;</span>
+&lt;script src="~/js/celebration.js" asp-append-version="true"&gt;&lt;/script&gt;
+&lt;script src="~/js/avatar.js"      asp-append-version="true"&gt;&lt;/script&gt;
+&lt;script src="~/js/shame.js"       asp-append-version="true"&gt;&lt;/script&gt;
+&lt;script src="~/js/battle.js"      asp-append-version="true"&gt;&lt;/script&gt;</code></pre>
+
+<!-- ═══ 2. SETTINGS ═══════════════════════════════════════════════════════════════════════ -->
+<h2 id="settings">2. Settings System — New "Behavior" Tab</h2>
+
+<p>A fifth tab is added to the existing <code>settingsTabs</code> Bootstrap nav in <code>_Layout.cshtml</code>. It is the master control for all three post-reveal reactions.</p>
+
+<h3>Settings UI Layout</h3>
+<div class="settings-mockup">🎭 Post-Reveal Behavior
+═══════════════════════════════════════════════════════
+
+🎉 After Consensus
+  [✓] Enable celebration effects
+  [▶ Configure Celebration]  (scroll to celebration tab)
+
+───────────────────────────────────────────────────────
+
+😤 After Single Outlier
+  [✓] Enable shame animation
+
+  ▼ Shame Configuration
+    Animation style:    [● Pulse]  [○ Shake]  [○ Spotlight]
+    Duration:           [━━━●━━━] 6s
+    Shame color:        [████] #ff4444
+    Floating emojis:    [✓]
+    Emoji set:          [🥲][👎][😤][💀]    (toggleable chips)
+    Custom emojis:      [________________________]
+    BOO! font size:     [━━●━━━━] 48px
+    Positive message:   [But wait... maybe you're onto something. State your case!]
+    Transition delay:   [━━●━━━━] 3s
+    [Test Shame ▶]  [Reset to Defaults]
+
+───────────────────────────────────────────────────────
+
+⚔️ After Disagreement
+  [✓] Enable battle animation
+  [▶ Configure Battle]  (see §5)
+  [Test Battle ▶]  [Reset to Defaults]
+
+───────────────────────────────────────────────────────
+
+⚖️ Priority Rules
+  When exactly 1 outlier exists:
+    [● Shame only]  [○ Battle only]  [○ Both]
+  Minimum voters to trigger battle:  [━●━━━━] 3
+  Show skip button on overlays:      [✓]
+  Skip button label:                 [Skip ▶________]
+
+[Save Behavior Settings]</div>
+
+<h3>Master Schema — <code>es_postRevealBehavior</code></h3>
+<pre><code>{
+  <span class="op">celebrationEnabled</span>: <span class="kw">true</span>,
+  <span class="op">shameEnabled</span>:       <span class="kw">true</span>,
+  <span class="op">battleEnabled</span>:      <span class="kw">true</span>,
+  <span class="op">outlierBehavior</span>:    <span class="str">'shame-only'</span>,  <span class="cm">// 'shame-only' | 'battle-only' | 'both'</span>
+  <span class="op">minVotersForBattle</span>: <span class="num">3</span>,
+  <span class="op">showSkip</span>:           <span class="kw">true</span>,
+  <span class="op">skipLabel</span>:          <span class="str">'Skip ▶'</span>
+}</code></pre>
+
+<h3>Post-Reveal Dispatch Logic (<code>room.js</code>)</h3>
+<pre><code>connection.on(<span class="str">'VotesRevealed'</span>, (votes, stats) => {
+  <span class="cm">// ... existing: render badges, show stats panel ...</span>
+
+  <span class="kw">const</span> beh    = <span class="fn">getPostRevealBehavior</span>();
+  <span class="kw">const</span> groups = <span class="fn">buildVoteGroups</span>(roomState.participants, votes);
+
+  <span class="kw">if</span> (stats.isConsensus) {
+    <span class="kw">if</span> (beh.celebrationEnabled) <span class="fn">triggerCelebration</span>();
+    <span class="kw">return</span>;
+  }
+
+  <span class="kw">const</span> hasOutlier = !!stats.shameParticipantId;
+  <span class="kw">const</span> hasBattle  = groups.length >= <span class="num">2</span>
+                  &amp;&amp; <span class="fn">totalVoters</span>(groups) >= beh.minVotersForBattle;
+
+  <span class="kw">if</span> (hasOutlier &amp;&amp; beh.shameEnabled
+      &amp;&amp; (beh.outlierBehavior === <span class="str">'shame-only'</span> || beh.outlierBehavior === <span class="str">'both'</span>)) {
+    <span class="fn">triggerShame</span>(stats.shameParticipantName, stats.shameParticipantId);
+  }
+
+  <span class="kw">const</span> shameBlocksBattle = hasOutlier &amp;&amp; beh.outlierBehavior === <span class="str">'shame-only'</span>;
+  <span class="kw">if</span> (hasBattle &amp;&amp; beh.battleEnabled &amp;&amp; !shameBlocksBattle) {
+    <span class="fn">triggerBattle</span>(groups);
+  }
+});</code></pre>
+
+<!-- ═══ 3. SHAME ═══════════════════════════════════════════════════════════════════════════ -->
+<h2 id="shame">3. Feature 1 — Shame</h2>
+
+<div class="callout info">
+  <strong>Trigger Condition</strong>
+  After votes are revealed: exactly one participant voted a different numeric value from all others (n−1 voters agree on value X; 1 voter chose value Y). Non-numeric votes (?, ☕) are excluded from the check. The outlier is called out with animation and emoji, then the overlay transitions to a positive message encouraging them to make their case.
+</div>
+
+<h3>3.1 Backend — <code>PokerModels.cs</code></h3>
+<pre><code><span class="kw">public class</span> <span class="cs">VoteStats</span>
+{
+    <span class="kw">public</span> <span class="cs">double</span>?  Average                { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> <span class="cs">string</span>?  Min                    { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> <span class="cs">string</span>?  Max                    { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> <span class="cs">bool</span>     IsConsensus            { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> <span class="cs">string</span>?  ShameParticipantName   { <span class="kw">get</span>; <span class="kw">set</span>; }  <span class="cm">// NEW</span>
+    <span class="kw">public</span> <span class="cs">string</span>?  ShameParticipantId     { <span class="kw">get</span>; <span class="kw">set</span>; }  <span class="cm">// NEW — SignalR ConnectionId</span>
+}</code></pre>
+
+<h3>3.2 Backend — <code>PokerHub.cs</code> — Outlier Detection</h3>
+<p>Appended to <code>CalculateStats()</code> after the existing consensus check:</p>
+<pre><code><span class="cm">// Single-outlier detection</span>
+<span class="kw">if</span> (!stats.IsConsensus &amp;&amp; numericVotes.Count >= <span class="num">2</span>)
+{
+    <span class="kw">var</span> groups = numericVotes
+        .GroupBy(kvp => kvp.Value)
+        .OrderByDescending(g => g.Count())
+        .ToList();
+
+    <span class="kw">if</span> (groups.Count == <span class="num">2</span> &amp;&amp; groups[<span class="num">1</span>].Count() == <span class="num">1</span>)
+    {
+        <span class="kw">var</span> outlierId = groups[<span class="num">1</span>].First().Key;   <span class="cm">// ConnectionId</span>
+        <span class="kw">var</span> outlier   = room.Participants
+            .FirstOrDefault(p => p.ConnectionId == outlierId);
+        <span class="kw">if</span> (outlier != <span class="kw">null</span>)
+        {
+            stats.ShameParticipantName = outlier.Name;
+            stats.ShameParticipantId   = outlierId;
+        }
+    }
+}</code></pre>
+
+<h3>3.3 Shame Animation Sequence</h3>
+<div class="timeline">
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Highlight (0 – 0.5s)</div>
+      <div class="phase-duration">Immediate</div>
+      <p>Outlier's participant badge gets <code>.shame-highlight</code> class with configured style (pulse / shake / spotlight). Backdrop dims for spotlight mode.</p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Floating Emojis (0 – 2s)</div>
+      <div class="phase-duration">6 emojis staggered at 220ms intervals</div>
+      <p>Configured emojis (🥲 👎 😤 💀) float upward from the badge position with <code>@keyframes boo-float</code>.</p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Shame Toast (0 – 3s)</div>
+      <div class="phase-duration">Fixed position overlay</div>
+      <p>"👀 <em>Name</em> went rogue! BOO! 😤 Everyone else agreed..."</p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Positive Message (3s+)</div>
+      <div class="phase-duration">Configurable transition delay, default 3s</div>
+      <p>Toast content swaps to: <em>"But wait... maybe you're onto something. 🤔 State your case!"</em></p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div></div>
+    <div class="phase-body"><div class="phase-title">Cleanup (after duration)</div>
+      <div class="phase-duration">Default: 6s total</div>
+      <p>Highlight class removed, backdrop removed, toast fades out.</p></div></div>
+</div>
+
+<h3>3.4 <code>wwwroot/js/shame.js</code> — Key Structure</h3>
+<pre><code><span class="kw">const</span> DEFAULT_SHAME = {
+  <span class="op">animationStyle</span>:  <span class="str">'pulse'</span>,    <span class="cm">// 'pulse' | 'shake' | 'spotlight'</span>
+  <span class="op">duration</span>:        <span class="num">6000</span>,
+  <span class="op">shameColor</span>:      <span class="str">'#ff4444'</span>,
+  <span class="op">floatingEmojis</span>:  <span class="kw">true</span>,
+  <span class="op">emojis</span>:          [<span class="str">'🥲'</span>, <span class="str">'👎'</span>, <span class="str">'😤'</span>],
+  <span class="op">booFontSize</span>:     <span class="num">48</span>,
+  <span class="op">positiveMessage</span>: <span class="str">"But wait... maybe you're onto something. 🤔 State your case!"</span>,
+  <span class="op">transitionDelay</span>: <span class="num">3000</span>
+};
+
+<span class="kw">function</span> <span class="fn">triggerShame</span>(participantName, participantId) {
+  <span class="kw">const</span> s = <span class="fn">getShameSettings</span>();
+  <span class="kw">const</span> badge = document.<span class="fn">querySelector</span>(<span class="str">`[data-participant-id="</span>${participantId}<span class="str">"]`</span>);
+
+  <span class="cm">// 1. Highlight badge</span>
+  badge?.style.<span class="fn">setProperty</span>(<span class="str">'--shame-color'</span>, s.shameColor);
+  badge?.classList.<span class="fn">add</span>(<span class="str">'shame-highlight'</span>);
+  badge?.dataset.style = s.animationStyle;
+
+  <span class="cm">// 2. Floating emojis</span>
+  <span class="kw">if</span> (s.floatingEmojis) {
+    <span class="kw">const</span> rect = badge?.<span class="fn">getBoundingClientRect</span>();
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; <span class="num">6</span>; i++)
+      <span class="fn">setTimeout</span>(() => <span class="fn">spawnBooEmoji</span>(s, rect), i * <span class="num">220</span>);
+  }
+
+  <span class="cm">// 3. Toast → positive message transition</span>
+  <span class="fn">showShameToast</span>(participantName, s);
+
+  <span class="cm">// 4. Cleanup</span>
+  <span class="fn">setTimeout</span>(() => <span class="fn">cleanupShame</span>(badge), s.duration);
+}</code></pre>
+
+<h3>3.5 <code>wwwroot/css/shame.css</code> — Key Animations</h3>
+<pre><code><span class="op">@keyframes</span> shame-pulse {
+  <span class="num">0%</span>,<span class="num">100%</span> { box-shadow: <span class="num">0</span> <span class="num">0</span> <span class="num">0</span> <span class="num">0</span> var(--shame-color); }
+  <span class="num">50%</span>      { box-shadow: <span class="num">0</span> <span class="num">0</span> <span class="num">24px</span> <span class="num">12px</span> color-mix(in srgb, var(--shame-color) 40%, transparent); }
+}
+<span class="op">@keyframes</span> shame-shake {
+  <span class="num">0%</span>,<span class="num">100%</span> { transform: translateX(<span class="num">0</span>); }
+  <span class="num">20%</span>     { transform: translateX(<span class="num">-8px</span>) rotate(<span class="num">-3deg</span>); }
+  <span class="num">40%</span>     { transform: translateX(<span class="num">8px</span>)  rotate(<span class="num">3deg</span>); }
+}
+<span class="op">@keyframes</span> boo-float {
+  <span class="num">0%</span>   { transform: translateY(<span class="num">0</span>) scale(<span class="num">1</span>);   opacity: <span class="num">1</span>; }
+  <span class="num">100%</span> { transform: translateY(<span class="num">-150px</span>) scale(<span class="num">1.5</span>); opacity: <span class="num">0</span>; }
+}
+
+.shame-highlight[data-style="pulse"]  { animation: shame-pulse 0.6s infinite; }
+.shame-highlight[data-style="shake"]  { animation: shame-shake 0.5s infinite; }
+.shame-highlight[data-style="spotlight"] { position: relative; z-index: 200; }
+.shame-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:190; }
+.boo-emoji { position:fixed; font-size:var(--shame-font-size,48px);
+             animation:boo-float 1.8s ease-out forwards; pointer-events:none; }
+.shame-toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+               background:#1a1a1a; border-left:6px solid var(--shame-color);
+               border-radius:12px; padding:20px 28px; max-width:440px; z-index:310; }
+.shame-toast .shame-name     { font-size:1.4rem; font-weight:bold; color:var(--shame-color); }
+.shame-toast .shame-positive { color:#88ff88; margin-top:10px; }</code></pre>
+
+<!-- ═══ 4. AVATARS ═════════════════════════════════════════════════════════════════════════ -->
+<h2 id="avatars">4. Feature 2 — User Avatars</h2>
+
+<h3>4.1 Open Source Libraries</h3>
+<div class="table-wrap"><table>
+  <tr><th>Library</th><th>License</th><th>Attribution</th><th>Styles</th><th>Source</th></tr>
+  <tr><td><b>DiceBear Core</b> v9</td><td><span class="badge badge-green">MIT</span></td><td>None required</td><td>—</td><td>npmjs.com/package/@dicebear/core</td></tr>
+  <tr><td><b>DiceBear Collection</b> v9</td><td><span class="badge badge-yellow">CC BY 4.0</span> per style</td><td>Per style (see below)</td><td>adventurer, bottts, croodles, fun-emoji, open-peeps, pixel-art, thumbs, micah</td><td>npmjs.com/package/@dicebear/collection</td></tr>
+  <tr><td><b>Boring Avatars</b> v2</td><td><span class="badge badge-green">MIT</span></td><td>None required</td><td>beam, marble, pixel, bauhaus, ring, sunset</td><td>npmjs.com/package/boring-avatars</td></tr>
+</table></div>
+
+<div class="callout warn">
+  <strong>Vendoring (no npm)</strong>
+  Since the project has no npm/bundler, download UMD builds via <code>npm pack</code> or jsDelivr and copy to:
+  <code>wwwroot/lib/dicebear/core.umd.min.js</code>, <code>wwwroot/lib/dicebear/collection.umd.min.js</code>, <code>wwwroot/lib/boring-avatars/boring-avatars.umd.min.js</code>
+</div>
+
+<h4>DiceBear Style Attribution</h4>
+<div class="table-wrap"><table>
+  <tr><th>Style</th><th>License</th><th>Artist</th></tr>
+  <tr><td>adventurer</td><td>CC BY 4.0</td><td>Lisa Wischofsky</td></tr>
+  <tr><td>bottts</td><td>CC BY 4.0</td><td>Pablo Stanley</td></tr>
+  <tr><td>croodles</td><td>CC BY 4.0</td><td>Hannah Langford</td></tr>
+  <tr><td>fun-emoji</td><td>CC BY 4.0</td><td>Davis Uche</td></tr>
+  <tr><td>open-peeps</td><td>CC0</td><td>Pablo Stanley</td></tr>
+  <tr><td>pixel-art</td><td>CC BY 4.0</td><td>Plastic Jam</td></tr>
+  <tr><td>thumbs</td><td>CC0</td><td>DiceBear</td></tr>
+  <tr><td>micah</td><td>CC BY 4.0</td><td>Micah Lanier</td></tr>
+</table></div>
+
+<h3>4.2 Avatar Data Format</h3>
+<div class="table-wrap"><table>
+  <tr><th>Source</th><th><code>AvatarData</code> Value</th><th>Example</th></tr>
+  <tr><td>Initials (default)</td><td><code>null</code> or <code>"initials"</code></td><td>—</td></tr>
+  <tr><td>DiceBear</td><td><code>"dicebear:{style}:{seed}:{optionsJson}"</code></td><td><code>"dicebear:bottts:Alice:{}"</code></td></tr>
+  <tr><td>Boring Avatar</td><td><code>"boring:{style}:{seed}"</code></td><td><code>"boring:beam:John"</code></td></tr>
+  <tr><td>Uploaded photo</td><td><code>"data:image/jpeg;base64,{b64}"</code></td><td>Max 48 KB after 128×128 resize</td></tr>
+</table></div>
+
+<h3>4.3 Backend Changes</h3>
+<h4><code>PokerModels.cs</code> — Participant</h4>
+<pre><code><span class="kw">public class</span> <span class="cs">Participant</span>
+{
+    <span class="kw">public</span> <span class="cs">string</span>  ConnectionId { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="str">""</span>;
+    <span class="kw">public</span> <span class="cs">string</span>  Name         { <span class="kw">get</span>; <span class="kw">set</span>; } = <span class="str">""</span>;
+    <span class="kw">public</span> <span class="cs">string</span>? Vote         { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> <span class="cs">bool</span>    IsObserver   { <span class="kw">get</span>; <span class="kw">set</span>; }
+    <span class="kw">public</span> <span class="cs">string</span>? AvatarData   { <span class="kw">get</span>; <span class="kw">set</span>; }  <span class="cm">// NEW</span>
+}</code></pre>
+
+<h4><code>PokerHub.cs</code> — New <code>UpdateAvatar</code> method</h4>
+<pre><code><span class="kw">public async</span> Task <span class="fn">UpdateAvatar</span>(<span class="cs">string</span> avatarData)
+{
+    <span class="kw">if</span> (avatarData?.<span class="fn">StartsWith</span>(<span class="str">"data:"</span>) == <span class="kw">true</span> &amp;&amp; avatarData.Length > <span class="num">65_536</span>)
+    {
+        <span class="kw">await</span> Clients.Caller.<span class="fn">SendAsync</span>(<span class="str">"Error"</span>, <span class="str">"Avatar image too large (max ~48 KB)."</span>);
+        <span class="kw">return</span>;
+    }
+    <span class="kw">var</span> roomName    = _roomService.<span class="fn">GetRoomForConnection</span>(Context.ConnectionId);
+    <span class="kw">var</span> room        = _roomService.<span class="fn">GetRoom</span>(roomName);
+    <span class="kw">var</span> participant = room?.Participants
+        .FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+    <span class="kw">if</span> (participant == <span class="kw">null</span>) <span class="kw">return</span>;
+
+    participant.AvatarData = avatarData;
+    <span class="kw">await</span> Clients.Group(roomName).<span class="fn">SendAsync</span>(<span class="str">"AvatarUpdated"</span>, Context.ConnectionId, avatarData);
+}</code></pre>
+
+<div class="callout note">
+  <strong>Also update</strong>
+  Include <code>AvatarData</code> in the participant payload for: <code>JoinRoom</code> (accept optional param), <code>RoomState</code>, <code>ParticipantJoined</code>, and <code>NameUpdated</code> broadcasts.
+</div>
+
+<h3>4.4 Avatar Settings UI</h3>
+<div class="settings-mockup">── Avatar ──────────────────────────────────────────────────
+
+Source:
+  [○ Initials]  [○ DiceBear]  [○ Boring Avatars]  [○ Upload Photo]
+
+▼ DiceBear Options
+  Style:
+  ┌──────────┬──────────┬──────────┬──────────┐
+  │ 🤖 Bottts│ 🧙 Advent│ ✏️ Croodl│ 😊 Fun E │
+  ├──────────┼──────────┼──────────┼──────────┤
+  │ 🧍 Peeps │ 👾 Pixel │ 👍 Thumbs│ 🎨 Micah │
+  └──────────┴──────────┴──────────┴──────────┘
+  Seed:       [● My name]  [○ Custom: ___________]
+  Background: [████]
+
+▼ Boring Avatars Options
+  [ beam ] [ marble ] [ pixel ] [ bauhaus ] [ ring ] [ sunset ]
+
+▼ Upload Photo
+  [Choose File…]  JPG, PNG, GIF, WebP  Max: 2 MB
+  ┌──────────────────────┐
+  │    (preview circle)  │  128 × 128, cropped to circle
+  └──────────────────────┘
+
+Live Preview: ┌────┐  John D.
+              │ AV │  ← 64 px, updates live
+              └────┘
+
+[Save Avatar]  [Reset to Initials]</div>
+
+<!-- ═══ 5. BATTLE ═════════════════════════════════════════════════════════════════════════ -->
+<h2 id="battle">5. Feature 3 — Avatar Battle</h2>
+
+<div class="callout info">
+  <strong>Trigger Condition</strong>
+  After votes are revealed: 2 or more distinct numeric vote values exist among non-observer voters, AND total voters meets the minimum threshold (default: 3). The battle fires unless the <code>outlierBehavior</code> setting is <code>'shame-only'</code> and only 1 outlier exists.
+</div>
+
+<h3>5.1 Animation Sequence</h3>
+<div class="timeline">
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Lineup (0 – 1.5s)</div>
+      <div class="phase-duration">Default: 1.5s × speed multiplier</div>
+      <p>Dark arena overlay fades in. Avatars + arms slide in from left/right, grouped by vote value. Team vote labels appear above each group.</p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Taunt (1.5 – 3s)</div>
+      <div class="phase-duration">1.5s</div>
+      <p>Speech bubble shows each team's vote value. Avatars lean toward center. Arms raise to ready position.</p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Clash Loop (3 – 8s)</div>
+      <div class="phase-duration">2–3 clash cycles, configurable</div>
+      <p>Teams rush to center. Fight cloud 💥 pops with weapon-specific hit word. Teams bounce back. Repeat.</p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Aftermath (8 – 11s)</div>
+      <div class="phase-duration">3s</div>
+      <p>Arms droop. Avatars tilt. Battered CSS filter applied (desaturate + contrast). Stars orbit heads.</p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div><div class="line"></div></div>
+    <div class="phase-body"><div class="phase-title">Resolution (11 – 14s)</div>
+      <div class="phase-duration">3s fade-in</div>
+      <p>Configurable two-line message appears: <em>"⚔️ A fierce battle of opinions!"</em> then <em>"State your case — describe your reasoning."</em></p></div></div>
+  <div class="phase"><div class="phase-dot"><div class="dot"></div></div>
+    <div class="phase-body"><div class="phase-title">Auto-dismiss (14s+)</div>
+      <div class="phase-duration">Configurable, 0 = never</div>
+      <p>Overlay fades out. Skip button available throughout.</p></div></div>
+</div>
+
+<h3>5.2 Speed Multipliers</h3>
+<div class="table-wrap"><table>
+  <tr><th>Setting</th><th>Multiplier</th><th>Total Duration</th></tr>
+  <tr><td>Slow</td><td>1.5×</td><td>~21s</td></tr>
+  <tr><td>Normal</td><td>1.0×</td><td>~14s</td></tr>
+  <tr><td>Fast</td><td>0.65×</td><td>~9s</td></tr>
+</table></div>
+
+<h3>5.3 Arena DOM Structure</h3>
+<pre><code>&lt;div id="battle-arena" class="battle-arena-overlay"&gt;
+  &lt;div class="battle-stage"&gt;
+    &lt;div class="battle-team team-left" data-vote="5"&gt;
+      &lt;div class="team-vote-label"&gt;5&lt;/div&gt;
+      &lt;div class="team-fighters"&gt;
+        &lt;!-- .fighter divs: avatar + arms --&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class="fight-zone"&gt;
+      &lt;div class="fight-cloud"&gt;💥&lt;/div&gt;
+      &lt;span class="hit-text"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class="battle-team team-right" data-vote="13"&gt;...&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class="battle-resolution"&gt;
+    &lt;p class="battle-headline"&gt;&lt;/p&gt;
+    &lt;p class="battle-cta"&gt;&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;button class="btn-skip-battle" onclick="dismissBattle()"&gt;Skip ▶&lt;/button&gt;
+&lt;/div&gt;</code></pre>
+
+<h3>5.4 Arm SVG — Base Structure with Actual Hand</h3>
+<p>ViewBox: <code>0 0 48 110</code>. <code>overflow="visible"</code> for wide weapons. CSS variables <code>--arm-skin</code> and <code>--arm-sleeve</code> are user-configurable.</p>
+<pre><code>&lt;svg class="fighter-arm" viewBox="0 0 48 110" width="48" height="110" overflow="visible"&gt;
+  <span class="cm">&lt;!-- Sleeve / upper arm --&gt;</span>
+  &lt;rect x="14" y="0"  width="20" height="45" rx="10" fill="var(--arm-sleeve,#4488cc)"/&gt;
+  <span class="cm">&lt;!-- Elbow skin gap --&gt;</span>
+  &lt;rect x="16" y="38" width="16" height="14" rx="5"  fill="var(--arm-skin,#f4c08a)"/&gt;
+  <span class="cm">&lt;!-- Forearm --&gt;</span>
+  &lt;rect x="15" y="50" width="18" height="36" rx="9"  fill="var(--arm-skin,#f4c08a)"/&gt;
+  <span class="cm">&lt;!-- Wrist --&gt;</span>
+  &lt;ellipse cx="24" cy="87" rx="10" ry="7"            fill="var(--arm-skin,#f4c08a)"/&gt;
+  <span class="cm">&lt;!-- Palm --&gt;</span>
+  &lt;rect x="16" y="84" width="20" height="16" rx="8"  fill="var(--arm-skin,#f4c08a)"/&gt;
+  <span class="cm">&lt;!-- Knuckles --&gt;</span>
+  &lt;circle cx="20" cy="84" r="5"  fill="var(--arm-skin,#f4c08a)"/&gt;
+  &lt;circle cx="27" cy="83" r="5"  fill="var(--arm-skin,#f4c08a)"/&gt;
+  &lt;circle cx="33" cy="84" r="4.5" fill="var(--arm-skin,#f4c08a)"/&gt;
+  <span class="cm">&lt;!-- Thumb --&gt;</span>
+  &lt;ellipse cx="14" cy="90" rx="5" ry="7"
+           fill="var(--arm-skin,#f4c08a)" transform="rotate(-20 14 90)"/&gt;
+  <span class="cm">&lt;!-- Weapon slot — only one .weapon-active shown at a time --&gt;</span>
+  &lt;g class="weapon weapon-sword"&gt;...&lt;/g&gt;
+  &lt;g class="weapon weapon-keyboard" style="display:none"&gt;...&lt;/g&gt;
+  <span class="cm">&lt;!-- etc. --&gt;</span>
+&lt;/svg&gt;</code></pre>
+
+<h3>5.5 Arm CSS Positioning &amp; Animation</h3>
+<pre><code>.fighter-arm { position:absolute; bottom:4px; width:48px; height:110px; }
+.fighter-arm.arm-right { right:-52px; transform-origin:24px 0; }
+.fighter-arm.arm-left  { left:-52px;  transform:scaleX(-1); transform-origin:24px 0; }
+
+<span class="op">@keyframes</span> arm-swing-ready {
+  0%,100% { transform: rotate(-15deg); }
+  50%     { transform: rotate(20deg);  }
+}
+<span class="op">@keyframes</span> arm-swing-attack {
+  0%  { transform: rotate(-30deg); }
+  40% { transform: rotate(50deg);  }
+  60% { transform: rotate(50deg);  }
+  100%{ transform: rotate(-30deg); }
+}
+.arm-swinging.arm-right  { animation: arm-swing-ready  0.7s ease-in-out infinite; }
+.arm-attacking.arm-right { animation: arm-swing-attack 0.5s ease-in-out; }</code></pre>
+
+<h3>5.6 Battle Settings Schema — <code>es_battleSettings</code></h3>
+<pre><code>{
+  <span class="op">battleStyle</span>:          <span class="str">'round-robin'</span>,  <span class="cm">// 'round-robin' | 'free-for-all'</span>
+  <span class="op">speed</span>:                <span class="str">'normal'</span>,        <span class="cm">// 'slow' | 'normal' | 'fast'</span>
+  <span class="op">totalDuration</span>:        <span class="num">12000</span>,
+  <span class="op">hitWords</span>:             [<span class="str">'POW!'</span>,<span class="str">'WHAM!'</span>,<span class="str">'BAM!'</span>,<span class="str">'ZAP!'</span>,<span class="str">'KABLAM!'</span>,<span class="str">'CRUNCH!'</span>,<span class="str">'SMASH!'</span>],
+  <span class="op">teamColors</span>:           [<span class="str">'#4488cc'</span>,<span class="str">'#cc4444'</span>,<span class="str">'#44cc44'</span>,<span class="str">'#cc44cc'</span>],
+  <span class="op">fightCloudColor</span>:      <span class="str">'rgba(255,200,50,0.9)'</span>,
+  <span class="op">arenaBackground</span>:      <span class="str">'rgba(0,0,0,0.85)'</span>,
+  <span class="op">arenaBlur</span>:            <span class="kw">true</span>,
+  <span class="op">weaponStyle</span>:          <span class="str">'random'</span>,        <span class="cm">// any weapon key or 'random'</span>
+  <span class="op">perFighterWeapon</span>:     <span class="kw">false</span>,
+  <span class="op">armSkinTone</span>:          <span class="str">'#f4c08a'</span>,
+  <span class="op">armSleeveFollowsTeam</span>: <span class="kw">true</span>,
+  <span class="op">armSleeveColor</span>:       <span class="str">'#4488cc'</span>,
+  <span class="op">batteredFilter</span>:       <span class="kw">true</span>,
+  <span class="op">orbitingStars</span>:        <span class="kw">true</span>,
+  <span class="op">starCount</span>:            <span class="num">3</span>,
+  <span class="op">resolutionLine1</span>:      <span class="str">'⚔️ A fierce battle of opinions!'</span>,
+  <span class="op">resolutionLine2</span>:      <span class="str">'State your case — describe your reasoning and let\'s find common ground.'</span>,
+  <span class="op">autoSkipMs</span>:           <span class="num">14000</span>
+}</code></pre>
+
+<!-- ═══ 6. WEAPONS ═════════════════════════════════════════════════════════════════════════ -->
+<h2 id="weapons-classic">6. Weapons Arsenal</h2>
+
+<h3>Complete Weapon Registry</h3>
+<pre><code><span class="kw">const</span> WEAPON_REGISTRY = {
+  <span class="cm">// Classic</span>
+  <span class="op">sword</span>:          { label: <span class="str">'🗡️ Sword'</span>,           hitWords: [<span class="str">'POW!'</span>,<span class="str">'SLASH!'</span>,<span class="str">'CLANG!'</span>] },
+  <span class="op">stick</span>:          { label: <span class="str">'🏏 Stick/Club'</span>,       hitWords: [<span class="str">'THWACK!'</span>,<span class="str">'BONK!'</span>,<span class="str">'WHUMP!'</span>] },
+  <span class="op">fist</span>:           { label: <span class="str">'✊ Fist'</span>,              hitWords: [<span class="str">'POW!'</span>,<span class="str">'WHAM!'</span>,<span class="str">'BAM!'</span>] },
+  <span class="op">pencil</span>:         { label: <span class="str">'✏️ Pencil'</span>,            hitWords: [<span class="str">'SCRIBBLE!'</span>,<span class="str">'DRAFT!'</span>,<span class="str">'REVISE!'</span>] },
+  <span class="op">wand</span>:           { label: <span class="str">'🪄 Magic Wand'</span>,        hitWords: [<span class="str">'ZAP!'</span>,<span class="str">'KAPOW!'</span>,<span class="str">'ALAKAZAM!'</span>] },
+  <span class="cm">// Tech</span>
+  <span class="op">toast</span>:          { label: <span class="str">'🍞 Toast'</span>,             hitWords: [<span class="str">'CRUMBLE!'</span>,<span class="str">'BUTTER!'</span>,<span class="str">'TOASTED!'</span>] },
+  <span class="op">keyboard</span>:       { label: <span class="str">'⌨️ Keyboard'</span>,          hitWords: [<span class="str">'CTRL+ALT+DEL!'</span>,<span class="str">'SYNTAX ERROR!'</span>,<span class="str">'BUFFER OVERFLOW!'</span>] },
+  <span class="op">monitor</span>:        { label: <span class="str">'🖥️ Monitor'</span>,           hitWords: [<span class="str">'BSOD!'</span>,<span class="str">'404!'</span>,<span class="str">'KERNEL PANIC!'</span>] },
+  <span class="op">mouseNunchuk</span>:   { label: <span class="str">'🖱️🖱️ Mouse Nunchuks'</span>, hitWords: [<span class="str">'DOUBLE CLICK!'</span>,<span class="str">'RIGHT CLICK!'</span>,<span class="str">'DRAG &amp; DROP!'</span>] },
+  <span class="op">mouseFlail</span>:     { label: <span class="str">'🖱️ Mouse Flail'</span>,       hitWords: [<span class="str">'SCROLL LOCK!'</span>,<span class="str">'CAPS LOCK!'</span>,<span class="str">'NUM LOCK!'</span>] },
+  <span class="op">creditCard</span>:     { label: <span class="str">'💳 Credit Card'</span>,       hitWords: [<span class="str">'DECLINED!'</span>,<span class="str">'INSUFFICIENT FUNDS!'</span>,<span class="str">'CHARGEBACK!'</span>] },
+  <span class="op">posTerminal</span>:    { label: <span class="str">'🧾 POS Terminal'</span>,      hitWords: [<span class="str">'PROCESSING...'</span>,<span class="str">'AMOUNT: ∞'</span>,<span class="str">'PIN REQUIRED!'</span>] },
+  <span class="op">usbDrive</span>:       { label: <span class="str">'🔌 USB Drive'</span>,         hitWords: [<span class="str">'PLUG &amp; PLAY!'</span>,<span class="str">'NOT RECOGNIZED!'</span>,<span class="str">'SAFELY REMOVE!'</span>] },
+  <span class="op">ethernetWhip</span>:   { label: <span class="str">'🪢 Ethernet Whip'</span>,     hitWords: [<span class="str">'PACKET LOSS!'</span>,<span class="str">'TIMEOUT!'</span>,<span class="str">'PING: 9999ms'</span>] },
+  <span class="op">floppyShuriken</span>: { label: <span class="str">'💾 Floppy Disk'</span>,       hitWords: [<span class="str">'CORRUPTED!'</span>,<span class="str">'DISK FULL!'</span>,<span class="str">'SAVE ERROR!'</span>] },
+  <span class="op">random</span>:         { label: <span class="str">'🎲 Random'</span>,             hitWords: [] }
+};</code></pre>
+
+<div class="weapon-grid">
+  <div class="weapon-card"><span class="icon">🗡️</span><div class="name">Sword</div><div class="words">SLASH! CLANG!</div></div>
+  <div class="weapon-card"><span class="icon">🏏</span><div class="name">Stick/Club</div><div class="words">THWACK! BONK!</div></div>
+  <div class="weapon-card"><span class="icon">✊</span><div class="name">Fist</div><div class="words">WHAM! BAM!</div></div>
+  <div class="weapon-card"><span class="icon">✏️</span><div class="name">Pencil</div><div class="words">SCRIBBLE! REVISE!</div></div>
+  <div class="weapon-card"><span class="icon">🪄</span><div class="name">Magic Wand</div><div class="words">ZAP! ALAKAZAM!</div></div>
+  <div class="weapon-card"><span class="icon">🍞</span><div class="name">Toast</div><div class="words">CRUMBLE! TOASTED!</div></div>
+  <div class="weapon-card"><span class="icon">⌨️</span><div class="name">Keyboard</div><div class="words">CTRL+ALT+DEL!</div></div>
+  <div class="weapon-card"><span class="icon">🖥️</span><div class="name">Monitor</div><div class="words">BSOD! 404!</div></div>
+  <div class="weapon-card"><span class="icon">🖱️🖱️</span><div class="name">Mouse Nunchuks</div><div class="words">DOUBLE CLICK!</div></div>
+  <div class="weapon-card"><span class="icon">🖱️</span><div class="name">Mouse Flail</div><div class="words">SCROLL LOCK!</div></div>
+  <div class="weapon-card"><span class="icon">💳</span><div class="name">Credit Card</div><div class="words">DECLINED!</div></div>
+  <div class="weapon-card"><span class="icon">🧾</span><div class="name">POS Terminal</div><div class="words">PROCESSING...</div></div>
+  <div class="weapon-card"><span class="icon">🔌</span><div class="name">USB Drive</div><div class="words">PLUG &amp; PLAY!</div></div>
+  <div class="weapon-card"><span class="icon">🪢</span><div class="name">Ethernet Whip</div><div class="words">PACKET LOSS!</div></div>
+  <div class="weapon-card"><span class="icon">💾</span><div class="name">Floppy Disk</div><div class="words">CORRUPTED!</div></div>
+  <div class="weapon-card"><span class="icon">🎲</span><div class="name">Random</div><div class="words">picks at battle start</div></div>
+</div>
+
+<h2 id="weapons-tech">Tech Weapon SVG Specifications</h2>
+
+<!-- TOAST -->
+<h3 id="weapons-toast">🍞 Toast</h3>
+<div class="callout good"><strong>Source</strong>Custom SVG. OpenMoji 🍞 (CC BY-SA 4.0) used as visual reference. Attribution required — see §7.</div>
+<p><b>Attack:</b> Flat-swipe arc (horizontal 90° rotation at swing peak). <b>Hit word:</b> CRUMBLE! → BUTTER! → TOASTED! <b>Hit effect:</b> 8 tan/brown squares (crumbs) scatter from impact with gravity CSS animation.</p>
+<pre><code>&lt;g class="weapon weapon-toast"&gt;
+  &lt;rect x="6"  y="18" width="36" height="40" rx="4"  fill="#8B5E3C"/&gt; <span class="cm">&lt;!-- crust --&gt;</span>
+  &lt;rect x="10" y="24" width="28" height="30" rx="3"  fill="#D4A26A"/&gt; <span class="cm">&lt;!-- bread --&gt;</span>
+  &lt;ellipse cx="24" cy="20" rx="16" ry="9"            fill="#8B5E3C"/&gt; <span class="cm">&lt;!-- top bump --&gt;</span>
+  &lt;ellipse cx="24" cy="19" rx="13" ry="7"            fill="#C8864A"/&gt;
+  &lt;line x1="12" y1="28" x2="34" y2="40" stroke="#B8742A" stroke-width="1.5" stroke-linecap="round"/&gt; <span class="cm">&lt;!-- burn lines --&gt;</span>
+  &lt;line x1="12" y1="37" x2="34" y2="49" stroke="#B8742A" stroke-width="1.5" stroke-linecap="round"/&gt;
+  &lt;rect x="14" y="28" width="10" height="7" rx="2"  fill="#ffd966" opacity="0.9"
+        transform="rotate(-8 19 31)"/&gt; <span class="cm">&lt;!-- butter pat --&gt;</span>
+  &lt;path d="M16 15 Q14 10 16 6 Q18 2 16 -2" <span class="cm">&lt;!-- steam wisps --&gt;</span>
+        stroke="rgba(200,200,200,0.7)" stroke-width="1.5" fill="none" stroke-linecap="round"/&gt;
+  &lt;path d="M28 14 Q26 9 28 5 Q30 1 28 -3"
+        stroke="rgba(200,200,200,0.7)" stroke-width="1.5" fill="none" stroke-linecap="round"/&gt;
+&lt;/g&gt;</code></pre>
+
+<!-- KEYBOARD -->
+<h3 id="weapons-keyboard">⌨️ Keyboard</h3>
+<div class="callout good"><strong>Source</strong>Tabler Icons <code>keyboard</code> — MIT license, no attribution required. Download: <a href="https://tabler.io/icons/icon/keyboard" target="_blank">tabler.io/icons/icon/keyboard</a> — paste the SVG path data. Scale 2.2× with −15° rotation.</div>
+<p><b>Attack:</b> Overhead cricket-bat slam. <b>Hit word:</b> CTRL+ALT+DEL! → SYNTAX ERROR! → BUFFER OVERFLOW! <b>Hit effect:</b> 3–5 random keycap letters (Q, W, $, ESC) spin away.</p>
+<pre><code>&lt;g class="weapon weapon-keyboard"
+   transform="translate(-14,5) scale(2.2) rotate(-15 12 12)"&gt;
+  <span class="cm">&lt;!-- Paste Tabler 'keyboard' SVG path data here. Fallback: --&gt;</span>
+  &lt;rect x="1"  y="5"  width="22" height="14" rx="2" fill="#e0e0e0" stroke="#bbb" stroke-width="0.5"/&gt;
+  &lt;rect x="2.5" y="6.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="5.5" y="6.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="8.5" y="6.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="11.5" y="6.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="14.5" y="6.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="17.5" y="6.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="20.5" y="6.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="2.5" y="9.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="5.5" y="9.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="8.5" y="9.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="11.5" y="9.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="14.5" y="9.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="17.5" y="9.5" width="2" height="2" rx="0.4" fill="#aaa"/&gt;
+  &lt;rect x="6"   y="12.5" width="12" height="2" rx="0.8" fill="#aaa"/&gt; <span class="cm">&lt;!-- space bar --&gt;</span>
+  &lt;rect x="20.5" y="9.5" width="2" height="5" rx="0.4" fill="#ff6644"/&gt; <span class="cm">&lt;!-- enter key (red) --&gt;</span>
+&lt;/g&gt;</code></pre>
+
+<!-- MONITOR -->
+<h3 id="weapons-monitor">🖥️ Computer Monitor</h3>
+<div class="callout good"><strong>Source</strong>Tabler Icons <code>device-imac</code> — MIT license. Download: <a href="https://tabler.io/icons/icon/device-imac" target="_blank">tabler.io/icons/icon/device-imac</a>. Scale 2.8× with −10° rotation. Held by stand base like a mace.</div>
+<p><b>Attack:</b> Slow heavy overhead slam. <b>Hit word:</b> BSOD! → 404! → KERNEL PANIC! <b>Hit effect:</b> Full-arena blue flash (150ms, 20% opacity) + white scan lines drift down 500ms.</p>
+<pre><code>&lt;g class="weapon weapon-monitor"
+   transform="translate(-22,-10) scale(2.8) rotate(-10 12 12)"&gt;
+  <span class="cm">&lt;!-- Paste Tabler 'device-imac' path data here. Fallback: --&gt;</span>
+  &lt;rect x="1"   y="1"   width="22" height="16" rx="2" fill="#2c2c2c"/&gt;
+  &lt;rect x="2.5" y="2.5" width="19" height="12" rx="1" fill="#1a6aff"/&gt;
+  &lt;line x1="4"  y1="4"  x2="9"    y2="4"  stroke="rgba(255,255,255,0.35)" stroke-width="0.8"/&gt;
+  &lt;text x="12" y="11" text-anchor="middle" font-size="6"
+        class="monitor-battle-icon"&gt;💀&lt;/text&gt; <span class="cm">&lt;!-- shown during slam --&gt;</span>
+  &lt;rect x="10"  y="17"  width="4"  height="4"  fill="#2c2c2c"/&gt; <span class="cm">&lt;!-- neck --&gt;</span>
+  &lt;rect x="7"   y="21"  width="10" height="2"  rx="1" fill="#2c2c2c"/&gt; <span class="cm">&lt;!-- base --&gt;</span>
+&lt;/g&gt;</code></pre>
+
+<!-- MOUSE NUNCHUK -->
+<h3 id="weapons-nunchuk">🖱️🖱️ Mouse Nunchuks</h3>
+<div class="callout good"><strong>Source</strong>Tabler Icons <code>device-computer-mouse</code> (MIT) × 2. Download: <a href="https://tabler.io/icons/icon/device-computer-mouse" target="_blank">tabler.io/icons</a>. Custom cable connector.</div>
+<p><b>Attack:</b> Figure-8 swing. JS morphs the <code>.nunchuk-cord</code> path <code>d</code> attribute through 4 Bezier keyframes with 150ms cord lag. <b>Hit word:</b> DOUBLE CLICK! → RIGHT CLICK! → DRAG &amp; DROP! <b>Hit effect:</b> Two simultaneous impact circles.</p>
+<pre><code>&lt;g class="weapon weapon-mouse-nunchuk" transform="translate(-8,0)"&gt;
+  &lt;!-- Mouse 1 in fist --&gt;
+  &lt;g transform="translate(12,20)"&gt;
+    &lt;ellipse cx="8" cy="12" rx="8" ry="12" fill="#e8e8e8"/&gt;
+    &lt;ellipse cx="8" cy="12" rx="6" ry="10" fill="#f0f0f0"/&gt;
+    &lt;path d="M4 3 Q8 1 12 3" stroke="#ccc" stroke-width="0.8" fill="none"/&gt;
+    &lt;ellipse cx="8" cy="8" rx="2.5" ry="4" fill="#bbb"/&gt;
+    &lt;circle  cx="8" cy="22" r="1.5" fill="#88aaff"/&gt;
+  &lt;/g&gt;
+  &lt;!-- Connecting cord (JS animates d attribute) --&gt;
+  &lt;path class="nunchuk-cord"
+        d="M20 44 C10 52,32 60,20 68 C8 76,30 84,24 92"
+        stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/&gt;
+  &lt;!-- Mouse 2 at cord end --&gt;
+  &lt;g transform="translate(18,90) rotate(40)"&gt;
+    &lt;ellipse cx="8" cy="12" rx="8" ry="12" fill="#e8e8e8"/&gt;
+    &lt;ellipse cx="8" cy="12" rx="6" ry="10" fill="#f0f0f0"/&gt;
+    &lt;path d="M4 3 Q8 1 12 3" stroke="#ccc" stroke-width="0.8" fill="none"/&gt;
+    &lt;ellipse cx="8" cy="8" rx="2.5" ry="4" fill="#bbb"/&gt;
+    &lt;circle  cx="8" cy="22" r="1.5" fill="#88aaff"/&gt;
+  &lt;/g&gt;
+&lt;/g&gt;</code></pre>
+
+<!-- MOUSE FLAIL -->
+<h3 id="weapons-flail">🖱️ Mouse Flail</h3>
+<div class="callout good"><strong>Source</strong>Same Tabler <code>device-computer-mouse</code> icon. Cord is a dynamic Bezier path.</div>
+<p><b>Attack:</b> JS drives <code>requestAnimationFrame</code> loop orbiting the mouse around the fist (radius 45px). Cord <code>d</code> updates each frame. Motion-blur ghost copies at 0.3 and 0.15 opacity trace the arc. <b>Hit word:</b> SCROLL LOCK! → CAPS LOCK! → NUM LOCK!</p>
+<pre><code>&lt;g class="weapon weapon-mouse-flail"&gt;
+  &lt;path class="flail-cord"
+        d="M24 84 C32 72,52 56,46 40 C40 24,22 18,30 8"
+        stroke="#555" stroke-width="2.5" fill="none" stroke-linecap="round"/&gt;
+  &lt;g class="flail-mouse"&gt;  <span class="cm">&lt;!-- JS animates transform --&gt;</span>
+    &lt;ellipse cx="8" cy="12" rx="8" ry="12" fill="#e8e8e8"/&gt;
+    &lt;ellipse cx="8" cy="12" rx="6" ry="10" fill="#f0f0f0"/&gt;
+    &lt;ellipse cx="8" cy="8"  rx="2.5" ry="4" fill="#bbb"/&gt;
+    &lt;circle  cx="8" cy="22" r="1.5" fill="#88aaff"/&gt;
+  &lt;/g&gt;
+  &lt;g class="flail-ghost-1" opacity="0.3"&gt;&lt;!-- same mouse, 20° behind --&gt;&lt;/g&gt;
+  &lt;g class="flail-ghost-2" opacity="0.15"&gt;&lt;!-- 40° behind --&gt;&lt;/g&gt;
+&lt;/g&gt;</code></pre>
+
+<!-- CREDIT CARD -->
+<h3 id="weapons-card">💳 Credit Card</h3>
+<div class="callout good"><strong>Source</strong>Tabler Icons <code>credit-card</code> — MIT. Download: <a href="https://tabler.io/icons/icon/credit-card" target="_blank">tabler.io/icons/icon/credit-card</a>. Held edge-on as a blade / shuriken.</div>
+<p><b>Attack:</b> Forward flick with CSS spin at 60ms per revolution, <code>ease-out</code> deceleration on hit. Card "embeds" and wobbles ±5° post-impact. <b>Hit word:</b> DECLINED! → INSUFFICIENT FUNDS! → CHARGEBACK!</p>
+<pre><code>&lt;g class="weapon weapon-credit-card"
+   transform="translate(-5,22) rotate(-30 20 13)"&gt;
+  &lt;rect x="0"  y="0"  width="42" height="27" rx="3"  fill="#1a3a6e"/&gt;
+  &lt;rect x="0"  y="5"  width="42" height="7"          fill="#111"/&gt; <span class="cm">&lt;!-- mag stripe --&gt;</span>
+  &lt;rect x="4"  y="14" width="11" height="9"  rx="1"  fill="#d4a017"/&gt; <span class="cm">&lt;!-- chip --&gt;</span>
+  &lt;line x1="4" y1="17" x2="15" y2="17" stroke="#b8860b" stroke-width="0.6"/&gt;
+  &lt;line x1="4" y1="20" x2="15" y2="20" stroke="#b8860b" stroke-width="0.6"/&gt;
+  &lt;line x1="9" y1="14" x2="9"  y2="23" stroke="#b8860b" stroke-width="0.6"/&gt;
+  &lt;circle cx="21" cy="19" r="1.3" fill="#999"/&gt;
+  &lt;circle cx="25" cy="19" r="1.3" fill="#999"/&gt;
+  &lt;circle cx="29" cy="19" r="1.3" fill="#999"/&gt;
+  &lt;circle cx="33" cy="19" r="1.3" fill="#999"/&gt;
+  &lt;line x1="3"  y1="1.5" x2="16" y2="1.5"
+        stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/&gt; <span class="cm">&lt;!-- shine --&gt;</span>
+  &lt;circle cx="36" cy="10" r="4" fill="none" stroke="#ff6600" stroke-width="1.2"/&gt;
+  &lt;circle cx="39" cy="10" r="4" fill="none" stroke="#ff9900" stroke-width="1.2" opacity="0.7"/&gt;
+&lt;/g&gt;</code></pre>
+
+<!-- POS TERMINAL -->
+<h3 id="weapons-pos">🧾 POS / Payment Terminal</h3>
+<div class="callout note"><strong>Source</strong>Fully custom SVG — no open source equivalent exists for a recognisable POS terminal. Design based on a typical Ingenico/Verifone form factor.</div>
+<p><b>Attack:</b> Overhead gavel slam. <b>Hit word:</b> PROCESSING... → AMOUNT: ∞ → PIN REQUIRED! <b>Hit effect:</b> <code>.pos-receipt</code> animates <code>translateY(-40px)</code> over 300ms (paper feeds out). Screen flashes green → red. Receipt text: "AMOUNT: ∞".</p>
+<pre><code>&lt;g class="weapon weapon-pos-terminal" transform="translate(8,8)"&gt;
+  &lt;rect x="0"  y="0"  width="28" height="52" rx="4" fill="#2c2c2c"/&gt; <span class="cm">&lt;!-- body --&gt;</span>
+  &lt;rect x="3"  y="3"  width="22" height="16" rx="2" fill="#1a8a3c"/&gt; <span class="cm">&lt;!-- screen --&gt;</span>
+  &lt;rect x="5"  y="6"  width="14" height="2"  rx="0.5" fill="#00ff66" opacity="0.9"/&gt;
+  &lt;rect x="5"  y="10" width="9"  height="2"  rx="0.5" fill="#00ff66" opacity="0.7"/&gt;
+  &lt;rect x="5"  y="14" width="12" height="2"  rx="0.5" fill="#00ff66" opacity="0.5"/&gt;
+  <span class="cm">&lt;!-- keypad 3×3 --&gt;</span>
+  &lt;rect x="4"  y="23" width="6" height="5" rx="1" fill="#444"/&gt;
+  &lt;rect x="11" y="23" width="6" height="5" rx="1" fill="#444"/&gt;
+  &lt;rect x="18" y="23" width="6" height="5" rx="1" fill="#444"/&gt;
+  &lt;rect x="4"  y="30" width="6" height="5" rx="1" fill="#444"/&gt;
+  &lt;rect x="11" y="30" width="6" height="5" rx="1" fill="#444"/&gt;
+  &lt;rect x="18" y="30" width="6" height="5" rx="1" fill="#444"/&gt;
+  &lt;rect x="4"  y="37" width="6" height="5" rx="1" fill="#444"/&gt;
+  &lt;rect x="11" y="37" width="6" height="5" rx="1" fill="#006600"/&gt; <span class="cm">&lt;!-- OK green --&gt;</span>
+  &lt;rect x="18" y="37" width="6" height="5" rx="1" fill="#660000"/&gt; <span class="cm">&lt;!-- Cancel red --&gt;</span>
+  <span class="cm">&lt;!-- card slot --&gt;</span>
+  &lt;rect x="6"  y="44" width="16" height="4" rx="1" fill="#555"/&gt;
+  &lt;rect x="11" y="44" width="6"  height="4"        fill="#111"/&gt;
+  <span class="cm">&lt;!-- receipt paper (animates on hit) --&gt;</span>
+  &lt;g class="pos-receipt"&gt;
+    &lt;rect x="9" y="-2" width="10" height="5" rx="1" fill="#f5f5f5"/&gt;
+    &lt;path d="M10 -4 Q11 -5.5 12 -4 Q13 -2.5 14 -4 Q15 -5.5 16 -4 Q17 -2.5 18 -4"
+          stroke="#ccc" stroke-width="0.6" fill="none"/&gt;
+  &lt;/g&gt;
+&lt;/g&gt;</code></pre>
+
+<!-- USB -->
+<h3 id="weapons-usb">🔌 USB Drive</h3>
+<div class="callout good"><strong>Source</strong>Tabler Icons <code>usb</code> — MIT. Download: <a href="https://tabler.io/icons/icon/usb" target="_blank">tabler.io/icons/icon/usb</a></div>
+<p><b>Attack:</b> Fast jab thrust (200ms forward + return). <b>Hit word:</b> PLUG &amp; PLAY! → NOT RECOGNIZED! → SAFELY REMOVE! <b>Hit effect:</b> 5–6 gold spark circles scatter from connector tip.</p>
+<pre><code>&lt;g class="weapon weapon-usb" transform="translate(10,12)"&gt;
+  &lt;rect x="5"  y="22" width="18" height="38" rx="3"  fill="#4488cc"/&gt;
+  &lt;rect x="5"  y="22" width="18" height="7"  rx="2"  fill="#2255aa"/&gt;
+  &lt;rect x="5"  y="31" width="18" height="2"           fill="#336699"/&gt; <span class="cm">&lt;!-- stripe --&gt;</span>
+  &lt;rect x="7"  y="10" width="14" height="14" rx="1"  fill="#c8c8c8"/&gt; <span class="cm">&lt;!-- USB connector --&gt;</span>
+  &lt;rect x="8"  y="11" width="12" height="12" rx="0.5" fill="#b0b0b0"/&gt;
+  &lt;rect x="10" y="12" width="2"  height="5"           fill="#888"/&gt;
+  &lt;rect x="16" y="12" width="2"  height="5"           fill="#888"/&gt;
+  &lt;circle cx="14" cy="46" r="2.5" fill="#00ff88" opacity="0.95"/&gt; <span class="cm">&lt;!-- LED --&gt;</span>
+  &lt;circle cx="14" cy="56" r="3"  fill="none" stroke="#3366aa" stroke-width="1.5"/&gt; <span class="cm">&lt;!-- keychain --&gt;</span>
+&lt;/g&gt;</code></pre>
+
+<!-- ETHERNET -->
+<h3 id="weapons-ethernet">🪢 Ethernet Cable Whip</h3>
+<div class="callout note"><strong>Source</strong>Custom SVG. Cable is a JS-morphed Bezier path. RJ45 connector custom-drawn.</div>
+<p><b>Attack:</b> Whip-crack — cable path morphs from coiled (S-curve) to extended in 200ms via JS-driven <code>d</code> attribute interpolation. The <code>.whip-tip</code> element translates along the path endpoint. <b>Hit word:</b> PACKET LOSS! → TIMEOUT! → PING: 9999ms <b>Hit effect:</b> Snap-ring radiates from RJ45 tip (expanding circle, opacity 0→1→0 over 300ms).</p>
+<pre><code>&lt;g class="weapon weapon-ethernet"&gt;
+  &lt;path class="whip-cord"
+        d="M24 82 C34 66,18 52,32 36 C46 20,22 10,38 -6"
+        stroke="#f5a623" stroke-width="4" fill="none" stroke-linecap="round"/&gt;
+  &lt;path class="whip-cord-stripe"
+        d="M24 82 C34 66,18 52,32 36 C46 20,22 10,38 -6"
+        stroke="#d48f1a" stroke-width="1.8" fill="none"
+        stroke-dasharray="5 9" stroke-linecap="round"/&gt;
+  &lt;!-- RJ45 connector at whip tip --&gt;
+  &lt;g class="whip-tip" transform="translate(32,-10) rotate(45)"&gt;
+    &lt;rect x="-5" y="-4"  width="10" height="8"  rx="1.5" fill="#ccc"/&gt;
+    &lt;rect x="-4" y="4"   width="8"  height="4"  rx="0.5" fill="#aaa"/&gt;
+    &lt;rect x="-4" y="2" width="1.2" height="3" fill="#888"/&gt;
+    &lt;rect x="-2" y="2" width="1.2" height="3" fill="#888"/&gt;
+    &lt;rect x="0"  y="2" width="1.2" height="3" fill="#888"/&gt;
+    &lt;rect x="2"  y="2" width="1.2" height="3" fill="#888"/&gt;
+    &lt;rect x="4"  y="2" width="1.2" height="3" fill="#888"/&gt;
+    &lt;rect x="-3" y="-6" width="6" height="3" rx="1" fill="#aaa"/&gt; <span class="cm">&lt;!-- locking tab --&gt;</span>
+  &lt;/g&gt;
+&lt;/g&gt;</code></pre>
+
+<!-- FLOPPY -->
+<h3 id="weapons-floppy">💾 Floppy Disk Shuriken</h3>
+<div class="callout note"><strong>Source</strong>Custom SVG — classic 3.5" floppy disk design, thrown spinning like a ninja star.</div>
+<p><b>Attack:</b> Spinning shuriken throw — CSS spin at 45ms per revolution. <b>Hit word:</b> CORRUPTED! → DISK FULL! → SAVE ERROR! <b>Hit effect:</b> Matrix rain — 8–10 green characters (0, 1, #, %) fall from impact point via <code>@keyframes matrix-fall</code>.</p>
+<pre><code>&lt;g class="weapon weapon-floppy"
+   transform="translate(4,16) rotate(-20 17 18)"&gt;
+  &lt;rect x="0"  y="0"  width="34" height="36" rx="2.5" fill="#1a1a2e"/&gt; <span class="cm">&lt;!-- body --&gt;</span>
+  &lt;rect x="4"  y="4"  width="26" height="18" rx="1.5" fill="#e8e4d9"/&gt; <span class="cm">&lt;!-- label --&gt;</span>
+  &lt;line x1="6"  y1="8"  x2="28" y2="8"  stroke="#ccc" stroke-width="1.2"/&gt;
+  &lt;line x1="6"  y1="12" x2="24" y2="12" stroke="#ccc" stroke-width="1.2"/&gt;
+  &lt;line x1="6"  y1="16" x2="26" y2="16" stroke="#ccc" stroke-width="1.2"/&gt;
+  &lt;rect x="10" y="25" width="18" height="9" rx="1"    fill="#999"/&gt; <span class="cm">&lt;!-- shutter --&gt;</span>
+  &lt;rect x="14" y="25" width="10" height="9"            fill="#666"/&gt; <span class="cm">&lt;!-- disk opening --&gt;</span>
+  &lt;circle cx="19" cy="29" r="3"                        fill="#333"/&gt; <span class="cm">&lt;!-- hub --&gt;</span>
+  &lt;circle cx="19" cy="29" r="1.2"                      fill="#888"/&gt;
+  &lt;rect x="2"  y="28" width="5" height="5" rx="1"     fill="#333"/&gt; <span class="cm">&lt;!-- write-protect --&gt;</span>
+  &lt;rect x="25" y="27" width="6" height="5" rx="0.5"   fill="#2244aa"/&gt; <span class="cm">&lt;!-- logo --&gt;</span>
+&lt;/g&gt;</code></pre>
+
+<!-- ═══ 7. ATTRIBUTION ═════════════════════════════════════════════════════════════════════ -->
+<h2 id="attribution">7. Open Source Attribution</h2>
+
+<div class="callout warn">
+  <strong>Required Action</strong>
+  Create <code>wwwroot/OPEN-SOURCE-CREDITS.txt</code> and display its contents in the About tab of the settings modal.
+</div>
+
+<div class="table-wrap"><table>
+  <tr><th>Asset</th><th>License</th><th>Attribution Required</th><th>URL</th></tr>
+  <tr><td>Tabler Icons (keyboard, device-imac, device-computer-mouse, credit-card, usb)</td>
+      <td><span class="badge badge-green">MIT</span></td><td>None required</td>
+      <td><a href="https://tabler.io/icons">tabler.io/icons</a></td></tr>
+  <tr><td>DiceBear Core</td>
+      <td><span class="badge badge-green">MIT</span></td><td>None required</td>
+      <td><a href="https://dicebear.com">dicebear.com</a></td></tr>
+  <tr><td>DiceBear Styles (adventurer, bottts, croodles, fun-emoji, pixel-art, micah)</td>
+      <td><span class="badge badge-yellow">CC BY 4.0</span></td><td>Yes — artist names</td>
+      <td><a href="https://dicebear.com/licenses">dicebear.com/licenses</a></td></tr>
+  <tr><td>DiceBear Styles (open-peeps, thumbs)</td>
+      <td><span class="badge badge-green">CC0</span></td><td>None required</td>
+      <td><a href="https://dicebear.com">dicebear.com</a></td></tr>
+  <tr><td>Boring Avatars</td>
+      <td><span class="badge badge-green">MIT</span></td><td>None required</td>
+      <td><a href="https://github.com/boringdesigners/boring-avatars">github.com/boringdesigners</a></td></tr>
+  <tr><td>OpenMoji (toast visual reference)</td>
+      <td><span class="badge badge-yellow">CC BY-SA 4.0</span></td><td>Yes — "OpenMoji"</td>
+      <td><a href="https://openmoji.org">openmoji.org</a></td></tr>
+  <tr><td>canvas-confetti</td>
+      <td><span class="badge badge-green">ISC</span></td><td>None required</td>
+      <td>github.com/catdad/canvas-confetti</td></tr>
+  <tr><td>fireworks-js</td>
+      <td><span class="badge badge-green">MIT</span></td><td>None required</td>
+      <td>github.com/crashmax-dev/fireworks-js</td></tr>
+  <tr><td>Custom SVGs (Mouse Nunchuks, Mouse Flail, POS Terminal, Ethernet Whip, Floppy Shuriken, Toast)</td>
+      <td><span class="badge badge-green">MIT</span></td><td>None — original work</td><td>—</td></tr>
+</table></div>
+
+<!-- ═══ 8. FILE MANIFEST ══════════════════════════════════════════════════════════════════ -->
+<h2 id="manifest">8. Complete File Manifest</h2>
+
+<h3>Modified Files</h3>
+<div class="table-wrap"><table>
+  <tr><th>File</th><th>Changes</th></tr>
+  <tr><td><code>PokerModels.cs</code></td>
+      <td>Add <code>AvatarData: string?</code> to <code>Participant</code>; add <code>ShameParticipantName</code> and <code>ShameParticipantId</code> to vote stats object</td></tr>
+  <tr><td><code>PokerHub.cs</code></td>
+      <td>Extend <code>CalculateStats()</code> with outlier detection; add <code>UpdateAvatar(string)</code> hub method; include <code>avatarData</code> in <code>JoinRoom</code>, <code>RoomState</code>, <code>ParticipantJoined</code>, <code>NameUpdated</code> broadcasts; update <code>JoinRoom</code> signature with optional <code>avatarData</code> param</td></tr>
+  <tr><td><code>wwwroot/js/room.js</code></td>
+      <td>Update <code>renderParticipants()</code> to call <code>renderAvatar()</code>; add <code>AvatarUpdated</code> SignalR handler; add post-reveal dispatch logic; add <code>buildVoteGroups()</code> and <code>totalVoters()</code> helpers; add <code>data-participant-id</code> attributes to participant badge elements</td></tr>
+  <tr><td><code>wwwroot/js/site.js</code></td>
+      <td>Wire new Behavior tab to <code>openSettingsModal()</code>; add avatar picker logic in Profile tab; call <code>populateShameTab()</code>, <code>populateBattleTab()</code>, <code>populateAvatarTab()</code> on modal open; add save handlers for each new settings section</td></tr>
+  <tr><td><code>wwwroot/css/site.css</code></td>
+      <td>Import new CSS files; verify no selector conflicts with <code>.avatar-wrapper</code>, <code>.battle-arena-overlay</code>, <code>.shame-toast</code></td></tr>
+  <tr><td><code>Views/Shared/_Layout.cshtml</code></td>
+      <td>Add Behavior tab button and pane; expand Profile tab with avatar section; add weapon gallery grid; add shame config HTML; add battle config HTML; add DiceBear + Boring Avatars <code>&lt;script&gt;</code> includes; add new CSS <code>&lt;link&gt;</code> tags</td></tr>
+</table></div>
+
+<h3>New Files</h3>
+<div class="table-wrap"><table>
+  <tr><th>File</th><th>Purpose</th></tr>
+  <tr><td><code>wwwroot/js/avatar.js</code></td>
+      <td>Avatar rendering engine; DiceBear + BoringAvatar wrappers; upload handler (canvas resize to 128×128); <code>getAvatarSettings()</code>, <code>saveAvatarSettings()</code>, settings UI helpers</td></tr>
+  <tr><td><code>wwwroot/js/shame.js</code></td>
+      <td>Shame animation engine; floating emoji spawner; shame toast; positive message transition; <code>getShameSettings()</code>, <code>saveShameSettings()</code>, <code>testShame()</code>, <code>resetShameSettings()</code></td></tr>
+  <tr><td><code>wwwroot/js/battle.js</code></td>
+      <td>Battle animation engine; WEAPON_REGISTRY; <code>buildArmSVG()</code> with all 15 weapon branches; fight sequence orchestrator (lineup → taunt → clash → aftermath → resolution); <code>getBattleSettings()</code>, <code>saveBattleSettings()</code>, <code>testBattle()</code>, <code>resetBattleSettings()</code></td></tr>
+  <tr><td><code>wwwroot/css/avatar.css</code></td>
+      <td>Avatar wrapper, vote-status outline rings, DiceBear/Boring style picker grid</td></tr>
+  <tr><td><code>wwwroot/css/shame.css</code></td>
+      <td>Shame pulse/shake/spotlight keyframes, floating emoji, backdrop, toast component</td></tr>
+  <tr><td><code>wwwroot/css/battle.css</code></td>
+      <td>Battle arena overlay, fighter positioning, arm swing keyframes, fight cloud, hit text, aftermath battered filter, orbiting star keyframes, resolution fade-in text</td></tr>
+  <tr><td><code>wwwroot/lib/dicebear/core.umd.min.js</code></td>
+      <td>DiceBear core — vendored from jsDelivr or <code>npm pack @dicebear/core</code></td></tr>
+  <tr><td><code>wwwroot/lib/dicebear/collection.umd.min.js</code></td>
+      <td>DiceBear all styles — vendored</td></tr>
+  <tr><td><code>wwwroot/lib/boring-avatars/boring-avatars.umd.min.js</code></td>
+      <td>Boring Avatars — vendored from <code>npm pack boring-avatars</code></td></tr>
+  <tr><td><code>wwwroot/OPEN-SOURCE-CREDITS.txt</code></td>
+      <td>Attribution file for CC BY licensed assets; also rendered in About tab</td></tr>
+</table></div>
+
+<!-- ═══ 9. IMPLEMENTATION ORDER ═══════════════════════════════════════════════════════════ -->
+<h2 id="order">9. Implementation Order</h2>
+
+<div class="callout info">
+  <strong>Rationale</strong>
+  Avatars are foundational — both the shame highlight and battle animations use them visually. The behavior settings tab should be scaffolded before wiring individual effects so the dispatch logic has a stable home.
+</div>
+
+<h3>Phase 1 — Avatars (Foundational)</h3>
+<ol class="steps">
+  <li>Add <code>AvatarData</code> to <code>Participant</code> model</li>
+  <li>Update hub broadcasts: <code>JoinRoom</code>, <code>RoomState</code>, <code>ParticipantJoined</code>, <code>NameUpdated</code></li>
+  <li>Add <code>UpdateAvatar()</code> hub method with 64 KB guard</li>
+  <li>Vendor DiceBear and Boring Avatars UMD builds into <code>wwwroot/lib/</code></li>
+  <li>Create <code>avatar.js</code> — rendering engine + upload handler</li>
+  <li>Create <code>avatar.css</code></li>
+  <li>Update <code>renderParticipants()</code> in <code>room.js</code> to use <code>renderAvatar()</code></li>
+  <li>Add <code>AvatarUpdated</code> SignalR handler in <code>room.js</code></li>
+  <li>Add avatar picker UI to Profile tab in <code>_Layout.cshtml</code></li>
+</ol>
+
+<h3>Phase 2 — Behavior Settings Tab</h3>
+<ol class="steps">
+  <li>Add Behavior tab button and pane skeleton to <code>_Layout.cshtml</code></li>
+  <li>Implement <code>getPostRevealBehavior()</code> / <code>savePostRevealBehavior()</code></li>
+  <li>Add post-reveal dispatch logic to <code>room.js</code> <code>VotesRevealed</code> handler (stubs OK at this stage)</li>
+</ol>
+
+<h3>Phase 3 — Shame</h3>
+<ol class="steps">
+  <li>Add outlier detection to <code>CalculateStats()</code> in <code>PokerHub.cs</code></li>
+  <li>Add <code>ShameParticipantName</code> / <code>ShameParticipantId</code> to stats broadcast</li>
+  <li>Create <code>shame.js</code></li>
+  <li>Create <code>shame.css</code></li>
+  <li>Add shame config UI section to Behavior tab</li>
+  <li>Wire <code>populateShameTab()</code> / <code>saveShameFromForm()</code> in <code>site.js</code></li>
+</ol>
+
+<h3>Phase 4 — Battle Core</h3>
+<ol class="steps">
+  <li>Create <code>battle.css</code> — arena layout, fighter positioning, arm CSS, cloud, aftermath, resolution</li>
+  <li>Create <code>battle.js</code> skeleton with phase sequence via <code>setTimeout</code></li>
+  <li>Implement <code>buildArmSVG()</code> for classic weapons (sword, stick, fist, pencil, wand)</li>
+  <li>Implement fight cloud + hit text animation</li>
+  <li>Implement aftermath phase (battered filter + orbiting stars)</li>
+  <li>Implement resolution phase + auto-dismiss</li>
+</ol>
+
+<h3>Phase 5 — Tech Weapons</h3>
+<ol class="steps">
+  <li>Add all 10 tech weapon SVG definitions to <code>buildArmSVG()</code></li>
+  <li>Implement weapon-specific attack animations (figure-eight, mouse orbit, whip-crack, card-spin)</li>
+  <li>Implement weapon-specific hit particles (crumbs, keycaps, BSOD flash, matrix rain, receipt paper, sparks, snap-ring)</li>
+  <li>Expand weapon selector grid in battle settings UI (5 → 15 options + per-fighter toggle)</li>
+</ol>
+
+<h3>Phase 6 — Polish &amp; QA</h3>
+<ol class="steps">
+  <li>Add credits to About tab and create <code>wwwroot/OPEN-SOURCE-CREDITS.txt</code></li>
+  <li>End-to-end test all three post-reveal paths: consensus → celebration, outlier → shame, disagreement → battle</li>
+  <li>Verify SignalR payload size for uploaded avatars (≤65 KB guard)</li>
+  <li>Mobile layout pass — arena overlay and shame toast usable on narrow screens</li>
+  <li>Validate all settings persist across page refresh and SignalR reconnect</li>
+  <li>Test with 3+ distinct vote values (round-robin multi-team battle)</li>
+</ol>
+
+<hr>
+<p class="muted" style="text-align:center; padding: 24px 0;">
+  EstimationStation Feature Plan — v1.0 — Generated 2026-05-10<br>
+  Branch: <code>claude/plan-consensus-features-RNEKZ</code>
+</p>
+
+</main>
+</div>
+</body>
+</html>
