@@ -431,23 +431,59 @@ public class PokerHub : Hub
 
     private static object CalculateStats(Room room)
     {
-        var numericVotes = room.Participants
-            .Where(p => !p.IsObserver && p.Vote != null)
-            .Select(p => p.Vote!)
-            .Where(v => double.TryParse(v.Replace("½", "0.5"), out _))
-            .Select(v => double.Parse(v.Replace("½", "0.5")))
+        var numericVoters = room.Participants
+            .Where(p => !p.IsObserver && p.Vote != null && double.TryParse(p.Vote!.Replace("½", "0.5"), out _))
+            .Select(p => (participant: p, val: double.Parse(p.Vote!.Replace("½", "0.5"))))
             .ToList();
 
-        if (numericVotes.Count == 0)
+        if (numericVoters.Count == 0)
+            return new { average = (double?)null, min = (double?)null, max = (double?)null, isConsensus = false,
+                         majorityValue = (string?)null, outlierValue = (string?)null,
+                         shameParticipantName = (string?)null, shameParticipantId = (string?)null };
+
+        var numericValues = numericVoters.Select(x => x.val).ToList();
+        var avg = numericValues.Average();
+        var min = numericValues.Min();
+        var max = numericValues.Max();
+        var isConsensus = numericValues.Distinct().Count() == 1;
+
+        string? majorityValue = null, outlierValue = null, shameParticipantName = null, shameParticipantId = null;
+
+        if (!isConsensus && numericVoters.Count >= 3)
         {
-            return new { average = (double?)null, min = (double?)null, max = (double?)null, isConsensus = false };
+            var groups = numericVoters
+                .GroupBy(x => x.participant.Vote!)
+                .OrderByDescending(g => g.Count())
+                .ToList();
+
+            var topGroup = groups[0];
+            if (topGroup.Count() * 2 >= numericVoters.Count)
+            {
+                majorityValue = topGroup.Key;
+                var majorityNum = double.Parse(majorityValue.Replace("½", "0.5"));
+
+                var outliers = numericVoters
+                    .Where(x => x.participant.Vote != majorityValue)
+                    .OrderByDescending(x => Math.Abs(x.val - majorityNum))
+                    .ToList();
+
+                if (outliers.Count > 0)
+                {
+                    var maxDist = Math.Abs(outliers[0].val - majorityNum);
+                    var farthest = outliers.Where(x => Math.Abs(x.val - majorityNum) == maxDist).ToList();
+
+                    if (farthest.Count == 1)
+                    {
+                        var shame = farthest[0];
+                        outlierValue = shame.participant.Vote;
+                        shameParticipantName = shame.participant.Name;
+                        shameParticipantId = shame.participant.ConnectionId;
+                    }
+                }
+            }
         }
 
-        var avg = numericVotes.Average();
-        var min = numericVotes.Min();
-        var max = numericVotes.Max();
-        var isConsensus = numericVotes.Distinct().Count() == 1;
-
-        return new { average = Math.Round(avg, 1), min, max, isConsensus };
+        return new { average = Math.Round(avg, 1), min, max, isConsensus,
+                     majorityValue, outlierValue, shameParticipantName, shameParticipantId };
     }
 }
