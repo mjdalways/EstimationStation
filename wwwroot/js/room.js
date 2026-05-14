@@ -112,6 +112,7 @@ function registerHandlers() {
         document.getElementById('hideBtn').style.display = 'block';
         renderParticipants();
         showStats(votes, stats, true);
+        if (typeof triggerShame === 'function') triggerShame(stats);
 
         // Record in history
         const storyTitle = roomState.currentStoryId
@@ -233,6 +234,7 @@ function renderParticipants() {
             (p.hasVoted ? ' voted' : '') +
             (p.isObserver ? ' observer' : '') +
             (isMe ? ' me' : '');
+        div.dataset.connectionId = p.connectionId;
 
         let voteDisplay = '';
         if (p.isObserver) {
