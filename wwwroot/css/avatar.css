@@ -1,0 +1,74 @@
+.avatar-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 50%;
+}
+
+.av-initials,
+.av-image,
+.av-image img,
+.av-image svg {
+    width: var(--av-size, 48px);
+    height: var(--av-size, 48px);
+    border-radius: 50%;
+    object-fit: cover;
+    overflow: hidden;
+    display: block;
+}
+
+.av-initials {
+    font-weight: 700;
+    color: #fff;
+    font-size: calc(var(--av-size, 48px) * 0.38);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+/* Vote-status rings */
+.avatar-wrapper.av-voted {
+    outline: 3px solid var(--accent, #0d6efd);
+    outline-offset: 2px;
+}
+.avatar-wrapper.av-not-voted {
+    opacity: 0.5;
+}
+.avatar-wrapper.av-observer {
+    outline: 3px dashed var(--text-secondary, #6c757d);
+    outline-offset: 2px;
+    opacity: 0.75;
+}
+.avatar-wrapper.av-me {
+    outline: 3px solid var(--btn-primary, #0d6efd);
+    outline-offset: 2px;
+}
+
+/* Style picker grid (used in Patch 3 for DiceBear/Boring style tiles) */
+.avatar-style-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.avatar-style-option {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 4px;
+    text-align: center;
+    font-size: 0.75rem;
+    transition: border-color 0.15s;
+}
+
+.avatar-style-option:hover {
+    border-color: var(--accent, #0d6efd);
+}
+
+.avatar-style-option.selected {
+    border-color: var(--accent, #0d6efd);
+    background: var(--card-hover, #e7f1ff);
+}

@@ -199,6 +199,11 @@ function registerHandlers() {
         stopLocalTimer();
     });
 
+    connection.on('AvatarUpdated', (connectionId, avatarData) => {
+        const p = roomState.participants.find(p => p.connectionId === connectionId);
+        if (p) { p.avatarData = avatarData; renderParticipants(); }
+    });
+
     connection.onreconnected(() => {
         connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver);
     });
@@ -251,6 +256,16 @@ function renderParticipants() {
             <span class="participant-name" title="${escHtml(p.name)}">${escHtml(p.name)}${isMe ? ' (you)' : ''}</span>
             ${voteDisplay}
         `;
+
+        if (typeof renderAvatar === 'function') {
+            const avatarEl = renderAvatar(p.avatarData, p.name, 32);
+            if (p.isObserver)      avatarEl.classList.add('av-observer');
+            else if (p.hasVoted)   avatarEl.classList.add('av-voted');
+            else                   avatarEl.classList.add('av-not-voted');
+            if (isMe)              avatarEl.classList.add('av-me');
+            div.prepend(avatarEl);
+        }
+
         container.appendChild(div);
     });
 }

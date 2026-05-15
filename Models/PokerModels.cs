@@ -21,6 +21,7 @@ public class Participant
     public string Name { get; set; } = string.Empty;
     public string? Vote { get; set; }
     public bool IsObserver { get; set; } = false;
+    public string? AvatarData { get; set; }
 }
 
 public class Story

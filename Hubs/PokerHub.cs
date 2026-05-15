@@ -54,7 +54,8 @@ public class PokerHub : Hub
             connectionId = participant.ConnectionId,
             name = participant.Name,
             isObserver = participant.IsObserver,
-            hasVoted = participant.Vote != null
+            hasVoted = participant.Vote != null,
+            avatarData = participant.AvatarData
         });
     }
 
@@ -385,6 +386,30 @@ public class PokerHub : Hub
         await Clients.Group(roomName).SendAsync("StoryCompleted", storyId, estimate);
     }
 
+    public async Task UpdateAvatar(string avatarData)
+    {
+        if (avatarData?.StartsWith("data:") == true && avatarData.Length > 65_536)
+        {
+            await Clients.Caller.SendAsync("Error", "Avatar image too large (max ~48 KB).");
+            return;
+        }
+
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        lock (room)
+        {
+            var participant = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+            if (participant == null) return;
+            participant.AvatarData = avatarData;
+        }
+
+        await Clients.Group(roomName).SendAsync("AvatarUpdated", Context.ConnectionId, avatarData);
+    }
+
     private static object BuildRoomState(Room room)
     {
         string[] estimateValues;
@@ -416,7 +441,8 @@ public class PokerHub : Hub
                 name = p.Name,
                 isObserver = p.IsObserver,
                 hasVoted = p.Vote != null,
-                vote = room.VotesRevealed ? p.Vote : null
+                vote = room.VotesRevealed ? p.Vote : null,
+                avatarData = p.AvatarData
             }),
             stories = room.Stories.Select(s => new
             {
