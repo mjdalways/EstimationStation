@@ -68,6 +68,13 @@
             </div>
         </div>
 
+        <!-- Vibe Check Panel -->
+        <div id="vibeCheckPanel" style="margin-bottom:10px;padding:8px 12px;background:var(--bg-secondary,#f8f9fa);border:1px solid var(--panel-border,#dee2e6);border-radius:10px;">
+            <div style="font-size:0.75rem;font-weight:600;color:var(--text-secondary,#6c757d);margin-bottom:6px;">🌡️ Vibe Check — how does this sprint feel?</div>
+            <div id="vibeButtons" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+            <div id="vibeSummary" style="font-size:0.72rem;color:var(--text-secondary,#6c757d);margin-top:5px;min-height:1em;"></div>
+        </div>
+
         <!-- Voting Cards -->
         <div class="voting-section">
             <h6 class="section-label">Your Vote</h6>
@@ -82,9 +89,13 @@
 
         <!-- Vote History (populated by JS after each reveal) -->
         <div class="vote-history-section" id="voteHistorySection" style="display:none;">
-            <button class="vote-history-toggle" onclick="toggleVoteHistory()">
-                📜 Vote History <span id="voteHistoryChevron">▾</span>
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <button class="vote-history-toggle" onclick="toggleVoteHistory()">
+                    📜 Vote History <span id="voteHistoryChevron">▾</span>
+                </button>
+                <button class="btn btn-sm btn-outline-warning py-0 px-2" id="awards-trigger-btn"
+                        onclick="showSessionAwards()" style="display:none;" title="Session Awards">🏆 Awards</button>
+            </div>
             <div id="voteHistoryList" class="vote-history-list" style="display:none;"></div>
         </div>
     </div>

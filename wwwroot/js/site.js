@@ -96,6 +96,8 @@ function openSettingsModal(tab) {
 
     if (typeof populateCelebrationTab === 'function') populateCelebrationTab();
     if (typeof populateAvatarTab === 'function') populateAvatarTab();
+    if (typeof populateShameSection === 'function') populateShameSection();
+    if (typeof populateBattleSection === 'function') populateBattleSection();
 
     _settingsSaved = false; // reset the save flag for this session
 

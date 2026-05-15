@@ -8,7 +8,12 @@ function avatarDataToUrl(avatarData, size) {
     var p1 = parts[1] || '';
     var p2 = parts.slice(2).join(':');
     if (provider === 'dicebear') {
-        return 'https://api.dicebear.com/9.x/' + encodeURIComponent(p1) + '/svg?seed=' + encodeURIComponent(p2) + '&size=' + size;
+        var pipeIdx = p2.indexOf('|');
+        var dbSeed  = pipeIdx >= 0 ? p2.substring(0, pipeIdx) : p2;
+        var dbBg    = pipeIdx >= 0 ? p2.substring(pipeIdx + 1) : '';
+        var dbUrl   = 'https://api.dicebear.com/9.x/' + encodeURIComponent(p1) + '/svg?seed=' + encodeURIComponent(dbSeed) + '&size=' + size;
+        if (dbBg) dbUrl += '&backgroundColor[]=' + encodeURIComponent(dbBg);
+        return dbUrl;
     }
     if (provider === 'robohash') {
         return 'https://robohash.org/' + encodeURIComponent(p2) + '?set=set' + (p1 || '1') + '&size=' + size + 'x' + size;
@@ -113,9 +118,11 @@ var DEFAULT_AVATAR_SETTINGS = {
     source: 'initials',
     seed: '',
     dicebearStyle: 'bottts',
+    dicebearBgColor: '',
     robohashSet: '1',
     unavatarService: 'github',
-    unavatarHandle: ''
+    unavatarHandle: '',
+    uploadDataUri: null
 };
 
 function getAvatarSettings() {
@@ -135,9 +142,13 @@ function buildAvatarData(s) {
     if (!s || s.source === 'initials') return null;
     var defaultName = (typeof ROOM_CONFIG !== 'undefined' ? ROOM_CONFIG.playerName : '') || (localStorage.getItem('es_playerName') || '');
     var seed = s.seed || defaultName;
-    if (s.source === 'dicebear') return 'dicebear:' + (s.dicebearStyle  || 'bottts') + ':' + seed;
+    if (s.source === 'dicebear') {
+        var dbBase = 'dicebear:' + (s.dicebearStyle || 'bottts') + ':' + seed;
+        return s.dicebearBgColor ? dbBase + '|' + s.dicebearBgColor : dbBase;
+    }
     if (s.source === 'robohash') return 'robohash:' + (s.robohashSet    || '1')       + ':' + seed;
     if (s.source === 'unavatar') return 'unavatar:' + (s.unavatarService || 'github')  + ':' + (s.unavatarHandle || '');
+    if (s.source === 'upload')   return s.uploadDataUri || null;
     return null;
 }
 
@@ -156,7 +167,11 @@ function _buildAvatarDataFromForm() {
     var seed = (seedEl ? seedEl.value.trim() : '') || defaultName;
     if (source === 'dicebear') {
         var activeStyleEl = document.querySelector('#avatar-dicebear-grid .avatar-style-option.selected');
-        return 'dicebear:' + (activeStyleEl ? activeStyleEl.dataset.styleId : 'bottts') + ':' + seed;
+        var bgEnableEl = document.getElementById('avatar-dicebear-bg-enable');
+        var bgColorEl  = document.getElementById('avatar-dicebear-bg');
+        var bgColor = (bgEnableEl && bgEnableEl.checked && bgColorEl) ? bgColorEl.value.replace('#', '') : '';
+        var dbBase = 'dicebear:' + (activeStyleEl ? activeStyleEl.dataset.styleId : 'bottts') + ':' + seed;
+        return bgColor ? dbBase + '|' + bgColor : dbBase;
     }
     if (source === 'robohash') {
         var activeSetEl = document.querySelector('#avatar-robohash-grid .avatar-style-option.selected');
@@ -166,6 +181,9 @@ function _buildAvatarDataFromForm() {
         var svcEl = document.getElementById('avatar-unavatar-service');
         var handleEl = document.getElementById('avatar-unavatar-handle');
         return 'unavatar:' + (svcEl ? svcEl.value : 'github') + ':' + (handleEl ? handleEl.value.trim() : '');
+    }
+    if (source === 'upload') {
+        return getAvatarSettings().uploadDataUri || null;
     }
     return null;
 }
@@ -229,14 +247,15 @@ function onAvatarSourceChange() {
     var panels = {
         'avatar-dicebear-panel': source === 'dicebear',
         'avatar-robohash-panel': source === 'robohash',
-        'avatar-unavatar-panel': source === 'unavatar'
+        'avatar-unavatar-panel': source === 'unavatar',
+        'avatar-upload-panel':   source === 'upload'
     };
     Object.keys(panels).forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.style.display = panels[id] ? '' : 'none';
     });
     var seedWrap = document.getElementById('avatar-seed-wrap');
-    if (seedWrap) seedWrap.style.display = source !== 'unavatar' ? '' : 'none';
+    if (seedWrap) seedWrap.style.display = (source === 'unavatar' || source === 'upload') ? 'none' : '';
     updateAvatarPreview();
 }
 
@@ -251,6 +270,11 @@ function populateAvatarTab() {
 
     renderDiceBearGrid(s.dicebearStyle || 'bottts');
     renderRoboHashGrid(s.robohashSet || '1');
+
+    var bgEnableEl = document.getElementById('avatar-dicebear-bg-enable');
+    var bgColorEl  = document.getElementById('avatar-dicebear-bg');
+    if (bgEnableEl) bgEnableEl.checked = !!s.dicebearBgColor;
+    if (bgColorEl)  bgColorEl.value = s.dicebearBgColor ? '#' + s.dicebearBgColor : '#6366f1';
 
     var svcEl = document.getElementById('avatar-unavatar-service');
     if (svcEl) svcEl.value = s.unavatarService || 'github';
@@ -277,6 +301,9 @@ function saveAvatarFromForm() {
     if (source === 'dicebear') {
         var activeStyleEl = document.querySelector('#avatar-dicebear-grid .avatar-style-option.selected');
         s.dicebearStyle = activeStyleEl ? activeStyleEl.dataset.styleId : 'bottts';
+        var bgEnableEl = document.getElementById('avatar-dicebear-bg-enable');
+        var bgColorEl  = document.getElementById('avatar-dicebear-bg');
+        s.dicebearBgColor = (bgEnableEl && bgEnableEl.checked && bgColorEl) ? bgColorEl.value.replace('#', '') : '';
     }
     if (source === 'robohash') {
         var activeSetEl = document.querySelector('#avatar-robohash-grid .avatar-style-option.selected');
@@ -294,6 +321,56 @@ function saveAvatarFromForm() {
     if (typeof connection !== 'undefined' && connection) {
         connection.invoke('UpdateAvatar', avatarData).catch(function(e) { console.error(e); });
     }
+    updateAvatarPreview();
+}
+
+function onAvatarFileChange(input) {
+    var errEl = document.getElementById('avatar-upload-error');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+            var canvas = document.getElementById('avatar-upload-canvas');
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+            var size = Math.min(img.width, img.height);
+            var sx = (img.width  - size) / 2;
+            var sy = (img.height - size) / 2;
+            ctx.drawImage(img, sx, sy, size, size, 0, 0, 128, 128);
+            var quality = 0.82;
+            var dataUri;
+            do {
+                dataUri = canvas.toDataURL('image/jpeg', quality);
+                quality -= 0.1;
+            } while (dataUri.length > 65536 && quality > 0.2);
+            if (dataUri.length > 65536) {
+                if (errEl) { errEl.textContent = 'Image too large after compression. Try a different photo.'; errEl.style.display = ''; }
+                return;
+            }
+            var s = getAvatarSettings();
+            s.uploadDataUri = dataUri;
+            saveAvatarSettings(s);
+            updateAvatarPreview();
+        };
+        img.onerror = function() {
+            if (errEl) { errEl.textContent = 'Could not read image file.'; errEl.style.display = ''; }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+var _RAND_ADJ  = ['swift','brave','fuzzy','cosmic','sneaky','jolly','grumpy','epic','silent','mighty'];
+var _RAND_NOUN = ['otter','ninja','comet','panda','ferret','wizard','cactus','goblin','robot','mango'];
+function randomizeAvatarSeed() {
+    var seed = _RAND_ADJ[Math.floor(Math.random() * _RAND_ADJ.length)]
+             + '-' + _RAND_NOUN[Math.floor(Math.random() * _RAND_NOUN.length)]
+             + '-' + (Math.floor(Math.random() * 90) + 10);
+    var el = document.getElementById('avatar-seed');
+    if (el) el.value = seed;
     updateAvatarPreview();
 }
 

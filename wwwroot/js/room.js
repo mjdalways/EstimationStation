@@ -10,6 +10,9 @@ let skipVoteEnabled = false;
 let currentEstimateValues = ['0','1','2','3','5','8','13','21','34','55','89','?','☕'];
 let timerInterval = null;
 let timerSeconds = 0;
+let _esConsensusStreak = 0;
+let _myVibe = null;
+const VIBE_EMOJIS = ['🚀','😱','😴','🤔','💪','🤷'];
 let roomState = {
     participants: [],
     stories: [],
@@ -105,14 +108,25 @@ function registerHandlers() {
 
     connection.on('VotesRevealed', (votes, stats) => {
         roomState.votesRevealed = true;
+        const vibePanel = document.getElementById('vibeCheckPanel');
+        if (vibePanel) vibePanel.style.display = 'none';
         roomState.participants.forEach(p => {
             if (votes[p.connectionId] !== undefined) p.vote = votes[p.connectionId];
         });
         document.getElementById('revealBtn').style.display = 'none';
         document.getElementById('hideBtn').style.display = 'block';
         renderParticipants();
+        if (stats) { if (stats.isConsensus) { _esConsensusStreak++; } else { _esConsensusStreak = 0; } }
         showStats(votes, stats, true);
-        if (typeof triggerShame === 'function') triggerShame(stats);
+        if (stats && stats.isConsensus && _esConsensusStreak >= 3 && typeof triggerStreakCelebration === 'function') {
+            triggerStreakCelebration(_esConsensusStreak);
+        }
+        var _ss = typeof getShameSettings === 'function' ? getShameSettings() : { enabled: true };
+        if (_ss.enabled && typeof triggerShame === 'function') triggerShame(stats);
+        if (typeof triggerBattle === 'function') triggerBattle(votes, stats);
+        if (stats && !stats.isConsensus && stats.shameParticipantId && typeof triggerFloorIsLava === 'function') {
+            triggerFloorIsLava(stats.shameParticipantId, 30);
+        }
 
         // Record in history
         const storyTitle = roomState.currentStoryId
@@ -134,10 +148,15 @@ function registerHandlers() {
     connection.on('VotesReset', () => {
         roomState.votesRevealed = false;
         selectedVote = null;
+        if (typeof stopFloorIsLava === 'function') stopFloorIsLava();
         roomState.participants.forEach(p => { p.vote = null; p.hasVoted = false; });
         document.getElementById('revealBtn').style.display = 'block';
         document.getElementById('hideBtn').style.display = 'none';
         document.getElementById('statsBar').style.display = 'none';
+        _myVibe = null;
+        const vibePanel = document.getElementById('vibeCheckPanel');
+        if (vibePanel) vibePanel.style.display = '';
+        renderVibeDisplay({});
         renderCards();
         renderParticipants();
     });
@@ -203,6 +222,8 @@ function registerHandlers() {
         const p = roomState.participants.find(p => p.connectionId === connectionId);
         if (p) { p.avatarData = avatarData; renderParticipants(); }
     });
+
+    connection.on('VibeUpdated', (counts) => { renderVibeDisplay(counts); });
 
     connection.onreconnected(() => {
         connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver);
@@ -461,6 +482,7 @@ async function stopTimer() {
 }
 
 async function leaveRoom() {
+    if (typeof stopSeasonalAmbience === 'function') stopSeasonalAmbience();
     try { await connection.invoke('LeaveRoom'); } catch(e) { }
     window.location.href = '/';
 }
@@ -559,6 +581,10 @@ function renderVoteHistory() {
 
     if (roomState.history.length === 0) { section.style.display = 'none'; return; }
     section.style.display = '';
+
+    const awardsBtn = document.getElementById('awards-trigger-btn');
+    if (awardsBtn) awardsBtn.style.display = roomState.history.length >= 2 ? '' : 'none';
+
     list.innerHTML = '';
     roomState.history.forEach(entry => {
         const div = document.createElement('div');
@@ -632,6 +658,8 @@ document.addEventListener('keydown', (e) => {
 
 document.getElementById('newStoryInput').addEventListener('keypress', e => { if (e.key === 'Enter') addStory(); });
 document.getElementById('chatInput').addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
+initVibePanel();
+if (typeof startSeasonalAmbience === 'function') startSeasonalAmbience();
 
 // ============================================================
 // Helpers
@@ -644,6 +672,46 @@ function escHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+// ============================================================
+// Vibe Check
+// ============================================================
+function initVibePanel() {
+    const container = document.getElementById('vibeButtons');
+    if (!container) return;
+    VIBE_EMOJIS.forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.className = 'vibe-btn';
+        btn.dataset.vibe = emoji;
+        btn.title = emoji;
+        btn.textContent = emoji;
+        btn.onclick = () => castVibeLocal(emoji);
+        container.appendChild(btn);
+    });
+}
+
+function castVibeLocal(emoji) {
+    _myVibe = emoji;
+    document.querySelectorAll('.vibe-btn').forEach(b =>
+        b.classList.toggle('vibe-selected', b.dataset.vibe === emoji));
+    connection.invoke('CastVibe', emoji).catch(e => console.error(e));
+}
+
+function renderVibeDisplay(counts) {
+    // Update count badges on each button
+    document.querySelectorAll('.vibe-btn').forEach(btn => {
+        const c = counts[btn.dataset.vibe] || 0;
+        let badge = btn.querySelector('.vibe-count');
+        if (!badge) { badge = document.createElement('span'); badge.className = 'vibe-count'; btn.appendChild(badge); }
+        badge.textContent = c > 0 ? c : '';
+    });
+    // Summary line
+    const summary = document.getElementById('vibeSummary');
+    if (!summary) return;
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    if (total === 0) { summary.textContent = ''; return; }
+    summary.textContent = total + ' teammate' + (total !== 1 ? 's' : '') + ' checked in';
 }
 
 // ============================================================

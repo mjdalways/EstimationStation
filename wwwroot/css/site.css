@@ -1205,4 +1205,45 @@ h1, h2, h3, h4, h5, h6 {
 }
 .ct-section-body { padding: 0.65rem 0.1rem 0.25rem 0.1rem; }
 
+/* ============================================================
+   Vibe Check Buttons
+   ============================================================ */
+.vibe-btn {
+  position: relative;
+  background: var(--card-bg, #fff);
+  border: 2px solid var(--panel-border, #dee2e6);
+  border-radius: 10px;
+  font-size: 1.3rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.vibe-btn:hover { transform: scale(1.12); border-color: var(--accent, #0d6efd); }
+.vibe-btn.vibe-selected {
+  border-color: var(--accent, #0d6efd);
+  background: var(--card-hover, #e9f0ff);
+}
+.vibe-count {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-secondary, #6c757d);
+  min-width: 10px;
+}
+
+/* ============================================================
+   Floor is Lava
+   ============================================================ */
+@keyframes lava-glow {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(255,69,0,0.7); border-color: #ff4500; }
+  50%       { box-shadow: 0 0 22px 7px rgba(255,100,0,0.95); border-color: #ff6b00; }
+}
+.lava-outlier {
+  animation: lava-glow 0.85s ease-in-out infinite !important;
+  border-color: #ff4500 !important;
+}
+
 

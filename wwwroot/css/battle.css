@@ -1,0 +1,524 @@
+/* ════════════════════════════════════════════════════════════════
+   battle.css — Avatar Battle Arena
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Overlay ──────────────────────────────────────────────────── */
+#battle-arena {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.90);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+#battle-arena.ba-visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* ── Arena Stage ──────────────────────────────────────────────── */
+#ba-stage {
+    position: relative;
+    width: min(720px, 98vw);
+    height: min(520px, 95vh);
+    background:
+        radial-gradient(ellipse 80% 25% at 50% 100%, rgba(160, 100, 30, 0.5) 0%, transparent 70%),
+        linear-gradient(180deg, #120824 0%, #1e0f3a 35%, #3a1f06 68%, #7a4a18 100%);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 195, 50, 0.28);
+    box-shadow: 0 0 70px rgba(255, 130, 40, 0.25), inset 0 0 50px rgba(0, 0, 0, 0.4);
+}
+
+/* Arena stone floor grid */
+#ba-stage::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 33%;
+    background:
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 64px),
+        repeating-linear-gradient(0deg,  rgba(0,0,0,0.12) 0, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 32px),
+        linear-gradient(180deg, #7a4a18, #5a3208);
+    border-top: 2px solid rgba(255, 190, 80, 0.25);
+    pointer-events: none;
+}
+
+/* Crowd silhouette */
+#ba-crowd {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 28%;
+    overflow: hidden;
+    pointer-events: none;
+}
+#ba-crowd::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='70'%3E%3Cg fill='%23111'%3E%3Ccircle cx='10' cy='60' r='9'/%3E%3Crect x='4' y='42' width='12' height='24'/%3E%3Ccircle cx='32' cy='55' r='10'/%3E%3Crect x='26' y='36' width='12' height='26'/%3E%3Ccircle cx='55' cy='60' r='8'/%3E%3Crect x='49' y='44' width='12' height='22'/%3E%3Ccircle cx='76' cy='52' r='11'/%3E%3Crect x='69' y='32' width='14' height='28'/%3E%3Ccircle cx='100' cy='60' r='9'/%3E%3Crect x='94' y='42' width='12' height='24'/%3E%3Ccircle cx='122' cy='54' r='10'/%3E%3Crect x='116' y='36' width='12' height='26'/%3E%3Ccircle cx='145' cy='60' r='8'/%3E%3Crect x='140' y='44' width='10' height='22'/%3E%3Ccircle cx='167' cy='52' r='11'/%3E%3Crect x='160' y='32' width='14' height='28'/%3E%3Ccircle cx='190' cy='60' r='9'/%3E%3Crect x='184' y='44' width='12' height='22'/%3E%3Ccircle cx='210' cy='54' r='8'/%3E%3Crect x='205' y='36' width='10' height='26'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: bottom;
+    filter: brightness(0.35) saturate(0);
+}
+/* Colored lights above crowd */
+#ba-crowd::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 15% 80%, rgba(255, 80, 80, 0.18) 0%, transparent 35%),
+        radial-gradient(circle at 40% 70%, rgba(80, 200, 255, 0.12) 0%, transparent 25%),
+        radial-gradient(circle at 65% 75%, rgba(255, 220, 60, 0.14) 0%, transparent 28%),
+        radial-gradient(circle at 88% 80%, rgba(140, 80, 255, 0.18) 0%, transparent 33%);
+}
+
+/* ── HUD ──────────────────────────────────────────────────────── */
+#ba-hud {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    z-index: 20;
+}
+
+.ba-fighter-hud {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ba-fighter-hud.ba-hud-right {
+    align-items: flex-end;
+    text-align: right;
+}
+
+.ba-fighter-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 5px rgba(0,0,0,0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.ba-fighter-vote-badge {
+    display: inline-block;
+    font-size: 1rem;
+    font-weight: 900;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255,215,0,0.7);
+    line-height: 1;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,215,0,0.4);
+    border-radius: 6px;
+    padding: 1px 7px;
+}
+
+.ba-hp-wrap {
+    width: 100%;
+    height: 13px;
+    background: rgba(0,0,0,0.55);
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.15);
+    overflow: hidden;
+}
+.ba-hp-bar {
+    height: 100%;
+    border-radius: 7px;
+    transition: width 0.5s ease;
+    background: linear-gradient(90deg, #15803d, #4ade80);
+    position: relative;
+}
+.ba-hp-bar.ba-hp-low {
+    background: linear-gradient(90deg, #b91c1c, #f87171);
+}
+.ba-hp-bar::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 45%;
+    background: rgba(255,255,255,0.22);
+    border-radius: 7px 7px 0 0;
+}
+
+.ba-hud-mid {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+}
+.ba-hud-vs-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+.ba-round-label {
+    font-size: 0.55rem;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+/* ── Fighter containers ───────────────────────────────────────── */
+#ba-fighters {
+    position: absolute;
+    bottom: 28%;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 48px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.ba-fighter {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 110px;
+    transition: transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#ba-fighter-left  { transform: translateX(-240px); }
+#ba-fighter-right { transform: translateX(240px); }
+#ba-fighter-left.ba-entered  { transform: translateX(0); }
+#ba-fighter-right.ba-entered { transform: translateX(0); }
+
+/* Fighter sprite — right side is mirrored so it faces left */
+.ba-fighter .bf-svg { display: block; }
+#ba-fighter-right .bf-svg { transform: scaleX(-1); }
+
+/* Un-mirror text inside the right fighter's SVG so initials are readable */
+#ba-fighter-right .bf-svg text {
+    transform-box: fill-box;
+    transform-origin: center center;
+    transform: scaleX(-1);
+}
+
+/* ── Fighter state animations ─────────────────────────────────── */
+
+/* Idle float */
+.ba-state-idle .bf-svg {
+    animation: ba-idle 2.2s ease-in-out infinite;
+}
+
+/* Attack lunge */
+#ba-fighter-left.ba-state-attack  { animation: ba-lunge-r 0.55s ease forwards; }
+#ba-fighter-right.ba-state-attack { animation: ba-lunge-l 0.55s ease forwards; }
+
+/* Hurt recoil */
+#ba-fighter-left.ba-state-hurt  { animation: ba-recoil-l 0.45s ease forwards; }
+#ba-fighter-right.ba-state-hurt { animation: ba-recoil-r 0.45s ease forwards; }
+
+/* Victory jump */
+.ba-state-victory .bf-svg {
+    animation: ba-victory 1.6s ease-in-out infinite;
+}
+
+/* Defeat fall */
+.ba-state-defeat .bf-svg {
+    animation: ba-defeat 0.7s ease forwards;
+    animation-fill-mode: forwards;
+}
+
+@keyframes ba-idle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-7px); }
+}
+@keyframes ba-lunge-r {
+    0%   { transform: translateX(0); }
+    40%  { transform: translateX(45px); }
+    100% { transform: translateX(0); }
+}
+@keyframes ba-lunge-l {
+    0%   { transform: translateX(0); }
+    40%  { transform: translateX(-45px); }
+    100% { transform: translateX(0); }
+}
+@keyframes ba-recoil-l {
+    0%   { transform: translateX(0); filter: brightness(1); }
+    20%  { transform: translateX(-18px); filter: brightness(4) saturate(0); }
+    50%  { transform: translateX(-10px); filter: brightness(1.8) sepia(1) saturate(5) hue-rotate(320deg); }
+    100% { transform: translateX(0); filter: brightness(1); }
+}
+@keyframes ba-recoil-r {
+    0%   { transform: translateX(0); filter: brightness(1); }
+    20%  { transform: translateX(18px); filter: brightness(4) saturate(0); }
+    50%  { transform: translateX(10px); filter: brightness(1.8) sepia(1) saturate(5) hue-rotate(320deg); }
+    100% { transform: translateX(0); filter: brightness(1); }
+}
+@keyframes ba-victory {
+    0%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
+    20%       { transform: translateY(-28px) scale(1.08) rotate(4deg); }
+    40%       { transform: translateY(-4px) scale(1.01) rotate(-2deg); }
+    60%       { transform: translateY(-18px) scale(1.05) rotate(3deg); }
+    80%       { transform: translateY(-2px) scale(1) rotate(-1deg); }
+}
+@keyframes ba-defeat {
+    0%   { transform: rotate(0deg) translateY(0); opacity: 1; }
+    35%  { transform: rotate(-25deg) translateY(-8px); opacity: 0.85; }
+    100% { transform: rotate(-88deg) translateY(22px); opacity: 0.35; filter: grayscale(1) brightness(0.45); }
+}
+
+/* ── Arm / leg animations on attack ──────────────────────────── */
+
+/* Weapon arm swings forward on attack */
+.ba-state-attack .bf-arm-r {
+    transform-box: view-box;
+    transform-origin: 70px 62px;
+    animation: ba-arm-swing 0.55s ease forwards;
+}
+/* Passive arm swings back */
+.ba-state-attack .bf-arm-l {
+    transform-box: view-box;
+    transform-origin: 30px 62px;
+    animation: ba-arm-swing-back 0.55s ease forwards;
+}
+/* Power leg kick forward */
+.ba-state-attack .bf-leg-r {
+    transform-box: view-box;
+    transform-origin: 58px 116px;
+    animation: ba-leg-kick 0.55s ease forwards;
+}
+/* Support leg bends */
+.ba-state-attack .bf-leg-l {
+    transform-box: view-box;
+    transform-origin: 42px 116px;
+    animation: ba-leg-bend 0.55s ease forwards;
+}
+
+@keyframes ba-arm-swing {
+    0%   { transform: rotate(0deg); }
+    30%  { transform: rotate(-90deg); }
+    60%  { transform: rotate(25deg); }
+    100% { transform: rotate(0deg); }
+}
+@keyframes ba-arm-swing-back {
+    0%   { transform: rotate(0deg); }
+    30%  { transform: rotate(35deg); }
+    100% { transform: rotate(0deg); }
+}
+@keyframes ba-leg-kick {
+    0%   { transform: rotate(0deg); }
+    30%  { transform: rotate(28deg); }
+    60%  { transform: rotate(-8deg); }
+    100% { transform: rotate(0deg); }
+}
+@keyframes ba-leg-bend {
+    0%   { transform: rotate(0deg); }
+    35%  { transform: rotate(-15deg); }
+    100% { transform: rotate(0deg); }
+}
+
+/* Idle leg sway */
+.ba-state-idle .bf-leg-l {
+    transform-box: view-box;
+    transform-origin: 42px 116px;
+    animation: ba-leg-sway-l 2.2s ease-in-out infinite;
+}
+.ba-state-idle .bf-leg-r {
+    transform-box: view-box;
+    transform-origin: 58px 116px;
+    animation: ba-leg-sway-r 2.2s ease-in-out infinite;
+}
+@keyframes ba-leg-sway-l {
+    0%, 100% { transform: rotate(0deg); }
+    50%       { transform: rotate(5deg); }
+}
+@keyframes ba-leg-sway-r {
+    0%, 100% { transform: rotate(0deg); }
+    50%       { transform: rotate(-5deg); }
+}
+
+/* Victory arm wave */
+.ba-state-victory .bf-arm-r {
+    transform-box: view-box;
+    transform-origin: 70px 62px;
+    animation: ba-arm-wave 0.6s ease-in-out infinite alternate;
+}
+@keyframes ba-arm-wave {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(-50deg); }
+}
+
+/* ── Hit effects ──────────────────────────────────────────────── */
+.ba-hit-effect {
+    position: absolute;
+    pointer-events: none;
+    z-index: 50;
+    transform: translate(-50%, -50%);
+}
+.ba-hit-star {
+    animation: ba-burst 0.4s ease forwards;
+}
+@keyframes ba-burst {
+    0%   { transform: translate(-50%,-50%) scale(0); opacity: 1; }
+    55%  { transform: translate(-50%,-50%) scale(1.3); opacity: 0.85; }
+    100% { transform: translate(-50%,-50%) scale(2); opacity: 0; }
+}
+
+.ba-damage-num {
+    position: absolute;
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.85), 0 0 18px rgba(255, 60, 60, 0.9);
+    pointer-events: none;
+    animation: ba-dmg-float 0.85s ease forwards;
+    white-space: nowrap;
+    z-index: 51;
+    transform: translateX(-50%);
+}
+@keyframes ba-dmg-float {
+    0%   { transform: translateX(-50%) translateY(0) scale(0.6); opacity: 1; }
+    28%  { transform: translateX(-50%) translateY(-28px) scale(1.25); opacity: 1; }
+    100% { transform: translateX(-50%) translateY(-72px) scale(0.85); opacity: 0; }
+}
+
+/* ── VS Screen ────────────────────────────────────────────────── */
+#ba-vs-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle, rgba(255,100,0,0.28) 0%, transparent 65%);
+    pointer-events: none;
+    z-index: 90;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+#ba-vs-screen.ba-vs-visible { opacity: 1; }
+.ba-vs-text {
+    font-size: 5.5rem;
+    font-weight: 900;
+    color: #ff6b35;
+    text-shadow: 0 0 35px rgba(255, 100, 50, 0.9), 0 4px 0 rgba(0,0,0,0.7);
+    letter-spacing: 10px;
+    animation: ba-vs-pulse 0.08s ease infinite alternate;
+}
+@keyframes ba-vs-pulse {
+    from { transform: scale(1);    }
+    to   { transform: scale(1.04); }
+}
+
+/* ── Announcement text ────────────────────────────────────────── */
+#ba-announcement {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 95;
+}
+#ba-ann-text {
+    font-size: 3.2rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 0 0 24px currentColor, 0 3px 0 rgba(0,0,0,0.6);
+    opacity: 0;
+    transform: scale(0.3);
+    transition: opacity 0.18s ease, transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#ba-ann-text.ba-ann-visible {
+    opacity: 1;
+    transform: scale(1);
+}
+#ba-ann-text.ba-ann-hide {
+    opacity: 0;
+    transform: scale(1.5);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+/* ── Winner Banner ────────────────────────────────────────────── */
+#ba-winner-banner {
+    position: absolute;
+    bottom: 22%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    pointer-events: none;
+    z-index: 96;
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+#ba-winner-banner.ba-banner-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.ba-winner-name {
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: #ffd700;
+    text-shadow: 0 0 22px rgba(255,215,0,0.85), 0 2px 0 rgba(0,0,0,0.7);
+    letter-spacing: 2px;
+}
+.ba-winner-label {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.75);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* ── Skip button ──────────────────────────────────────────────── */
+#ba-skip-btn {
+    position: absolute;
+    bottom: 14px;
+    right: 18px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.22);
+    color: rgba(255,255,255,0.65);
+    padding: 4px 16px;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    z-index: 200;
+    transition: background 0.2s ease, color 0.2s ease;
+    font-family: inherit;
+}
+#ba-skip-btn:hover {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 540px) {
+    #ba-fighters { padding: 0 22px; }
+    .ba-fighter { width: 88px; }
+    .ba-fighter .bf-svg { width: 88px !important; height: 176px !important; }
+    #ba-ann-text { font-size: 2.2rem; }
+    .ba-winner-name { font-size: 1.4rem; }
+    .ba-vs-text { font-size: 3.8rem; }
+    .ba-fighter-name { font-size: 0.7rem; max-width: 130px; }
+    #ba-fighters { bottom: 26%; }
+}
+
+/* ── Battle settings in Celebration tab ──────────────────────── */
+.ba-speed-btns { display: flex; gap: 5px; }
+.ba-speed-btns .btn { flex: 1; font-size: 0.78rem; padding: 3px 6px; }

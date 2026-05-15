@@ -1,7 +1,6 @@
 /* shame.css — outlier spotlight animations on vote reveal */
 
 .shame-spotlight {
-    box-shadow: 0 0 0 3px #dc3545, 0 0 18px rgba(220, 53, 69, 0.55) !important;
     position: relative;
     z-index: 10;
 }

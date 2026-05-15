@@ -1,0 +1,228 @@
+/* ============================================================
+   EstimationStation — Seasonal Ambient Animations
+   All animations are position:fixed, pointer-events:none
+   ============================================================ */
+
+/* ── Movement ── */
+@keyframes sea-lr {
+  from { transform: translateX(-220px); }
+  to   { transform: translateX(calc(100vw + 220px)); }
+}
+@keyframes sea-rl {
+  from { transform: translateX(220px); }
+  to   { transform: translateX(calc(-100vw - 220px)); }
+}
+@keyframes sea-float-up {
+  from { transform: translateY(0);   opacity: 1; }
+  to   { transform: translateY(calc(-100vh - 80px)); opacity: 0; }
+}
+@keyframes sea-wave-y {
+  from { transform: translateY(-14px); }
+  to   { transform: translateY(14px); }
+}
+
+/* ── Entrance / Exit ── */
+@keyframes sea-popup-in {
+  0%   { transform: scale(0) rotate(-15deg); opacity: 0; }
+  65%  { transform: scale(1.25) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes sea-popup-out {
+  from { transform: scale(1); opacity: 1; }
+  to   { transform: scale(0.2); opacity: 0; }
+}
+@keyframes sea-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes sea-slide-up-in {
+  from { transform: translateY(120px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes sea-slide-up-out {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(120px); opacity: 0; }
+}
+@keyframes sea-slide-in-r {
+  from { transform: translateX(200px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes sea-slide-out-r {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(200px); opacity: 0; }
+}
+@keyframes sea-slide-in-l {
+  from { transform: translateX(-200px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes sea-slide-out-l {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(-200px); opacity: 0; }
+}
+@keyframes sea-banner-drop {
+  from { transform: translateX(-50%) translateY(-120px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+@keyframes sea-banner-lift {
+  from { transform: translateX(-50%) translateY(0); opacity: 1; }
+  to   { transform: translateX(-50%) translateY(-120px); opacity: 0; }
+}
+@keyframes sea-sun-in {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+@keyframes sea-sun-out {
+  from { transform: scale(1); opacity: 1; }
+  to   { transform: scale(0); opacity: 0; }
+}
+
+/* ── Locomotion ── */
+@keyframes sea-wobble {
+  0%,100% { transform: rotate(-13deg); }
+  50%     { transform: rotate(13deg); }
+}
+@keyframes sea-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes sea-slow-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes sea-bounce {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-28px); }
+}
+@keyframes sea-bob {
+  0%,100% { transform: translateY(0) rotate(-5deg); }
+  50%     { transform: translateY(-14px) rotate(5deg); }
+}
+@keyframes sea-run {
+  from { transform: rotate(-6deg) scaleY(0.95); }
+  to   { transform: rotate(6deg)  scaleY(1.05); }
+}
+@keyframes sea-hop {
+  0%,100% { transform: translateY(0) rotate(-10deg); }
+  50%     { transform: translateY(-24px) rotate(10deg); }
+}
+@keyframes sea-swing {
+  0%,100% { transform: rotate(-20deg); transform-origin: top center; }
+  50%     { transform: rotate(20deg);  transform-origin: top center; }
+}
+
+/* ── Falling particles ── */
+@keyframes sea-snowfall {
+  from { transform: translateY(-30px) rotate(0deg);   opacity: 0.9; }
+  to   { transform: translateY(calc(100vh + 40px)) rotate(720deg); opacity: 0.5; }
+}
+@keyframes sea-leaf-fall {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+  25%  { transform: translateY(25vh) translateX(38px) rotate(90deg); }
+  50%  { transform: translateY(50vh) translateX(-28px) rotate(200deg); }
+  75%  { transform: translateY(75vh) translateX(22px) rotate(310deg); }
+  100% { transform: translateY(calc(100vh + 45px)) translateX(-12px) rotate(420deg); opacity: 0.4; }
+}
+@keyframes sea-petal-fall {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+  30%  { transform: translateY(30vh) translateX(32px) rotate(130deg); }
+  65%  { transform: translateY(65vh) translateX(-22px) rotate(260deg); }
+  100% { transform: translateY(calc(100vh + 40px)) translateX(8px) rotate(420deg); opacity: 0.3; }
+}
+@keyframes sea-rain {
+  from { transform: translateY(-20px) translateX(0) rotate(15deg); opacity: 0.8; }
+  to   { transform: translateY(calc(100vh + 20px)) translateX(-40px) rotate(15deg); opacity: 0.3; }
+}
+@keyframes sea-streamer {
+  0%   { transform: translateY(-30px) rotate(0deg) translateX(0); opacity: 1; }
+  40%  { transform: translateY(40vh) rotate(180deg) translateX(18px); }
+  100% { transform: translateY(calc(100vh + 40px)) rotate(420deg) translateX(-22px); opacity: 0.5; }
+}
+@keyframes sea-acorn-drop {
+  0%   { transform: translateY(0) rotate(0deg); }
+  80%  { transform: translateY(calc(100vh)) rotate(540deg); opacity: 1; }
+  100% { transform: translateY(calc(100vh + 10px)); opacity: 0; }
+}
+@keyframes sea-float-bounce {
+  0%   { transform: translateY(0); opacity: 1; }
+  20%  { transform: translateY(-28px); }
+  35%  { transform: translateY(-12px); }
+  55%  { transform: translateY(-52px); }
+  75%  { transform: translateY(-38px); }
+  100% { transform: translateY(calc(-100vh)); opacity: 0; }
+}
+
+/* ── Special effects ── */
+@keyframes sea-lightning {
+  0%,100%  { opacity: 0; }
+  8%, 28%  { opacity: 0.72; }
+  18%, 38% { opacity: 0; }
+}
+@keyframes sea-spider-drop {
+  0%  { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  60% { transform: translateY(0); }
+  75% { transform: translateY(-20px); }
+  100%{ transform: translateY(0); }
+}
+@keyframes sea-spider-up {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(-180px); opacity: 0; }
+}
+@keyframes sea-hand-rise {
+  0%   { transform: translateY(80px); opacity: 0; }
+  15%  { opacity: 1; }
+  60%  { transform: translateY(-140px); }
+  78%  { transform: translateY(-110px); opacity: 1; }
+  100% { transform: translateY(-155px); opacity: 0; }
+}
+@keyframes sea-flower-grow {
+  0%   { font-size: 0.6rem; opacity: 0; }
+  70%  { font-size: 4.8rem; opacity: 1; }
+  100% { font-size: 4rem;   opacity: 1; }
+}
+@keyframes sea-heart-burst {
+  0%   { transform: scale(0); opacity: 1; }
+  50%  { transform: scale(1.5); opacity: 0.85; }
+  100% { transform: scale(3); opacity: 0; }
+}
+@keyframes sea-wave-wash {
+  0%   { transform: translateX(-50%); opacity: 0.7; }
+  35%  { opacity: 1; }
+  100% { transform: translateX(60%); opacity: 0; }
+}
+@keyframes sea-sparkler {
+  0%,100% { transform: scale(1);    filter: drop-shadow(0 0 5px #ffd700); }
+  50%     { transform: scale(1.4);  filter: drop-shadow(0 0 22px #ffd700); }
+}
+@keyframes sea-tree-glow {
+  from { filter: drop-shadow(0 0 4px rgba(0,230,50,0.35)); }
+  to   { filter: drop-shadow(0 0 20px rgba(0,230,50,1)); }
+}
+@keyframes sea-fog-roll {
+  0%   { transform: translateX(-40%); opacity: 0; }
+  20%  { opacity: 0.75; }
+  80%  { opacity: 0.65; }
+  100% { transform: translateX(70%); opacity: 0; }
+}
+@keyframes sea-moon-rise {
+  from { transform: translateY(0); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translateY(130px); opacity: 1; }
+}
+@keyframes sea-moon-fade {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes sea-owl-look {
+  0%,100% { transform: rotate(0deg); }
+  33%     { transform: rotate(-22deg); }
+  66%     { transform: rotate(22deg); }
+}
+@keyframes sea-heat-wave {
+  0%,100% { opacity: 0; transform: translateY(0); }
+  50%     { opacity: 0.16; transform: translateY(-18px); }
+}
+@keyframes sea-cauldron-bubble {
+  0%,100% { transform: scale(1) translateY(0); }
+  50%     { transform: scale(1.06) translateY(-4px); }
+}

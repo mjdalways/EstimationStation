@@ -15,6 +15,8 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/shame.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/avatar.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/battle.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/seasonal.css" asp-append-version="true" />
     @RenderSection("HeadStyles", required: false)
 </head>
 <body data-theme="classic" id="appBody">
@@ -409,6 +411,18 @@
                                 <input class="form-check-input" type="checkbox" id="cel-enable-balloons" />
                                 <label class="form-check-label fw-semibold" for="cel-enable-balloons">🎈 Balloons</label>
                             </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cel-streak-enabled" />
+                                <label class="form-check-label fw-semibold" for="cel-streak-enabled">🔥 Streak Bonus</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cel-lava-enabled" />
+                                <label class="form-check-label fw-semibold" for="cel-lava-enabled">🌋 Floor is Lava</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cel-seasonal-theme" />
+                                <label class="form-check-label fw-semibold" for="cel-seasonal-theme">🗓️ Seasonal Theme</label>
+                            </div>
                         </div>
 
                         <!-- Confetti -->
@@ -510,6 +524,72 @@
                             </div>
                         </div>
 
+                        <!-- Shame Spotlight -->
+                        <h6 class="text-muted border-bottom pb-1 mb-2">🎯 Shame Spotlight</h6>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="shame-enabled" onchange="saveShameFromForm()">
+                            <label class="form-check-label small" for="shame-enabled">Spotlight the outlier voter on reveal</label>
+                        </div>
+                        <div id="shame-options-wrap">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <label class="form-label mb-0 small" for="shame-color">Color</label>
+                                <input type="color" id="shame-color" value="#dc3545" class="form-control form-control-color form-control-sm" style="width:40px;height:28px;" oninput="saveShameFromForm()">
+                            </div>
+                            <div class="input-group input-group-sm mb-3">
+                                <span class="input-group-text small text-muted">{name}</span>
+                                <input type="text" id="shame-message" class="form-control" placeholder="went rogue!" maxlength="60" oninput="saveShameFromForm()">
+                            </div>
+                        </div>
+
+                        <!-- Avatar Battle -->
+                        <h6 class="text-muted border-bottom pb-1 mb-2 mt-3">⚔️ Avatar Battle</h6>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="battle-enabled" onchange="saveBattleFromForm()">
+                            <label class="form-check-label small" for="battle-enabled">Play a battle animation when votes are revealed</label>
+                        </div>
+                        <div id="battle-options-wrap">
+                            <div class="row g-2 mb-2">
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">Speed</label>
+                                    <div class="ba-speed-btns">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-battle-speed="slow" onclick="setBattleSpeed('slow')">🐢 Slow</button>
+                                        <button type="button" class="btn btn-sm btn-primary" data-battle-speed="normal" onclick="setBattleSpeed('normal')">▶ Normal</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-battle-speed="fast" onclick="setBattleSpeed('fast')">⚡ Fast</button>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">Rounds</label>
+                                    <div class="ba-speed-btns">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-battle-rounds="1" onclick="setBattleRounds(1)">1 — Quick</button>
+                                        <button type="button" class="btn btn-sm btn-primary" data-battle-rounds="2" onclick="setBattleRounds(2)">2 — Normal</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-battle-rounds="3" onclick="setBattleRounds(3)">3 — Epic</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-1" for="battle-trigger">When to trigger</label>
+                                    <select id="battle-trigger" class="form-select form-select-sm" onchange="saveBattleFromForm()">
+                                        <option value="outlier">Outlier voter present</option>
+                                        <option value="always">Every reveal (≥ 2 voters)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-1" for="battle-outcome">Who wins</label>
+                                    <select id="battle-outcome" class="form-select form-select-sm" onchange="saveBattleFromForm()">
+                                        <option value="majority">Majority voter</option>
+                                        <option value="random">Random 🎲</option>
+                                        <option value="higher">Higher vote wins</option>
+                                        <option value="lower">Lower vote wins</option>
+                                        <option value="chaos">Chaos — outlier wins</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">Auto-dismiss: <span id="battle-dismiss-val">3s</span></label>
+                                    <input type="range" id="battle-dismiss" class="form-range" min="1" max="10" step="1" value="3"
+                                           oninput="document.getElementById('battle-dismiss-val').textContent=this.value+'s'; saveBattleFromForm()" />
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="d-flex gap-2 flex-wrap border-top pt-3">
                             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetCelebrationSettings()">↩ Reset defaults</button>
                             <button type="button" class="btn btn-sm btn-outline-success" onclick="testCelebration()">🎉 Test</button>
@@ -559,11 +639,24 @@
                                         <input class="form-check-input" type="radio" name="avatar-source" id="avatar-src-unavatar" value="unavatar" onchange="onAvatarSourceChange()" />
                                         <label class="form-check-label" for="avatar-src-unavatar">Social</label>
                                     </div>
+                                    <div class="form-check form-check-inline me-0">
+                                        <input class="form-check-input" type="radio" name="avatar-source" id="avatar-src-upload" value="upload" onchange="onAvatarSourceChange()" />
+                                        <label class="form-check-label" for="avatar-src-upload">Upload</label>
+                                    </div>
                                 </div>
 
                                 <!-- DiceBear style grid -->
                                 <div id="avatar-dicebear-panel" class="mb-2" style="display:none;">
                                     <div class="avatar-style-grid" id="avatar-dicebear-grid"></div>
+                                    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                                        <div class="form-check form-check-inline mb-0">
+                                            <input class="form-check-input" type="checkbox" id="avatar-dicebear-bg-enable" onchange="updateAvatarPreview()" />
+                                            <label class="form-check-label small" for="avatar-dicebear-bg-enable">Background color</label>
+                                        </div>
+                                        <input type="color" id="avatar-dicebear-bg" value="#6366f1"
+                                               class="form-control form-control-color form-control-sm" style="width:36px;height:26px;"
+                                               oninput="updateAvatarPreview()" title="Pick background color" />
+                                    </div>
                                 </div>
 
                                 <!-- RoboHash set buttons -->
@@ -585,10 +678,21 @@
                                     <div class="form-text">Loads your social profile photo.</div>
                                 </div>
 
-                                <!-- Seed (hidden for Social) -->
+                                <!-- Photo upload -->
+                                <div id="avatar-upload-panel" class="mb-2" style="display:none;">
+                                    <label class="form-label small mb-1">Choose a photo (cropped &amp; resized to 128×128)</label>
+                                    <input type="file" class="form-control form-control-sm" id="avatar-upload-input" accept="image/*" onchange="onAvatarFileChange(this)">
+                                    <canvas id="avatar-upload-canvas" width="128" height="128" style="display:none;"></canvas>
+                                    <div id="avatar-upload-error" class="form-text text-danger" style="display:none;"></div>
+                                </div>
+
+                                <!-- Seed (hidden for Social / Upload) -->
                                 <div id="avatar-seed-wrap" class="mb-2">
                                     <label class="form-label small mb-1" for="avatar-seed">Seed <span class="text-muted">(leave blank to use your name)</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="avatar-seed" maxlength="64" placeholder="e.g. lucky-cat" oninput="updateAvatarPreview()" />
+                                    <div class="d-flex align-items-center gap-1">
+                                        <input type="text" class="form-control form-control-sm" id="avatar-seed" maxlength="64" placeholder="e.g. lucky-cat" oninput="updateAvatarPreview()" style="flex:1;" />
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="randomizeAvatarSeed()" title="Randomize seed">🎲</button>
+                                    </div>
                                 </div>
 
                                 <div class="d-flex gap-2">
@@ -617,6 +721,21 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/15/2026</strong></p>
+                        <ul class="mb-2">
+                            <li>🌋 Floor is Lava — when there's an outlier after reveal, their badge glows red and a 30-second countdown banner appears. When time runs out, a lava confetti burst fires. Toggle in Celebration settings.</li>
+                            <li>🌡️ Anonymous Vibe Check — before voting, teammates can react with 🚀😱😴🤔💪🤷. Counts shown live; no names attached. Resets with votes.</li>
+                            <li>🎨 DiceBear background color — optional color picker inside the DiceBear avatar panel; color baked into the preview and synced to the room.</li>
+                            <li>🗓️ Seasonal Theme — when enabled, celebrations auto-use seasonal confetti colors and emojis (Halloween, Christmas, Spring, Summer, etc.). Toggle in Celebration settings.</li>
+                            <li>🏆 Session Awards — after 2+ rounds a trophy button appears in Vote History. Click it to see four personality awards: The Anchor, The Lone Wolf, The Dreamer, and The Pragmatist.</li>
+                            <li>🔥 Streak Bonus — consecutive consensus votes trigger an escalating celebration (Triple Consensus → Godlike!) with a golden toast and enhanced confetti/fireworks burst. Toggle in Celebration settings.</li>
+                            <li>📦 Open Source Credits — full attributions added to the About tab and <code>OPEN-SOURCE-CREDITS.txt</code>.</li>
+                            <li>⚔️ Avatar Battle Arena — animated fighter duel plays after votes are revealed. Each fighter wields a weapon scaled to their vote (dagger → broadsword → warhammer → trident → infinity gauntlet).</li>
+                            <li>Battle settings in Celebration tab — toggle on/off, adjust speed (slow/normal/fast), and choose when battles fire (outlier only or every reveal).</li>
+                            <li>Avatar picker: 🎲 Randomize button generates a fun random seed for quick browsing.</li>
+                            <li>Shame spotlight settings: toggle the outlier highlight on/off, pick a custom color, and customize the toast message — in the Celebration tab.</li>
+                            <li>Avatar: Upload a custom photo — auto-cropped and resized.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/14/2026</strong></p>
                         <ul class="mb-2">
                             <li>Participant avatars — colored initials circles appear next to every participant's name.</li>
@@ -660,12 +779,95 @@
                             <li>People joining from a link are guided to enter their name first.</li>
                             <li>Added a quick Recent Changes button in the top bar.</li>
                         </ul>
+                        <!-- Open source credits -->
+                        <h6 class="fw-bold mb-2 mt-4">📦 Open Source Credits</h6>
+                        <p class="small text-muted mb-2">EstimationStation is built on these fine open source projects:</p>
+                        <table class="table table-sm table-borderless mb-2" style="max-width:520px;font-size:0.82rem;">
+                            <thead><tr class="text-muted"><th>Library / Service</th><th>License</th><th>Author</th></tr></thead>
+                            <tbody>
+                                <tr><td><a href="https://dicebear.com" target="_blank" rel="noopener">DiceBear</a> styles</td><td>CC BY 4.0 / CC0</td><td>Various designers</td></tr>
+                                <tr><td><a href="https://robohash.org" target="_blank" rel="noopener">RoboHash</a></td><td>CC BY 4.0</td><td>Colin Davis</td></tr>
+                                <tr><td><a href="https://unavatar.io" target="_blank" rel="noopener">Unavatar</a></td><td>MIT</td><td>Kiko Beats</td></tr>
+                                <tr><td><a href="https://github.com/catdad/canvas-confetti" target="_blank" rel="noopener">canvas-confetti</a></td><td>ISC</td><td>Kiril Vatev</td></tr>
+                                <tr><td><a href="https://github.com/crashmax-dev/fireworks-js" target="_blank" rel="noopener">fireworks-js</a></td><td>MIT</td><td>Crashmax</td></tr>
+                                <tr><td><a href="https://getbootstrap.com" target="_blank" rel="noopener">Bootstrap 5</a></td><td>MIT</td><td>The Bootstrap Authors</td></tr>
+                                <tr><td><a href="https://jquery.com" target="_blank" rel="noopener">jQuery</a></td><td>MIT</td><td>The jQuery Foundation</td></tr>
+                                <tr><td><a href="https://dotnet.microsoft.com/apps/aspnet/signalr" target="_blank" rel="noopener">SignalR</a></td><td>MIT</td><td>Microsoft</td></tr>
+                            </tbody>
+                        </table>
+                        <p class="small text-muted">DiceBear styles used: adventurer (Lisa Wischofsky), bottts (Pablo Stanley), croodles (Hannah Langford), fun-emoji (Davis Uche), open-peeps &amp; pixel-art (Pablo Stanley / Plastic Jam), thumbs (DiceBear), micah (Micah Lanier). Full details in <code>OPEN-SOURCE-CREDITS.txt</code>.</p>
                     </div><!-- end tab-about -->
 
                 </div><!-- end tab-content -->
             </div>
         </div>
     </div><!-- end settingsModal -->
+
+    <!-- ═══════════════════════════════════════════════════════
+         Battle Arena overlay (hidden until triggerBattle fires)
+         ═══════════════════════════════════════════════════════ -->
+    <div id="battle-arena" style="display:none;" aria-hidden="true">
+        <div id="ba-stage">
+            <!-- Crowd -->
+            <div id="ba-crowd"></div>
+
+            <!-- HUD -->
+            <div id="ba-hud">
+                <div class="ba-fighter-hud">
+                    <div class="ba-fighter-name" id="ba-name-left"></div>
+                    <div class="ba-fighter-vote-badge" id="ba-vote-left"></div>
+                    <div class="ba-hp-wrap"><div class="ba-hp-bar" id="ba-hp-left" style="width:100%"></div></div>
+                </div>
+                <div class="ba-hud-mid">
+                    <div class="ba-hud-vs-icon">⚔️</div>
+                    <div class="ba-round-label">Battle</div>
+                </div>
+                <div class="ba-fighter-hud ba-hud-right">
+                    <div class="ba-fighter-name" id="ba-name-right"></div>
+                    <div class="ba-fighter-vote-badge" id="ba-vote-right"></div>
+                    <div class="ba-hp-wrap"><div class="ba-hp-bar" id="ba-hp-right" style="width:100%"></div></div>
+                </div>
+            </div>
+
+            <!-- Fighters -->
+            <div id="ba-fighters">
+                <div class="ba-fighter" id="ba-fighter-left"></div>
+                <div class="ba-fighter" id="ba-fighter-right"></div>
+            </div>
+
+            <!-- VS screen flash -->
+            <div id="ba-vs-screen">
+                <span class="ba-vs-text">VS</span>
+            </div>
+
+            <!-- Mid-battle announcements -->
+            <div id="ba-announcement">
+                <div id="ba-ann-text"></div>
+            </div>
+
+            <!-- Winner banner -->
+            <div id="ba-winner-banner">
+                <div class="ba-winner-name" id="ba-winner-name"></div>
+                <div class="ba-winner-label">Winner!</div>
+            </div>
+
+            <!-- Skip -->
+            <button id="ba-skip-btn" onclick="skipBattle()">Skip ⏭</button>
+        </div>
+    </div>
+
+    <!-- Session Awards Modal -->
+    <div class="modal fade" id="awardsModal" tabindex="-1" aria-labelledby="awardsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:460px;">
+            <div class="modal-content">
+                <div class="modal-header py-2 border-bottom">
+                    <h5 class="modal-title fs-6 fw-bold" id="awardsModalLabel">🏆 Session Awards</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body py-3 px-4" id="awards-modal-content"></div>
+            </div>
+        </div>
+    </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
@@ -677,6 +879,9 @@
     <script src="~/js/celebration.js" asp-append-version="true"></script>
     <script src="~/js/avatar.js" asp-append-version="true"></script>
     <script src="~/js/shame.js" asp-append-version="true"></script>
+    <script src="~/js/battle.js" asp-append-version="true"></script>
+    <script src="~/js/awards.js" asp-append-version="true"></script>
+    <script src="~/js/seasonal.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
     <script>
         // Register service worker for PWA

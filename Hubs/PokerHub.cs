@@ -185,9 +185,33 @@ public class PokerHub : Hub
             foreach (var p in room.Participants)
                 p.Vote = null;
             room.VotesRevealed = false;
+            room.Vibes.Clear();
         }
 
         await Clients.Group(roomName).SendAsync("VotesReset");
+        await Clients.Group(roomName).SendAsync("VibeUpdated", new Dictionary<string, int>());
+    }
+
+    public async Task CastVibe(string emoji)
+    {
+        var allowed = new HashSet<string> { "🚀", "😱", "😴", "🤔", "💪", "🤷" };
+        if (!allowed.Contains(emoji)) return;
+
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        Dictionary<string, int> counts;
+        lock (room)
+        {
+            room.Vibes[Context.ConnectionId] = emoji;
+            counts = room.Vibes.Values
+                .GroupBy(v => v)
+                .ToDictionary(g => g.Key, g => g.Count());
+        }
+
+        await Clients.Group(roomName).SendAsync("VibeUpdated", counts);
     }
 
     public async Task AddStory(string title)

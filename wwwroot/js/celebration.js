@@ -27,6 +27,9 @@ const DEFAULT_CELEBRATION = {
     enableConfetti:          true,
     enableFireworks:         true,
     enableBalloons:          true,
+    streakEnabled:           true,
+    lavaEnabled:             true,
+    seasonalTheme:           true,
     confettiDuration:        4000,
     confettiParticleCount:   150,
     confettiSpread:          70,
@@ -59,13 +62,156 @@ function saveCelebrationSettings(settings) {
 }
 
 // ============================================================
+// Seasonal theme override — returns partial settings object or null
+// ============================================================
+function _getSeasonalOverride() {
+    const now = new Date();
+    const m = now.getMonth() + 1; // 1-based
+    const d = now.getDate();
+    if (m === 10)                          return { colors: ['#ff6600','#ff4500','#222222','#8b0000','#ffd700'], emojis: ['🎃','👻','🕷️','🦇','🕸️'] };
+    if (m === 12 || (m === 1 && d <= 5))   return { colors: ['#cc0000','#006600','#ffffff','#ffd700','#cc0000'], emojis: ['🎄','⛄','❄️','🎁','🦌'] };
+    if (m === 1 && d <= 10)                return { colors: ['#ffd700','#c0c0c0','#ff6b6b','#4fc3f7','#ffffff'], emojis: ['🎆','🎉','✨','🥂','🎊'] };
+    if (m === 2 && d >= 12 && d <= 16)     return { colors: ['#ff1493','#ff69b4','#c71585','#ff4040','#ffffff'], emojis: ['❤️','💘','💝','🌹','💞'] };
+    if (m >= 3 && m <= 5)                  return { colors: ['#66bb6a','#aed581','#f06292','#ffb74d','#4fc3f7'], emojis: ['🌸','🌼','🦋','🌷','🐝'] };
+    if (m >= 6 && m <= 8)                  return { colors: ['#ffd54f','#ff7043','#29b6f6','#66bb6a','#ffffff'], emojis: ['☀️','🌊','🏖️','🍦','🌻'] };
+    if (m === 9)                           return { colors: ['#e65100','#bf360c','#ffd54f','#8d6e63','#d7ccc8'], emojis: ['🍁','🍂','🌾','🎑','🦉'] };
+    if (m === 11 && d >= 20)               return { colors: ['#e65100','#d32f2f','#ffa000','#5d4037','#ffcc02'], emojis: ['🦃','🍂','🌽','🥧','🍁'] };
+    return null;
+}
+
+// ============================================================
 // Main entry point — called from room.js on fresh consensus
 // ============================================================
 function triggerCelebration() {
     const s = getCelebrationSettings();
-    if (s.enableConfetti)  triggerConfetti(s);
-    if (s.enableFireworks) triggerFireworks(s);
-    if (s.enableBalloons)  triggerBalloons(s);
+    let effective = s;
+    if (s.seasonalTheme) {
+        const override = _getSeasonalOverride();
+        if (override) {
+            effective = Object.assign({}, s, {
+                confettiColors: override.colors,
+                confettiEmojis: override.emojis,
+                confettiUseThemeColors: false
+            });
+        }
+    }
+    if (effective.enableConfetti)  triggerConfetti(effective);
+    if (effective.enableFireworks) triggerFireworks(effective);
+    if (effective.enableBalloons)  triggerBalloons(effective);
+}
+
+// ============================================================
+// Streak celebration — called from room.js when streak >= 3
+// ============================================================
+function triggerStreakCelebration(streak) {
+    const s = getCelebrationSettings();
+    if (!s.streakEnabled) return;
+    _showStreakToast(streak);
+    if (typeof confetti !== 'undefined') {
+        const boost = Math.min(streak * 35, 250);
+        confetti({ particleCount: boost, spread: 110, startVelocity: 45, origin: { x: 0.5, y: 0.35 },
+                   colors: ['#ffd700','#ff6b6b','#00ff88','#00cfff','#ff69b4','#ffffff'] });
+    }
+    if (streak >= 5 && s.enableFireworks) {
+        const FW = _getFireworksConstructor();
+        if (FW) {
+            const c = document.createElement('div');
+            c.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9992;pointer-events:none;';
+            document.body.appendChild(c);
+            const fw = new FW(c, { particles: 90, intensity: 55, explosion: 9,
+                                    hue: { min: 0, max: 360 }, delay: { min: 10, max: 20 } });
+            fw.start();
+            setTimeout(function() { try { fw.stop(); } catch(e) {} c.remove(); }, 2800);
+        }
+    }
+}
+
+// ============================================================
+// Floor is Lava — called from room.js on non-consensus reveal
+// ============================================================
+var _lavaInterval = null;
+
+function triggerFloorIsLava(connectionId, seconds) {
+    var s = getCelebrationSettings();
+    if (!s.lavaEnabled) return;
+    stopFloorIsLava();
+
+    var card = document.querySelector('[data-connection-id="' + connectionId + '"]');
+    if (card) card.classList.add('lava-outlier');
+
+    var banner = document.createElement('div');
+    banner.id = 'lava-banner';
+    banner.innerHTML = '🌋 Floor is Lava! Outlier has <span id="lava-countdown">' + seconds + '</span>s to reconsider…';
+    Object.assign(banner.style, {
+        position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+        background: 'linear-gradient(135deg,#ff4500,#ff6b00)',
+        color: '#fff', padding: '8px 20px', borderRadius: '20px',
+        fontWeight: '700', fontSize: '0.9rem', zIndex: '9990',
+        boxShadow: '0 4px 16px rgba(255,69,0,0.5)',
+        pointerEvents: 'none', whiteSpace: 'nowrap'
+    });
+    document.body.appendChild(banner);
+
+    var remaining = seconds;
+    _lavaInterval = setInterval(function() {
+        remaining--;
+        var el = document.getElementById('lava-countdown');
+        if (el) el.textContent = remaining;
+        if (remaining <= 0) {
+            stopFloorIsLava();
+            if (typeof confetti !== 'undefined') {
+                confetti({ particleCount: 70, spread: 85, startVelocity: 42, origin: { x: 0.5, y: 0.6 },
+                           colors: ['#ff4500','#ff6b00','#ffd700','#ff0000','#ff8c00'] });
+            }
+        }
+    }, 1000);
+}
+
+function stopFloorIsLava() {
+    if (_lavaInterval) { clearInterval(_lavaInterval); _lavaInterval = null; }
+    var banner = document.getElementById('lava-banner');
+    if (banner) banner.remove();
+    document.querySelectorAll('.lava-outlier').forEach(function(el) { el.classList.remove('lava-outlier'); });
+}
+
+function _showStreakToast(streak) {
+    var existing = document.getElementById('es-streak-toast');
+    if (existing) existing.remove();
+    var labels = { 3: '🔥 TRIPLE CONSENSUS!', 4: '⚡ FOUR IN A ROW!', 5: '💎 GODLIKE CONSENSUS!',
+                   6: '🚀 SIX IN A ROW!' };
+    var label = labels[streak] || (streak + '🔥 IN A ROW!');
+    var sub = streak >= 5 ? 'Your team is a well-oiled machine!' : 'Keep the momentum going!';
+    var toast = document.createElement('div');
+    toast.id = 'es-streak-toast';
+    toast.innerHTML =
+        '<div style="font-size:2.4rem;font-weight:900;letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,0.6);">' + label + '</div>' +
+        '<div style="font-size:1rem;margin-top:8px;opacity:0.85;">' + streak + ' consensus votes in a row 🎯</div>' +
+        '<div style="font-size:0.88rem;margin-top:4px;opacity:0.7;">' + sub + '</div>';
+    Object.assign(toast.style, {
+        position:    'fixed',
+        top:         '50%',
+        left:        '50%',
+        transform:   'translate(-50%, -50%) scale(0)',
+        background:  'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        border:      '2px solid #ffd700',
+        borderRadius:'18px',
+        padding:     '30px 44px',
+        color:       '#ffd700',
+        textAlign:   'center',
+        zIndex:      '9995',
+        boxShadow:   '0 8px 48px rgba(255,215,0,0.4), 0 0 0 4px rgba(255,215,0,0.12)',
+        pointerEvents:'none',
+        transition:  'transform 0.38s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease'
+    });
+    document.body.appendChild(toast);
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() { toast.style.transform = 'translate(-50%, -50%) scale(1)'; });
+    });
+    setTimeout(function() {
+        toast.style.opacity  = '0';
+        toast.style.transform = 'translate(-50%, -50%) scale(0.88)';
+        setTimeout(function() { if (toast.parentNode) toast.remove(); }, 380);
+    }, 2500);
 }
 
 function stopCelebration() {
@@ -346,6 +492,9 @@ function populateCelebrationTab() {
     _celSet('cel-enable-confetti',   'checked', s.enableConfetti);
     _celSet('cel-enable-fireworks',  'checked', s.enableFireworks);
     _celSet('cel-enable-balloons',   'checked', s.enableBalloons);
+    _celSet('cel-streak-enabled',    'checked', s.streakEnabled !== false);
+    _celSet('cel-lava-enabled',      'checked', s.lavaEnabled !== false);
+    _celSet('cel-seasonal-theme',    'checked', s.seasonalTheme !== false);
 
     _celSet('cel-confetti-type',     'value',   s.confettiType);
     _celSet('cel-confetti-duration', 'value',   s.confettiDuration);
@@ -376,6 +525,9 @@ function saveCelebrationSettingsFromForm() {
         enableConfetti:         _celGet('cel-enable-confetti',  'checked'),
         enableFireworks:        _celGet('cel-enable-fireworks', 'checked'),
         enableBalloons:         _celGet('cel-enable-balloons',  'checked'),
+        streakEnabled:          _celGet('cel-streak-enabled',   'checked') !== false,
+        lavaEnabled:            _celGet('cel-lava-enabled',      'checked') !== false,
+        seasonalTheme:          _celGet('cel-seasonal-theme',    'checked') !== false,
         confettiType:           _celGet('cel-confetti-type',    'value'),
         confettiDuration:       _celGetInt('cel-confetti-duration',   DEFAULT_CELEBRATION.confettiDuration),
         confettiParticleCount:  _celGetInt('cel-confetti-particles',  DEFAULT_CELEBRATION.confettiParticleCount),

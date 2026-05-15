@@ -13,6 +13,7 @@ public class Room
     public string? CustomEstimates { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastActivity { get; set; } = DateTime.UtcNow;
+    public Dictionary<string, string> Vibes { get; set; } = new();
 }
 
 public class Participant

@@ -1,0 +1,62 @@
+EstimationStation — Open Source Attributions
+═════════════════════════════════════════════
+
+Avatar Services
+───────────────
+DiceBear (avatar generation API)
+  URL     : https://dicebear.com
+  License : MIT (library); individual styles vary (see below)
+  Styles used and their licenses:
+    adventurer  — Lisa Wischofsky     — CC BY 4.0
+    bottts      — Pablo Stanley       — CC BY 4.0
+    croodles    — Hannah Langford     — CC BY 4.0
+    fun-emoji   — Davis Uche          — CC BY 4.0
+    open-peeps  — Pablo Stanley       — CC0
+    pixel-art   — Plastic Jam         — CC BY 4.0
+    thumbs      — DiceBear            — CC0
+    micah       — Micah Lanier        — CC BY 4.0
+
+RoboHash (avatar image generation)
+  URL     : https://robohash.org
+  License : CC BY 4.0
+  Author  : Colin Davis
+
+Unavatar (social profile photo proxy)
+  URL     : https://unavatar.io
+  License : MIT
+  Author  : Kiko Beats
+
+Celebration Libraries
+─────────────────────
+canvas-confetti
+  URL     : https://github.com/catdad/canvas-confetti
+  License : ISC
+  Author  : Kiril Vatev
+
+fireworks-js
+  URL     : https://github.com/crashmax-dev/fireworks-js
+  License : MIT
+  Author  : Crashmax
+
+UI Framework & Tooling
+───────────────────────
+Bootstrap 5
+  URL     : https://getbootstrap.com
+  License : MIT
+  Authors : The Bootstrap Authors
+
+jQuery
+  URL     : https://jquery.com
+  License : MIT
+  Authors : The jQuery Foundation
+
+Microsoft SignalR
+  URL     : https://dotnet.microsoft.com/apps/aspnet/signalr
+  License : MIT
+  Authors : Microsoft Corporation
+
+═════════════════════════════════════════════
+CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+CC0       — https://creativecommons.org/publicdomain/zero/1.0/
+ISC       — https://opensource.org/licenses/ISC
+MIT       — https://opensource.org/licenses/MIT
