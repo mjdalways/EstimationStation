@@ -634,6 +634,10 @@ h1, h2, h3, h4, h5, h6 {
     white-space: nowrap;
 }
 .sea-row button:hover { background: rgba(128,128,128,0.12); }
+.btn-sea-cfg { font-size: 0.7rem; padding: 1px 5px; line-height: 1.5; border: 1px solid var(--panel-border, #dee2e6); border-radius: 4px; background: transparent; color: var(--text-secondary, #6c757d); cursor: pointer; }
+.btn-sea-cfg:hover { background: rgba(128,128,128,0.12); }
+.sea-cfg-row { background: var(--bg-secondary, #f8f9fa); }
+.sea-cfg-row:hover { background: rgba(128,128,128,0.1); }
 
 .participant-badge { position: relative; }
 .participant-badge.chicken-overlay::after {

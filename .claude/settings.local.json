@@ -3,7 +3,10 @@
     "allow": [
       "Bash(dotnet build *)",
       "Bash(Get-Content \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\Views\\\\Shared\\\\_Layout.cshtml\")",
-      "Bash(Select-String -Pattern 'seasonal|celebration|sea-')"
+      "Bash(Select-String -Pattern 'seasonal|celebration|sea-')",
+      "Bash(findstr /i \"error\\\\|warning\\\\|succeeded\\\\|failed\")",
+      "Bash(findstr /v \"MSB3026\\\\|MSB3027\\\\|MSB3021\\\\|locked\\\\|retry\")",
+      "PowerShell(cd \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\"; dotnet build 2>&1 | Select-String -Pattern \"error|Build succeeded|Build FAILED\" | Where-Object { $_ -notmatch \"MSB302\" })"
     ]
   }
 }

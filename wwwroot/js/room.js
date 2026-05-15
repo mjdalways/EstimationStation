@@ -14,6 +14,9 @@ let _esConsensusStreak = 0;
 let _myVibe = null;
 let _counterSpellOutlierId = null;
 const VIBE_EMOJIS = ['🚀','😱','😴','🤔','💪','🤷'];
+let _roundVoteOrder  = [];                // connectionIds in order votes were cast this round
+let _roundFlipCounts = {};                // connectionId → number of vote changes this round
+let _roundStartMs    = Date.now();        // reset on VotesReset, used for relative timestamps
 let roomState = {
     participants: [],
     stories: [],
@@ -22,7 +25,7 @@ let roomState = {
     ghostModeEnabled: false,
     currentStoryId: null,
     estimateSet: 'fibonacci',
-    history: []   // last 5 rounds: { story, votes, stats }
+    history: []   // full session: { story, votes, stats, voteOrder, flipCounts }
 };
 
 // ============================================================
@@ -108,7 +111,18 @@ function registerHandlers() {
 
     connection.on('VoteCast', (connectionId, hasVoted) => {
         const p = roomState.participants.find(p => p.connectionId === connectionId);
-        if (p) { p.hasVoted = hasVoted; renderParticipants(); }
+        if (p) {
+            if (hasVoted) {
+                if (p.hasVoted) {
+                    // already voted — this is a flip
+                    _roundFlipCounts[connectionId] = (_roundFlipCounts[connectionId] || 0) + 1;
+                } else {
+                    _roundVoteOrder.push(connectionId);
+                }
+            }
+            p.hasVoted = hasVoted;
+            renderParticipants();
+        }
     });
 
     connection.on('VotesRevealed', (votes, stats) => {
@@ -125,6 +139,10 @@ function registerHandlers() {
         showStats(votes, stats, true);
         if (stats && stats.isConsensus && _esConsensusStreak >= 3 && typeof triggerStreakCelebration === 'function') {
             triggerStreakCelebration(_esConsensusStreak);
+            var _fThresh = (typeof getCelebrationSettings === 'function' ? getCelebrationSettings().finisherThreshold : 4) || 4;
+            if (_esConsensusStreak >= _fThresh && typeof triggerFinisher === 'function') {
+                setTimeout(function() { triggerFinisher(_esConsensusStreak); }, 700);
+            }
         }
         var _ss = typeof getShameSettings === 'function' ? getShameSettings() : { enabled: true };
         if (_ss.enabled && typeof triggerShame === 'function') triggerShame(stats);
@@ -141,12 +159,15 @@ function registerHandlers() {
         _counterSpellOutlierId = (stats && stats.shameParticipantId) || null;
         _renderCounterSpellButton(stats);
 
-        // Record in history
+        // Record in history (no cap — keep full session)
         const storyTitle = roomState.currentStoryId
             ? (roomState.stories.find(s => s.id === roomState.currentStoryId)?.title || 'Unnamed')
             : 'Unnamed';
-        roomState.history.unshift({ story: storyTitle, votes, stats });
-        if (roomState.history.length > 5) roomState.history.pop();
+        roomState.history.unshift({
+            story: storyTitle, votes, stats,
+            voteOrder:  _roundVoteOrder.slice(),
+            flipCounts: Object.assign({}, _roundFlipCounts)
+        });
         renderVoteHistory();
     });
 
@@ -162,6 +183,9 @@ function registerHandlers() {
         roomState.votesRevealed = false;
         selectedVote = null;
         _counterSpellOutlierId = null;
+        _roundVoteOrder  = [];
+        _roundFlipCounts = {};
+        _roundStartMs    = Date.now();
         _hideCounterSpellButton();
         if (typeof stopFloorIsLava === 'function') stopFloorIsLava();
         if (typeof stopDiscussionTimer === 'function') stopDiscussionTimer();

@@ -96,7 +96,9 @@ const DEFAULT_CELEBRATION = {
     fireworksHueMin:         0,
     fireworksHueMax:         360,
     balloonCount:            10,
-    balloonDuration:         6000
+    balloonDuration:         6000,
+    finisherEnabled:         true,
+    finisherThreshold:       4
 };
 
 function getCelebrationSettings() {
@@ -219,6 +221,58 @@ function triggerStreakCelebration(streak) {
             setTimeout(function() { try { fw.stop(); } catch(e) {} c.remove(); }, 2800);
         }
     }
+}
+
+// ============================================================
+// The Finisher — full-screen overlay after N consecutive consensus
+// ============================================================
+var _FINISHER_TITLES = [
+    ['SYNCHRONIZED ANNIHILATION', 'TEAM HIVEMIND', 'PERFECT HARMONY'],
+    ['ABSOLUTE CONSENSUS', 'MIND MELD ACHIEVED', 'ONE BRAIN, ALL GLORY'],
+    ['UNSTOPPABLE FORCE', 'BEYOND HUMAN COMPREHENSION', 'GODLIKE SYNC']
+];
+
+function _finisherTitle(streak) {
+    var tier = streak <= 4 ? 0 : streak <= 6 ? 1 : 2;
+    var pool = _FINISHER_TITLES[tier];
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function _ensureFinisherStyles() {
+    if (document.getElementById('finisher-anim-style')) return;
+    var s = document.createElement('style');
+    s.id = 'finisher-anim-style';
+    s.textContent =
+        '@keyframes finisher-in { from { opacity:0; transform:scale(1.06); } to { opacity:1; transform:none; } }' +
+        '@keyframes finisher-content { from { opacity:0; transform:translateY(18px) scale(0.95); } to { opacity:1; transform:none; } }';
+    document.head.appendChild(s);
+}
+
+function triggerFinisher(streak) {
+    var s = getCelebrationSettings();
+    if (!s.finisherEnabled) return;
+    _ensureFinisherStyles();
+    var existing = document.getElementById('finisher-overlay');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.id = 'finisher-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;display:flex;align-items:center;'
+        + 'justify-content:center;background:rgba(0,0,0,0.82);backdrop-filter:blur(4px);'
+        + 'cursor:pointer;animation:finisher-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275) both;';
+    var title = _finisherTitle(streak);
+    overlay.innerHTML = '<div style="text-align:center;animation:finisher-content 0.5s 0.15s both;padding:0 24px;">'
+        + '<div style="font-size:clamp(1.2rem,4vw,2.2rem);font-weight:900;letter-spacing:.06em;color:#fff;'
+        + 'text-shadow:0 0 40px rgba(255,200,0,0.9),0 2px 8px rgba(0,0,0,0.8);margin-bottom:16px;'
+        + 'text-transform:uppercase;">' + title + '</div>'
+        + '<div style="font-size:clamp(3rem,12vw,7rem);line-height:1;margin-bottom:12px;">💥</div>'
+        + '<div style="font-size:clamp(0.9rem,2.5vw,1.3rem);color:rgba(255,220,100,0.9);font-weight:700;'
+        + 'letter-spacing:.12em;text-transform:uppercase;">' + streak + ' IN A ROW</div>'
+        + '<div style="margin-top:24px;font-size:0.75rem;color:rgba(255,255,255,0.35);'
+        + 'letter-spacing:.08em;">CLICK TO DISMISS</div>'
+        + '</div>';
+    overlay.onclick = function() { overlay.remove(); };
+    document.body.appendChild(overlay);
+    setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 4000);
 }
 
 // ============================================================
@@ -592,8 +646,10 @@ function populateCelebrationTab() {
     _celSet('cel-enable-confetti',   'checked', s.enableConfetti);
     _celSet('cel-enable-fireworks',  'checked', s.enableFireworks);
     _celSet('cel-enable-balloons',   'checked', s.enableBalloons);
-    _celSet('cel-streak-enabled',    'checked', s.streakEnabled !== false);
-    _celSet('cel-lava-enabled',      'checked', s.lavaEnabled !== false);
+    _celSet('cel-streak-enabled',      'checked', s.streakEnabled !== false);
+    _celSet('cel-finisher-enabled',    'checked', s.finisherEnabled !== false);
+    _celSet('cel-finisher-threshold',  'value',   s.finisherThreshold || DEFAULT_CELEBRATION.finisherThreshold);
+    _celSet('cel-lava-enabled',        'checked', s.lavaEnabled !== false);
     _celSet('cel-lava-duration',     'value',   s.lavaDuration || DEFAULT_CELEBRATION.lavaDuration);
     _celSet('cel-lava-color',        'value',   s.lavaColor    || DEFAULT_CELEBRATION.lavaColor);
     var lavaSub = document.getElementById('cel-lava-sub');
@@ -679,8 +735,10 @@ function saveCelebrationSettingsFromForm() {
         enableConfetti:         _celGet('cel-enable-confetti',  'checked'),
         enableFireworks:        _celGet('cel-enable-fireworks', 'checked'),
         enableBalloons:         _celGet('cel-enable-balloons',  'checked'),
-        streakEnabled:          _celGet('cel-streak-enabled',   'checked') !== false,
-        lavaEnabled:            _celGet('cel-lava-enabled',      'checked') !== false,
+        streakEnabled:          _celGet('cel-streak-enabled',       'checked') !== false,
+        finisherEnabled:        _celGet('cel-finisher-enabled',    'checked') !== false,
+        finisherThreshold:      _celGetInt('cel-finisher-threshold', DEFAULT_CELEBRATION.finisherThreshold),
+        lavaEnabled:            _celGet('cel-lava-enabled',         'checked') !== false,
         lavaDuration:           _celGetInt('cel-lava-duration', DEFAULT_CELEBRATION.lavaDuration),
         lavaColor:              _celGet('cel-lava-color', 'value') || DEFAULT_CELEBRATION.lavaColor,
         seasonalTheme:          _celGet('cel-seasonal-theme',    'checked') !== false,
