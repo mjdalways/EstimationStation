@@ -12,12 +12,14 @@ let timerInterval = null;
 let timerSeconds = 0;
 let _esConsensusStreak = 0;
 let _myVibe = null;
+let _counterSpellOutlierId = null;
 const VIBE_EMOJIS = ['🚀','😱','😴','🤔','💪','🤷'];
 let roomState = {
     participants: [],
     stories: [],
     votesRevealed: false,
     autoReveal: false,
+    ghostModeEnabled: false,
     currentStoryId: null,
     estimateSet: 'fibonacci',
     history: []   // last 5 rounds: { story, votes, stats }
@@ -38,6 +40,7 @@ async function initSignalR() {
         await connection.start();
         myConnectionId = connection.connectionId;
         await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver);
+        if (typeof initVoiceRecognition === 'function') initVoiceRecognition();
     } catch (err) {
         console.error('SignalR connection failed:', err);
         setTimeout(initSignalR, 3000);
@@ -53,6 +56,7 @@ function registerHandlers() {
         roomState.stories = state.stories || [];
         roomState.votesRevealed = state.votesRevealed;
         roomState.autoReveal = state.autoReveal;
+        roomState.ghostModeEnabled = state.ghostModeEnabled || false;
         roomState.currentStoryId = state.currentStoryId;
         roomState.estimateSet = state.estimateSet;
         currentEstimateValues = state.estimateValues || currentEstimateValues;
@@ -68,6 +72,7 @@ function registerHandlers() {
         renderParticipants();
         renderStories();
         updateCurrentStoryDisplay();
+        _updateGhostToggleBtn();
 
         if (state.votesRevealed) {
             const votes = {};
@@ -124,9 +129,17 @@ function registerHandlers() {
         var _ss = typeof getShameSettings === 'function' ? getShameSettings() : { enabled: true };
         if (_ss.enabled && typeof triggerShame === 'function') triggerShame(stats);
         if (typeof triggerBattle === 'function') triggerBattle(votes, stats);
-        if (stats && !stats.isConsensus && stats.shameParticipantId && typeof triggerFloorIsLava === 'function') {
-            triggerFloorIsLava(stats.shameParticipantId, 30);
+        if (stats && !stats.isConsensus) {
+            var _disc = typeof getDiscussionSettings === 'function' ? getDiscussionSettings() : {};
+            if (_disc.enabled) {
+                if (typeof triggerDiscussionTimer === 'function') triggerDiscussionTimer(stats.shameParticipantId || null);
+            } else if (stats.shameParticipantId && typeof triggerFloorIsLava === 'function') {
+                triggerFloorIsLava(stats.shameParticipantId);
+            }
         }
+
+        _counterSpellOutlierId = (stats && stats.shameParticipantId) || null;
+        _renderCounterSpellButton(stats);
 
         // Record in history
         const storyTitle = roomState.currentStoryId
@@ -148,8 +161,11 @@ function registerHandlers() {
     connection.on('VotesReset', () => {
         roomState.votesRevealed = false;
         selectedVote = null;
+        _counterSpellOutlierId = null;
+        _hideCounterSpellButton();
         if (typeof stopFloorIsLava === 'function') stopFloorIsLava();
-        roomState.participants.forEach(p => { p.vote = null; p.hasVoted = false; });
+        if (typeof stopDiscussionTimer === 'function') stopDiscussionTimer();
+        roomState.participants.forEach(p => { p.vote = null; p.hasVoted = false; p.isGhost = false; });
         document.getElementById('revealBtn').style.display = 'block';
         document.getElementById('hideBtn').style.display = 'none';
         document.getElementById('statsBar').style.display = 'none';
@@ -159,6 +175,21 @@ function registerHandlers() {
         renderVibeDisplay({});
         renderCards();
         renderParticipants();
+    });
+
+    connection.on('GhostModeToggled', (enabled, togglerName) => {
+        roomState.ghostModeEnabled = enabled;
+        _showGhostInfoBar(enabled, togglerName);
+        _updateGhostToggleBtn();
+        renderCards();
+    });
+
+    connection.on('CounterSpellCast', (casterConnectionId, casterName) => {
+        const p = roomState.participants.find(p => p.connectionId === casterConnectionId);
+        if (p) p.counterUsed = true;
+        _hideCounterSpellButton();
+        if (typeof triggerChickenOverlay === 'function') triggerChickenOverlay(casterConnectionId);
+        _showCounterSpellToast(casterName);
     });
 
     connection.on('StoryAdded', (story) => {
@@ -236,14 +267,16 @@ function registerHandlers() {
 function renderCards() {
     const container = document.getElementById('cardContainer');
     container.innerHTML = '';
+    const meIsGhost = roomState.participants.some(p => p.connectionId === connection?.connectionId && p.isGhost);
+    const cantVote = isObserver || meIsGhost;
     const values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
     values.forEach(val => {
         const card = document.createElement('div');
-        card.className = 'poker-card' + (selectedVote === val ? ' selected' : '') + (isObserver ? ' disabled' : '');
+        card.className = 'poker-card' + (selectedVote === val ? ' selected' : '') + (cantVote ? ' disabled' : '');
         card.setAttribute('data-value', val);
         card.textContent = val;
-        card.title = `Vote: ${val}`;
-        if (!isObserver) {
+        card.title = meIsGhost ? '👻 Ghosts cannot vote' : `Vote: ${val}`;
+        if (!cantVote) {
             card.onclick = () => castVote(val);
         }
         container.appendChild(card);
@@ -259,11 +292,14 @@ function renderParticipants() {
         div.className = 'participant-badge' +
             (p.hasVoted ? ' voted' : '') +
             (p.isObserver ? ' observer' : '') +
+            (p.isGhost ? ' ghost' : '') +
             (isMe ? ' me' : '');
         div.dataset.connectionId = p.connectionId;
 
         let voteDisplay = '';
-        if (p.isObserver) {
+        if (p.isGhost) {
+            voteDisplay = '<span class="vote-waiting">👻</span>';
+        } else if (p.isObserver) {
             voteDisplay = '<span class="vote-waiting">👁️</span>';
         } else if (roomState.votesRevealed && p.vote) {
             voteDisplay = `<span class="participant-vote">${escHtml(p.vote)}</span>`;
@@ -376,6 +412,8 @@ function appendChat(author, message, timestamp) {
 // ============================================================
 async function castVote(val) {
     if (isObserver) return;
+    const meIsGhost = roomState.participants.some(p => p.connectionId === connection?.connectionId && p.isGhost);
+    if (meIsGhost) return;
     const wasSelected = selectedVote === val;
     selectedVote = wasSelected ? null : val;
     renderCards();
@@ -392,6 +430,74 @@ async function castVote(val) {
 
 async function revealVotes() {
     try { await connection.invoke('RevealVotes'); } catch(e) { console.error(e); }
+}
+
+async function toggleGhostMode() {
+    try { await connection.invoke('ToggleGhostMode', !roomState.ghostModeEnabled); } catch(e) { console.error(e); }
+}
+
+function _updateGhostToggleBtn() {
+    var btn = document.getElementById('ghostToggleBtn');
+    if (!btn) return;
+    if (roomState.ghostModeEnabled) {
+        btn.textContent = '👻 Ghost: On';
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-secondary');
+    } else {
+        btn.textContent = '👻 Ghost: Off';
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-outline-secondary');
+    }
+}
+
+function _showGhostInfoBar(enabled, name) {
+    var existing = document.getElementById('ghost-info-bar');
+    if (existing) existing.remove();
+    var bar = document.createElement('div');
+    bar.id = 'ghost-info-bar';
+    bar.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);' +
+        'background:#6c757d;color:#fff;padding:6px 20px;border-radius:20px;font-size:0.85rem;' +
+        'font-weight:600;z-index:9990;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+    bar.textContent = '👻 Ghost mode ' + (enabled ? 'enabled' : 'disabled') + ' by ' + name;
+    document.body.appendChild(bar);
+    setTimeout(function() { if (bar.parentNode) bar.remove(); }, 4000);
+}
+
+function _renderCounterSpellButton(stats) {
+    var bar = document.getElementById('counterSpellBar');
+    if (!bar) return;
+    var cs = typeof getCounterSpellSettings === 'function' ? getCounterSpellSettings() : {};
+    if (!cs.enabled) { bar.style.display = 'none'; return; }
+    if (!stats || !stats.shameParticipantId) { bar.style.display = 'none'; return; }
+    var myId = connection && connection.connectionId;
+    if (stats.shameParticipantId !== myId) { bar.style.display = 'none'; return; }
+    var me = roomState.participants.find(p => p.connectionId === myId);
+    if (me && me.counterUsed) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    bar.innerHTML = '<span style="font-size:0.85rem;">🪄 You\'re the outlier — retaliate!</span>' +
+        '<button class="btn btn-sm btn-warning" onclick="castCounterSpell()">🐔 Cast Spell</button>';
+}
+
+function _hideCounterSpellButton() {
+    var bar = document.getElementById('counterSpellBar');
+    if (bar) bar.style.display = 'none';
+}
+
+function _showCounterSpellToast(casterName) {
+    var existing = document.getElementById('counter-spell-toast');
+    if (existing) existing.remove();
+    var toast = document.createElement('div');
+    toast.id = 'counter-spell-toast';
+    toast.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);' +
+        'background:#ffc107;color:#000;padding:8px 24px;border-radius:20px;font-size:0.9rem;' +
+        'font-weight:700;z-index:9995;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.25);';
+    toast.textContent = '🪄 ' + casterName + ' cast a Counter-Spell! 🐔';
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 4000);
+}
+
+async function castCounterSpell() {
+    try { await connection.invoke('CastCounterSpell'); } catch(e) { console.error(e); }
 }
 
 async function hideVotes() {

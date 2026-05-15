@@ -105,10 +105,8 @@ var DICEBEAR_STYLES = [
 
 var ROBOHASH_SETS = [
     { id: '1', label: '🤖 Robots' },
-    { id: '2', label: '👾 Monsters' },
-    { id: '3', label: '🤖 Robot Heads' },
-    { id: '4', label: '🐱 Cats' },
-    { id: '5', label: '🧑 Humans' }
+    { id: '2', label: '👾 Monsters' }
+    // Sets 3 (Robot Heads), 4 (Cats), 5 (Humans) disabled — return blank images for many seeds
 ];
 
 // ── Avatar settings ──────────────────────────────────────────
@@ -128,7 +126,12 @@ var DEFAULT_AVATAR_SETTINGS = {
 function getAvatarSettings() {
     try {
         var raw = localStorage.getItem(AVATAR_SETTINGS_KEY);
-        return Object.assign({}, DEFAULT_AVATAR_SETTINGS, raw ? JSON.parse(raw) : {});
+        var s = Object.assign({}, DEFAULT_AVATAR_SETTINGS, raw ? JSON.parse(raw) : {});
+        // Migrate away from unreliable RoboHash sets 3/4/5
+        if (s.source === 'robohash' && ['3','4','5'].indexOf(s.robohashSet) !== -1) {
+            s.robohashSet = '1';
+        }
+        return s;
     } catch (e) {
         return Object.assign({}, DEFAULT_AVATAR_SETTINGS);
     }

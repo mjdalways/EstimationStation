@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EstimationStation — Feature Plan v3.0</title>
+<style>
+  :root {
+    --bg: #0f1117; --bg2: #1a1d27; --bg3: #22263a;
+    --border: #2e3350; --accent: #5b8dee; --accent2: #a78bfa;
+    --green: #34d399; --red: #f87171; --yellow: #fbbf24; --orange: #fb923c;
+    --pink: #f472b6; --cyan: #22d3ee;
+    --text: #e2e8f0; --muted: #8892a4; --code-bg: #0d1117;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text);
+         line-height: 1.7; font-size: 15px; }
+
+  .layout { display: flex; min-height: 100vh; }
+  nav.sidebar { width: 280px; min-width: 280px; background: var(--bg2);
+                border-right: 1px solid var(--border); position: sticky;
+                top: 0; height: 100vh; overflow-y: auto; padding: 24px 0; }
+  nav.sidebar .logo { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  nav.sidebar .logo h2 { font-size: 1rem; color: var(--accent); }
+  nav.sidebar .logo p  { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+  nav.sidebar a { display: block; padding: 5px 20px; color: var(--muted);
+                  text-decoration: none; font-size: 0.8rem; border-left: 3px solid transparent;
+                  transition: all 0.15s; }
+  nav.sidebar a:hover, nav.sidebar a.active
+    { color: var(--text); border-left-color: var(--accent); background: rgba(91,141,238,0.08); }
+  nav.sidebar .nav-section { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+                              color: var(--muted); padding: 14px 20px 4px; }
+  main { flex: 1; max-width: 1100px; padding: 48px 56px; overflow-x: hidden; }
+
+  h1 { font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2));
+       -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  h2 { font-size: 1.5rem; font-weight: 700; color: var(--accent); margin: 48px 0 16px;
+       padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 1.15rem; font-weight: 700; color: var(--accent2); margin: 32px 0 12px; }
+  h4 { font-size: 1rem; font-weight: 600; color: var(--yellow); margin: 24px 0 8px; }
+  h5 { font-size: 0.9rem; font-weight: 600; color: var(--green); margin: 18px 0 6px; }
+  p  { margin-bottom: 12px; color: var(--text); }
+
+  .hero { background: linear-gradient(135deg, #1a1d2e, #252a40);
+          border: 1px solid var(--border); border-radius: 16px;
+          padding: 32px 36px; margin-bottom: 40px; }
+  .hero h1 { margin-bottom: 12px; }
+  .hero .meta { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; }
+  .hero .meta span { font-size: 0.82rem; color: var(--muted);
+                     background: var(--bg3); border: 1px solid var(--border);
+                     padding: 4px 12px; border-radius: 20px; }
+  .hero .meta span b { color: var(--text); }
+
+  .callout { border-radius: 10px; padding: 16px 20px; margin: 20px 0; border-left: 4px solid; }
+  .callout.info  { background: rgba(91,141,238,0.08); border-color: var(--accent); }
+  .callout.warn  { background: rgba(251,191,36,0.08);  border-color: var(--yellow); }
+  .callout.good  { background: rgba(52,211,153,0.08);  border-color: var(--green); }
+  .callout.note  { background: rgba(167,139,250,0.08); border-color: var(--accent2); }
+  .callout.danger{ background: rgba(248,113,113,0.08); border-color: var(--red); }
+  .callout strong { display: block; margin-bottom: 4px; font-size: 0.85rem;
+                    text-transform: uppercase; letter-spacing: 0.05em; }
+  .callout.info  strong { color: var(--accent); }
+  .callout.warn  strong { color: var(--yellow); }
+  .callout.good  strong { color: var(--green); }
+  .callout.note  strong { color: var(--accent2); }
+  .callout.danger strong { color: var(--red); }
+
+  .table-wrap { overflow-x: auto; margin: 16px 0; border-radius: 10px;
+                border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: var(--bg3); color: var(--accent); font-size: 0.8rem;
+       text-transform: uppercase; letter-spacing: 0.06em;
+       padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 16px; border-bottom: 1px solid var(--border);
+       vertical-align: top; font-size: 0.88rem; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px;
+        padding: 20px; overflow-x: auto; margin: 16px 0; font-size: 0.82rem; line-height: 1.6; }
+  code { font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; }
+  pre code { color: #c9d1d9; }
+  :not(pre) > code { background: var(--bg3); color: var(--accent2);
+                     padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 12px;
+           font-size: 0.75rem; font-weight: 600; margin: 2px; }
+  .badge-blue   { background: rgba(91,141,238,0.2); color: var(--accent); border: 1px solid rgba(91,141,238,0.4); }
+  .badge-purple { background: rgba(167,139,250,0.2); color: var(--accent2); border: 1px solid rgba(167,139,250,0.4); }
+  .badge-green  { background: rgba(52,211,153,0.2);  color: var(--green);   border: 1px solid rgba(52,211,153,0.4); }
+  .badge-yellow { background: rgba(251,191,36,0.2);  color: var(--yellow);  border: 1px solid rgba(251,191,36,0.4); }
+  .badge-red    { background: rgba(248,113,113,0.2); color: var(--red);     border: 1px solid rgba(248,113,113,0.4); }
+  .badge-orange { background: rgba(251,146,60,0.2);  color: var(--orange);  border: 1px solid rgba(251,146,60,0.4); }
+  .badge-pink   { background: rgba(244,114,182,0.2); color: var(--pink);    border: 1px solid rgba(244,114,182,0.4); }
+  .badge-cyan   { background: rgba(34,211,238,0.2);  color: var(--cyan);    border: 1px solid rgba(34,211,238,0.4); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+  ul { margin: 10px 0 10px 24px; }
+  ul li { margin-bottom: 6px; font-size: 0.9rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+
+  .done-card { background: rgba(52,211,153,0.06); border: 1px solid rgba(52,211,153,0.25);
+               border-radius: 12px; padding: 16px 20px; margin: 12px 0;
+               display: flex; align-items: flex-start; gap: 12px; }
+  .done-card .done-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 2px; }
+  .done-card .done-body h4 { color: var(--green); margin: 0 0 4px; font-size: 0.95rem; }
+  .done-card .done-body p  { color: var(--muted); font-size: 0.84rem; margin: 0; }
+
+  .feature-card { background: var(--bg2); border: 1px solid var(--border);
+                  border-radius: 12px; padding: 16px 20px; margin: 12px 0; }
+  .feature-card h4 { color: var(--yellow); margin: 0 0 6px; font-size: 0.95rem; }
+  .feature-card p  { color: var(--muted); font-size: 0.84rem; margin: 0 0 4px; }
+  .feature-card ul { margin: 6px 0 0 18px; }
+  .feature-card ul li { color: var(--text); font-size: 0.84rem; margin-bottom: 3px; }
+
+  .patch-card { background: var(--bg2); border: 1px solid rgba(91,141,238,0.3);
+                border-radius: 12px; padding: 20px 24px; margin: 16px 0; }
+  .patch-card h3 { color: var(--accent); margin: 0 0 10px; font-size: 1rem; }
+  .patch-card .tag { font-size: 0.72rem; background: rgba(91,141,238,0.15); color: var(--accent);
+                     border: 1px solid rgba(91,141,238,0.3); padding: 2px 8px; border-radius: 8px;
+                     margin-right: 6px; }
+
+  .seasonal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+  .sea-event { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+               padding: 10px 12px; }
+  .sea-event .sea-name { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+  .sea-event .sea-date { font-size: 0.73rem; color: var(--muted); margin-top: 2px; }
+  .sea-event .sea-p { font-size: 0.68rem; padding: 1px 6px; border-radius: 6px; margin-top: 4px;
+                      display: inline-block; font-weight: 700; }
+  .p1 { background: rgba(248,113,113,0.2); color: var(--red); }
+  .p2 { background: rgba(251,191,36,0.2); color: var(--yellow); }
+  .p3 { background: rgba(34,211,238,0.2); color: var(--cyan); }
+  .p4 { background: rgba(52,211,153,0.2); color: var(--green); }
+
+  .ranking-table th { background: rgba(91,141,238,0.15); }
+  .ranking-table td.rank { text-align: center; font-weight: 700; color: var(--accent); }
+  .ranking-table td.effort-cell { text-align: center; }
+  td.status-done { color: var(--green); font-weight: 600; }
+  td.status-todo { color: var(--muted); }
+
+  @media (max-width: 900px) {
+    nav.sidebar { display: none; }
+    main { padding: 24px 20px; }
+    .seasonal-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="logo">
+    <h2>🃏 EstimationStation</h2>
+    <p>Feature Plan v3.0</p>
+  </div>
+  <div class="nav-section">Overview</div>
+  <a href="#completed">✅ Completed Features</a>
+  <a href="#ranking">Master Priority Table</a>
+  <div class="nav-section">v3 Pipeline</div>
+  <a href="#carried">Carried from v2.0</a>
+  <a href="#patch1">P1 — Visual Polish</a>
+  <a href="#patch2">P2 — Voting Enhancements</a>
+  <a href="#patch3">P3 — Party Tools</a>
+  <a href="#patch4">P4 — Analytics</a>
+  <a href="#patch5">P5 — Game Modes</a>
+  <a href="#patch6">P6 — Atmosphere</a>
+  <a href="#patch7">P7 — Jira Integration</a>
+  <a href="#polish">Polish &amp; Fixes</a>
+  <div class="nav-section">Not Planned</div>
+  <a href="#wont-do">Will Not Do (4)</a>
+  <div class="nav-section">Seasonal Expansion</div>
+  <a href="#seasonal-overview">Overview &amp; Priority</a>
+  <a href="#seasonal-events">All 39 Events</a>
+</nav>
+
+<main>
+
+<div class="hero">
+  <h1>EstimationStation — Feature Plan v3.0</h1>
+  <p>Progress snapshot, new roadmap items, and the expanded seasonal event system.</p>
+  <div class="meta">
+    <span>📅 <b>Updated 2026-05-15</b></span>
+    <span>🏆 <b>7 / 20 v2.0 features complete</b></span>
+    <span>🔧 Stack: <b>ASP.NET Core 10 / C# / SignalR / Bootstrap 5 / Vanilla JS</b></span>
+    <span>🗓️ Seasonal: <b>8 → 39 events</b></span>
+  </div>
+</div>
+
+<div class="callout good">
+  <strong>What changed in v3.0</strong>
+  Seven of the original 20 features are shipped. New v3.0 patches add 28 more smaller feature ideas across 7 delivery batches.
+  The seasonal system has been redesigned with 39 events, a priority/overlap resolver, and variable-date support for lunar calendar events.
+  Every feature module now ships with a <code>testX()</code> function and an in-tab test button — no more waiting for a real vote reveal.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 id="completed">✅ Completed Features</h2>
+
+<h3>Core Mechanics (v1.0 / v2.0)</h3>
+
+<div class="done-card">
+  <div class="done-icon">😤</div>
+  <div class="done-body">
+    <h4>Shame (Lone Wolf) — <span class="badge badge-pink">TOP PRIORITY</span></h4>
+    <p>Outlier badge highlighted with animated spotlight on reveal. Configurable color and toast message. Syncs <code>--shame-color</code> CSS variable.</p>
+  </div>
+</div>
+<div class="done-card">
+  <div class="done-icon">🤖</div>
+  <div class="done-body">
+    <h4>User Avatars — <span class="badge badge-pink">TOP PRIORITY</span></h4>
+    <p>Initials circles, DiceBear illustrated styles (20+ packs), RoboHash (Robots &amp; Monsters), social photo upload. Real-time sync via SignalR. Sets 3/4/5 disabled (blank-image bug).</p>
+  </div>
+</div>
+<div class="done-card">
+  <div class="done-icon">⚔️</div>
+  <div class="done-body">
+    <h4>Avatar Battle Arena — <span class="badge badge-pink">TOP PRIORITY</span></h4>
+    <p>Animated fighter duel with weapon scaling (vote value → dagger through infinity gauntlet). 3 speed modes, 3 round lengths, 5 outcome modes. Configurable auto-dismiss. 🧪 Test button added.</p>
+  </div>
+</div>
+<div class="done-card">
+  <div class="done-icon">🌡️</div>
+  <div class="done-body">
+    <h4>Anonymous Vibe Check — <span class="badge badge-green">EASY</span></h4>
+    <p>Pre-vote emoji reactions (🚀😱😴🤔💪🤷). Counts shown live, no names attached. Resets with votes. SignalR broadcast.</p>
+  </div>
+</div>
+<div class="done-card">
+  <div class="done-icon">🏅</div>
+  <div class="done-body">
+    <h4>End-of-Session Awards — <span class="badge badge-green">EASY</span></h4>
+    <p>After 2+ rounds, a trophy button appears in Vote History. Computes: The Anchor, Lone Wolf, The Dreamer, The Pragmatist. Pure client-side calculation over history.</p>
+  </div>
+</div>
+<div class="done-card">
+  <div class="done-icon">🔥</div>
+  <div class="done-body">
+    <h4>Estimate Streaks &amp; Godlike Mode — <span class="badge badge-yellow">MED</span></h4>
+    <p>Consecutive consensus votes trigger Triple Consensus → GODLIKE toasts with golden overlay and boosted fireworks. 🧪 Test button added (simulates 5-streak).</p>
+  </div>
+</div>
+<div class="done-card">
+  <div class="done-icon">🗓️</div>
+  <div class="done-body">
+    <h4>Seasonal Themes — <span class="badge badge-yellow">MED</span></h4>
+    <p>8 original seasons with ambient on-screen animations (~80 total) + seasonal confetti override. Per-season enable/disable toggles. Being expanded to 39 events in this release.</p>
+  </div>
+</div>
+
+<h3>Settings &amp; Polish (v2.1)</h3>
+
+<div class="done-card">
+  <div class="done-icon">🌋</div>
+  <div class="done-body">
+    <h4>Floor is Lava — configurable</h4>
+    <p>Outlier badge glows with customizable lava color (CSS variable). Countdown duration configurable 5–120s. 🧪 Test button added (injects a fake badge if none present).</p>
+  </div>
+</div>
+<div class="done-card">
+  <div class="done-icon">🎨</div>
+  <div class="done-body">
+    <h4>Event Colors in Theme System</h4>
+    <p><code>--lava-color-primary</code>, <code>--lava-color-secondary</code>, <code>--shame-color</code> added to all 11 base themes and the custom theme builder. Controllable from both Theme tab and Events tab.</p>
+  </div>
+</div>
+<div class="done-card">
+  <div class="done-icon">🧪</div>
+  <div class="done-body">
+    <h4>Individual Test Buttons for All Effects</h4>
+    <p>Every section in the Events tab now has a 🧪 Test button: Confetti, Fireworks, Balloons, Streak Bonus, Floor is Lava, Shame Spotlight, Avatar Battle, Seasonal Animation. Global button renamed to "🎉 Test All".</p>
+  </div>
+</div>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 id="ranking">Master Priority Table</h2>
+
+<div class="table-wrap"><table class="ranking-table">
+  <tr><th>#</th><th>Feature</th><th>Tier</th><th>Effort</th><th>Status</th><th>Notes</th></tr>
+  <tr><td class="rank">1</td><td><b>Shame (Lone Wolf)</b></td><td><span class="badge badge-pink">TOP</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v1.0</td></tr>
+  <tr><td class="rank">2</td><td><b>User Avatars</b></td><td><span class="badge badge-pink">TOP</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v1.0</td></tr>
+  <tr><td class="rank">3</td><td><b>Avatar Battle</b></td><td><span class="badge badge-pink">TOP</span></td><td class="effort-cell">L</td><td class="status-done">✅ Done</td><td>v1.0</td></tr>
+  <tr><td class="rank">4</td><td>Anonymous Vibe Check</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">S</td><td class="status-done">✅ Done</td><td>v2.0</td></tr>
+  <tr><td class="rank">5</td><td>Ghost Mode</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">S</td><td class="status-done">✅ Done</td><td>v3.0</td></tr>
+  <tr><td class="rank">6</td><td>Discussion Timer (Coffee / Lava)</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">S</td><td class="status-done">✅ Done</td><td>v3.0</td></tr>
+  <tr><td class="rank">7</td><td>Voice-Activated Reveal</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">S</td><td class="status-done">✅ Done</td><td>v3.0</td></tr>
+  <tr><td class="rank">8</td><td>End-of-Session Awards</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v2.0</td></tr>
+  <tr><td class="rank">9</td><td>Estimate Streaks &amp; Godlike Mode</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v2.0</td></tr>
+  <tr><td class="rank">10</td><td>Lone Wolf Counter-Spell</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v3.0</td></tr>
+  <tr><td class="rank">11</td><td>Hall of Fame (per session)</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td><span class="badge badge-blue">🔵 v3</span></td><td>End-session stats screen</td></tr>
+  <tr><td class="rank">12</td><td>Seasonal Themes</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v2.0 · expanding to 39 events</td></tr>
+  <tr><td class="rank">13</td><td>The Finisher (Team Ultimate)</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td><span class="badge badge-blue">🔵 v3</span></td><td>Celebration extension</td></tr>
+  <tr><td class="rank">14</td><td>Jira Integration</td><td><span class="badge badge-orange">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-blue">🔵 v3</span></td><td>v3.0 Patch 7</td></tr>
+  <tr><td class="rank">15</td><td>Boss Fight Arena</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-blue">🔵 v3</span></td><td>Ticket-state machine</td></tr>
+  <tr><td class="rank">16</td><td>Oracle Prediction</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-blue">🔵 v3</span></td><td>Pre-reveal wager phase</td></tr>
+  <tr><td class="rank">17</td><td>Duel of Perspective</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-red">❌ Won't Do</span></td><td>Too complex, too niche</td></tr>
+  <tr><td class="rank">18</td><td>Power-Ups</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-red">❌ Won't Do</span></td><td>Too complex, too niche</td></tr>
+  <tr><td class="rank">19</td><td>Scrum Gold Economy</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">XL</td><td><span class="badge badge-red">❌ Won't Do</span></td><td>Needs persistence layer</td></tr>
+  <tr><td class="rank">20</td><td>Loot Boxes</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-red">❌ Won't Do</span></td><td>Depends on Scrum Gold</td></tr>
+</table></div>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 id="carried">v3 Pipeline — Carried from v2.0</h2>
+
+<div class="callout info">
+  <strong>Moved from v2.0 backlog</strong>
+  These features were originally ranked in v2.0 but not yet built. All are now part of the v3 pipeline. Each must ship with a <code>testX()</code> function and an in-tab test button.
+</div>
+
+<div class="feature-card" id="ghost-mode" style="border-color:var(--green);">
+  <h4>#5 — 👻 Ghost Mode <span class="badge badge-green">EASY · S</span> <span class="status-done">✅ Done — v3.0</span></h4>
+  <p>Global room toggle — any participant can enable/disable ghost mode, all participants see a Teams-style info bar. When on, latecomers who join mid-vote are marked ghosts (watch only). Ghost status clears on reset.</p>
+  <ul>
+    <li><code>GhostModeEnabled</code> on <code>Room</code>; <code>IsGhost</code> on <code>Participant</code></li>
+    <li>New <code>ToggleGhostMode(bool)</code> hub method broadcasts <code>GhostModeToggled</code> event</li>
+    <li>Toggle button in room controls; 👻 badge on ghost participant; vote cards disabled for ghosts</li>
+  </ul>
+</div>
+
+<div class="feature-card" id="discussion-timer" style="border-color:var(--green);">
+  <h4>#6 — ☕ Discussion Timer <span class="badge badge-green">EASY · S</span> <span class="status-done">✅ Done — v3.0</span></h4>
+  <p>After a non-consensus reveal, an optional countdown banner gives the team discussion time before 🌋 Floor is Lava kicks in. Both phases optional and independently configurable.</p>
+  <ul>
+    <li>Pure client-side (<code>discussion.js</code>); triggered in <code>VotesRevealed</code> handler</li>
+    <li>Configurable duration (default 120s); enable toggle in Events settings tab</li>
+    <li>On expiry: calls <code>triggerFloorIsLava()</code> automatically (if lava enabled)</li>
+    <li>Clears on vote reset</li>
+  </ul>
+</div>
+
+<div class="feature-card" id="voice-reveal" style="border-color:var(--green);">
+  <h4>#7 — 🎤 Voice-Activated Reveal <span class="badge badge-green">EASY · S</span> <span class="status-done">✅ Done — v3.0</span></h4>
+  <p>Say a configurable trigger phrase to reveal votes hands-free. Works for whoever enables it locally — no host gating.</p>
+  <ul>
+    <li>Uses <code>window.SpeechRecognition</code> / <code>webkitSpeechRecognition</code> — no server changes</li>
+    <li>Settings: trigger phrase (default "reveal"), language, enable toggle in Events tab</li>
+    <li>🎤 Listening badge in navbar while active; auto-restarts after silence</li>
+    <li>Works in Chrome/Edge; graceful no-op on unsupported browsers</li>
+  </ul>
+</div>
+
+<div class="feature-card" id="counter-spell" style="border-color:var(--green);">
+  <h4>#10 — 🪄 Lone Wolf Counter-Spell <span class="badge badge-yellow">MED · M</span> <span class="status-done">✅ Done — v3.0</span></h4>
+  <p>The outlier voter gets a once-per-session button to cast a Counter-Spell, overlaying all other voters with a 🐔 bouncing chicken for a configurable duration.</p>
+  <ul>
+    <li><code>CastCounterSpell()</code> hub method validates caller is current shame participant and <code>CounterUsed == false</code></li>
+    <li><code>CounterUsed: bool</code> on <code>Participant</code>; <code>ShameParticipantId</code> stored on <code>Room</code> at reveal for server-side validation</li>
+    <li>🐔 chicken overlay CSS animation on all non-outlier badges; bouncing keyframe animation</li>
+    <li>Settings: enable toggle, duration (default 4s) in Events tab; 🧪 Test button</li>
+  </ul>
+</div>
+
+<div class="feature-card" id="hall-of-fame">
+  <h4>#11 — 🏆 Hall of Fame <span class="badge badge-yellow">MED · M</span></h4>
+  <p>End-of-session leaderboard showing who was most accurate, fastest voter, most consensus hits, etc.</p>
+  <ul>
+    <li>Persists <code>ConsensusHits</code>, <code>FlipCount</code>, <code>LastVoteMs</code> per participant in backend <code>Room</code></li>
+    <li>Triggered by "End Session" button (host only); shows modal with ranked table</li>
+    <li>Extends existing End-of-Session Awards with more categories</li>
+  </ul>
+</div>
+
+<div class="feature-card" id="finisher">
+  <h4>#13 — 💥 The Finisher <span class="badge badge-yellow">MED · M</span></h4>
+  <p>When the team achieves 3+ consecutive consensus votes, the next consensus triggers a team "Ultimate Move" screen.</p>
+  <ul>
+    <li>Extension of existing streak system — fires after streak ≥ 3 AND consensus</li>
+    <li>Full-screen animated overlay with team name + dramatic title ("SYNCHRONIZED ANNIHILATION")</li>
+    <li>Settings: streak threshold, animation style, enable toggle</li>
+  </ul>
+</div>
+
+<div class="feature-card" id="boss-fight">
+  <h4>#15 — 🐉 Boss Fight Arena <span class="badge badge-red">HARD · L</span></h4>
+  <p>Each story is framed as a boss monster to defeat. Disagreement = the boss attacks; consensus = damage dealt.</p>
+  <ul>
+    <li>New ticket state machine on <code>Room</code>: boss HP, phase, attack log</li>
+    <li>Arena overlay replaces the normal vote reveal</li>
+    <li>Boss art is generated procedurally from story title hash</li>
+  </ul>
+</div>
+
+<div class="feature-card" id="oracle">
+  <h4>#16 — 🔮 Oracle Prediction <span class="badge badge-red">HARD · L</span></h4>
+  <p>Before revealing, each voter secretly wagers whether the group will reach consensus. Correct predictions earn points.</p>
+  <ul>
+    <li>New pre-reveal phase; hidden wagers broadcast on reveal</li>
+    <li>Per-user currency state (<code>es_oraclePoints</code> in localStorage)</li>
+    <li>Settings: wager window (seconds), streak multiplier, enable toggle</li>
+  </ul>
+</div>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2>New v3.0 Features</h2>
+
+<div class="callout info">
+  <strong>Delivery format</strong>
+  v3.0 features ship in 7 patches. Each patch is self-contained and independently reviewable. All new JS modules follow the established pattern including <code>testX()</code>.
+</div>
+
+<div class="patch-card" id="patch1">
+  <h3>Patch 1 — 🃏 Visual Polish</h3>
+  <span class="tag">Easy</span><span class="tag">Client-only</span>
+  <ul style="margin-top:10px;">
+    <li><b>Card particle burst</b> — confetti burst from the voted card position on each vote cast</li>
+    <li><b>Card flip reveal</b> — cards animate with a 3D flip when votes are revealed instead of just appearing</li>
+    <li><b>Streak name glow</b> — participant badges glow gold during an active streak</li>
+    <li><b>Reaction burst</b> — when you cast a vibe reaction, a brief emoji floats up from the button</li>
+  </ul>
+</div>
+
+<div class="patch-card" id="patch2">
+  <h3>Patch 2 — 📊 Voting Enhancements</h3>
+  <span class="tag">Easy–Med</span><span class="tag">Some backend</span>
+  <ul style="margin-top:10px;">
+    <li><b>Confidence indicator</b> — optional slider (1–5 stars) alongside your vote card; broadcast and shown post-reveal</li>
+    <li><b>Speed badge</b> — first voter gets a ⚡ badge; last voter (before reveal) gets a 🐢 badge</li>
+    <li><b>Hot/cold meter</b> — after several rounds, a "temperature" gauge tracks whether the team is converging or diverging</li>
+    <li><b>Anonymous mode</b> — room-level setting (host toggle) that hides voter names until reveal</li>
+  </ul>
+</div>
+
+<div class="patch-card" id="patch3">
+  <h3>Patch 3 — 🎰 Party Tools</h3>
+  <span class="tag">Medium</span><span class="tag">Client-only</span>
+  <ul style="margin-top:10px;">
+    <li><b>Poker hand reveal</b> — instead of cards flipping simultaneously, they flip one-by-one with a dramatic reveal drum-roll</li>
+    <li><b>Soundboard</b> — host can trigger crowd sounds (👏 applause, 😂 laugh track, 🔔 ding) from a panel; broadcast to all</li>
+    <li><b>The Decider wheel</b> — spin-the-wheel overlay that lands on a random participant; used to pick who speaks next</li>
+    <li><b>Vote distribution bar</b> — animated horizontal bar chart showing vote spread, shown post-reveal alongside the results</li>
+  </ul>
+</div>
+
+<div class="patch-card" id="patch4">
+  <h3>Patch 4 — 📈 Analytics</h3>
+  <span class="tag">Medium</span><span class="tag">localStorage</span>
+  <ul style="margin-top:10px;">
+    <li><b>Room lifetime stats panel</b> — sidebar widget showing total rounds, consensus rate, average estimation time, longest streak</li>
+    <li><b>Velocity tracker</b> — tracks story points per session over time (localStorage); shown as a sparkline in the stats panel</li>
+    <li><b>Planning poker bingo</b> — auto-generated bingo card (e.g. "someone votes ∞", "first-try consensus", "longest debate"); marks off automatically</li>
+  </ul>
+</div>
+
+<div class="patch-card" id="patch5">
+  <h3>Patch 5 — 🎮 Game Modes</h3>
+  <span class="tag">Hard</span><span class="tag">Backend changes</span>
+  <ul style="margin-top:10px;">
+    <li><b>Vote prediction</b> — before reveal, each player secretly predicts the majority vote; correct = bonus points toward Oracle currency</li>
+    <li><b>Devil's Advocate role</b> — one randomly assigned player must argue against the consensus, even if they agree (shown post-reveal)</li>
+    <li><b>Range voting mode</b> — instead of single-point cards, players pick a min/max range; displayed as confidence intervals</li>
+  </ul>
+</div>
+
+<div class="patch-card" id="patch6">
+  <h3>Patch 6 — 🌆 Atmosphere</h3>
+  <span class="tag">Medium</span><span class="tag">Client-only</span>
+  <ul style="margin-top:10px;">
+    <li><b>Background ambience audio</b> — optional lo-fi music or office/café background sounds; volume control in settings; plays via Web Audio API</li>
+    <li><b>Retro CRT theme</b> — 13th CSS theme: scanline overlay, green phosphor text, CRT bloom effect, old-school beep sounds on votes</li>
+  </ul>
+</div>
+
+<div class="patch-card" id="patch7">
+  <h3>Patch 7 — 🔗 Jira Integration</h3>
+  <span class="tag">Hard</span><span class="tag">Full backend</span>
+  <ul style="margin-top:10px;">
+    <li>Import Jira backlog items via JQL query into the story list</li>
+    <li>C# backend: <code>JiraService.cs</code> calls Jira REST API; secrets stored in <code>appsettings.json</code> (not committed)</li>
+    <li>Frontend: Jira import wizard in the Room settings panel</li>
+    <li>ADF description parsing → plain text for story display</li>
+    <li>Portal animation (spinning cards) during import</li>
+    <li>Write estimated points back to Jira story point field on session end (optional)</li>
+  </ul>
+</div>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 id="polish">🔧 v3.0 Polish &amp; Fixes</h2>
+
+<div class="callout good">
+  <strong>Small targeted improvements</strong>
+  These don't need a full patch — they're focused quality-of-life fixes and UX enhancements that ship alongside any other work.
+</div>
+
+<div class="patch-card">
+  <h3>🎯 Shame Settings Inline Preview</h3>
+  <span class="tag">Easy</span><span class="tag">Client-only</span>
+  <ul style="margin-top:10px;">
+    <li>Add a live preview inside the Shame Spotlight settings panel — a mini participant badge with the glow shadow and a mock toast — both update in real-time as you change the color picker or message text</li>
+    <li>Similar in concept to the Theme tab's Live Preview pane</li>
+    <li>No new settings keys; purely cosmetic feedback in <code>_Layout.cshtml</code> + <code>shame.js</code></li>
+  </ul>
+</div>
+
+<div class="patch-card">
+  <h3>▶ Per-Season Test Buttons</h3>
+  <span class="tag">Easy</span><span class="tag">Client-only</span>
+  <ul style="margin-top:10px;">
+    <li>Each of the 39 seasonal event checkboxes gets a small <code>▶</code> icon that fires that season's animation immediately</li>
+    <li>New <code>testSpecificSeason(key)</code> function in <code>seasonal.js</code> — picks a random animation from <code>SEA_ANIMS[key]</code></li>
+    <li>No need to wait for a real date match; every season is now individually testable from settings</li>
+  </ul>
+</div>
+
+<div class="patch-card">
+  <h3>🐇 Spring Rabbit Direction Fix</h3>
+  <span class="tag">Trivial</span><span class="tag">Bug fix</span>
+  <ul style="margin-top:10px;">
+    <li>The 🐇 emoji faces left but <code>_seaBunnyHop()</code> was using the left-to-right animation — making it appear to hop backwards</li>
+    <li>Fix: change <code>sea-lr</code> → <code>sea-rl</code> so the rabbit moves from right to left, matching its facing direction</li>
+  </ul>
+</div>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 id="wont-do">🚫 Will Not Do</h2>
+
+<div class="callout danger">
+  <strong>Removed from roadmap</strong>
+  These four features were originally ranked in v2.0 but are being formally dropped. The complexity-to-fun ratio doesn't justify the build cost, and #19 and #20 require a persistence layer that would be an architectural shift for what is intentionally a stateless, in-memory app.
+</div>
+
+<div class="feature-card" style="border-color:var(--red);opacity:0.7;" id="duel">
+  <h4 style="color:var(--red);">#17 — ⚡ Duel of Perspective <span class="badge badge-red">HARD · L</span></h4>
+  <p>Post-reveal 1v1 debate duel with hotkey attack spells. Interactive but too niche — most teams just want to discuss, not fight.</p>
+</div>
+
+<div class="feature-card" style="border-color:var(--red);opacity:0.7;" id="power-ups">
+  <h4 style="color:var(--red);">#18 — ⚡ Power-Ups <span class="badge badge-red">HARD · L</span></h4>
+  <p>Per-session special abilities (Mirror, Smoke, Double-Down, Bomb). Adds server-side inventory validation complexity with limited payoff.</p>
+</div>
+
+<div class="feature-card" style="border-color:var(--red);opacity:0.7;" id="scrum-gold">
+  <h4 style="color:var(--red);">#19 — 💰 Scrum Gold Economy <span class="badge badge-red">HARD · XL</span></h4>
+  <p>Persistent in-game currency requiring a storage layer. The app is intentionally stateless and in-memory; this would be a fundamental architectural change.</p>
+</div>
+
+<div class="feature-card" style="border-color:var(--red);opacity:0.7;" id="loot-boxes">
+  <h4 style="color:var(--red);">#20 — 🎁 Loot Boxes <span class="badge badge-red">HARD · L</span></h4>
+  <p>Random cosmetic drops dependent on Scrum Gold (#19). Dropped with its prerequisite.</p>
+</div>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 id="seasonal-overview">🗓️ Seasonal Expansion — Design</h2>
+
+<div class="callout note">
+  <strong>From 8 → 39 events</strong>
+  The seasonal system is redesigned with a data-table architecture, a priority resolver for overlaps, and variable-date support for lunar calendar events.
+</div>
+
+<h3>Priority System</h3>
+<p>When multiple events overlap on a given date, the resolver picks the <b>lowest priority number</b> (highest priority). Tiebreak: shorter duration wins.</p>
+<div class="table-wrap"><table>
+  <tr><th>Priority</th><th>Type</th><th>Examples</th></tr>
+  <tr><td><span class="badge badge-red">P1</span></td><td>Very short specific day (1–2 days)</td><td>Pi Day, April Fools, Star Wars Day, Tanabata, Bastille Day, Solstices</td></tr>
+  <tr><td><span class="badge badge-yellow">P2</span></td><td>Holiday / Major Event (3–14 days)</td><td>Valentine's, Halloween, Christmas, Lunar New Year, Diwali, Hanami, Ocean Week</td></tr>
+  <tr><td><span class="badge badge-cyan">P3</span></td><td>Cultural event (2–6 weeks)</td><td>Pride Month, Oktoberfest, Awards Season, Ramadan/Eid, Thanksgiving</td></tr>
+  <tr><td><span class="badge badge-green">P4</span></td><td>Long season (months, background)</td><td>Deep Winter, Spring, Summer, Autumn</td></tr>
+</table></div>
+
+<h3>Variable Date Support</h3>
+<pre><code>const LUNAR_DATES = {
+    2024: { lunarNewYear: [2,10], diwali: [11,1], midAutumn: [9,17] },
+    2025: { lunarNewYear: [1,29], diwali: [10,20], midAutumn: [10,6] },
+    2026: { lunarNewYear: [2,17], diwali: [11,8],  midAutumn: [9,25] }
+};
+
+const RAMADAN_DATES = {
+    2024: [3,11], 2025: [3,1], 2026: [2,18]  // approx start (30-day window)
+};
+
+// Pancake Day = Shrove Tuesday = Easter - 47 days (Meeus algorithm)
+// August Bank Holiday = last Monday of August</code></pre>
+
+<h3>Architecture: SEA_EVENT_TABLE</h3>
+<p>Replaces the if-else chain in <code>_seaGetSeason()</code> and <code>_getSeasonalOverride()</code>:</p>
+<pre><code>// [key, m1, d1, m2, d2, priority, settingKey]
+// m1=0 → variable date, resolved at runtime
+const SEA_EVENT_TABLE = [
+    ['newyear',       1, 1,  1, 10,  2, 'seasonalNewYear'],
+    ['deepwinter',    1, 11, 1, 31,  4, 'seasonalDeepWinter'],
+    ['lunarnew',      0, 0,  0, 5,   2, 'seasonalLunarNew'],   // ±5-day window
+    ['awards',        2, 1,  2, 28,  3, 'seasonalAwards'],
+    ['valentine',     2, 12, 2, 16,  2, 'seasonalValentine'],
+    ['pancakeday',    0, 0,  0, 1,   1, 'seasonalPancakeDay'],
+    ['piday',         3, 14, 3, 14,  1, 'seasonalPiDay'],
+    ['stpatricks',    3, 15, 3, 18,  2, 'seasonalStPatricks'],
+    // ... (39 total)
+];</code></pre>
+
+<h2 id="seasonal-events">All 39 Seasonal Events</h2>
+
+<div class="seasonal-grid">
+  <div class="sea-event"><div class="sea-name">🎆 New Year Kickoff</div><div class="sea-date">Jan 1 – Jan 10</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">❄️ Deep Winter</div><div class="sea-date">Jan 11 – Jan 31</div><div class="sea-p p4">P4 Season</div></div>
+  <div class="sea-event"><div class="sea-name">🏆 Awards Season</div><div class="sea-date">Feb 1 – Feb 28</div><div class="sea-p p3">P3</div></div>
+  <div class="sea-event"><div class="sea-name">🐉 Lunar New Year</div><div class="sea-date">Variable (lunar)</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">💘 Valentine's Day</div><div class="sea-date">Feb 12 – Feb 16</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🥞 Pancake Day</div><div class="sea-date">Variable (Shrove Tue)</div><div class="sea-p p1">P1 🇬🇧</div></div>
+  <div class="sea-event"><div class="sea-name">π Pi Day</div><div class="sea-date">Mar 14</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">🍀 St. Patrick's Day</div><div class="sea-date">Mar 15 – Mar 18</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🎨 Holi</div><div class="sea-date">~March</div><div class="sea-p p3">P3</div></div>
+  <div class="sea-event"><div class="sea-name">🌸 Spring</div><div class="sea-date">Mar 1 – May 31</div><div class="sea-p p4">P4 Season</div></div>
+  <div class="sea-event"><div class="sea-name">🌸 Hanami (Sakura)</div><div class="sea-date">Mar 20 – Apr 10</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🃏 April Fools</div><div class="sea-date">Apr 1</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">🌍 Earth Day</div><div class="sea-date">Apr 22</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">🌙 Ramadan / Eid</div><div class="sea-date">Variable (lunar)</div><div class="sea-p p3">P3</div></div>
+  <div class="sea-event"><div class="sea-name">🌺 May Day</div><div class="sea-date">May 1</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">⚔️ Star Wars Day</div><div class="sea-date">May 4</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">☀️ Summer</div><div class="sea-date">Jun 1 – Aug 31</div><div class="sea-p p4">P4 Season</div></div>
+  <div class="sea-event"><div class="sea-name">🏳️‍🌈 Pride Month</div><div class="sea-date">Jun 1 – Jun 30</div><div class="sea-p p3">P3</div></div>
+  <div class="sea-event"><div class="sea-name">🌊 Ocean Week</div><div class="sea-date">Jun 8 – Jun 15</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🌅 Summer Solstice</div><div class="sea-date">Jun 20 – Jun 22</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">🫖 Independence Day</div><div class="sea-date">Jul 4 (🇬🇧 tea version!)</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">🎋 Tanabata</div><div class="sea-date">Jul 7</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">🇫🇷 Bastille Day</div><div class="sea-date">Jul 14</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">🌧️ Aug Bank Holiday</div><div class="sea-date">Last Mon of Aug 🇬🇧</div><div class="sea-p p3">P3 🇬🇧</div></div>
+  <div class="sea-event"><div class="sea-name">🍂 Autumn</div><div class="sea-date">Sep 1 – Nov 30</div><div class="sea-p p4">P4 Season</div></div>
+  <div class="sea-event"><div class="sea-name">🎒 Back to School</div><div class="sea-date">Sep 1 – Sep 10</div><div class="sea-p p3">P3</div></div>
+  <div class="sea-event"><div class="sea-name">🍺 Oktoberfest</div><div class="sea-date">Sep 15 – Oct 1</div><div class="sea-p p3">P3</div></div>
+  <div class="sea-event"><div class="sea-name">🌕 Mid-Autumn Festival</div><div class="sea-date">Variable (lunar)</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🚀 Space Week</div><div class="sea-date">Oct 4 – Oct 10</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🎃 Halloween</div><div class="sea-date">Oct 20 – Oct 31</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">💀 Day of the Dead</div><div class="sea-date">Nov 1 – Nov 2</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🎆 Bonfire Night</div><div class="sea-date">Nov 5 🇬🇧</div><div class="sea-p p2">P2 🇬🇧</div></div>
+  <div class="sea-event"><div class="sea-name">🪔 Diwali</div><div class="sea-date">Variable (lunar)</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🌹 Remembrance Day</div><div class="sea-date">Nov 11 🇬🇧</div><div class="sea-p p2">P2 🇬🇧</div></div>
+  <div class="sea-event"><div class="sea-name">🦃 Thanksgiving</div><div class="sea-date">Nov 20 – Nov 30</div><div class="sea-p p3">P3</div></div>
+  <div class="sea-event"><div class="sea-name">🎄 Christmas</div><div class="sea-date">Dec 1 – Dec 25</div><div class="sea-p p2">P2</div></div>
+  <div class="sea-event"><div class="sea-name">🎁 Boxing Day</div><div class="sea-date">Dec 26 🇬🇧</div><div class="sea-p p2">P2 🇬🇧</div></div>
+  <div class="sea-event"><div class="sea-name">🌌 Winter Solstice</div><div class="sea-date">Dec 21</div><div class="sea-p p1">P1</div></div>
+  <div class="sea-event"><div class="sea-name">⏰ End of Year</div><div class="sea-date">Dec 27 – Dec 30</div><div class="sea-p p3">P3</div></div>
+</div>
+
+<div class="callout warn">
+  <strong>Priority examples</strong>
+  Oct 1: Oktoberfest (P3) beats Autumn (P4). ·
+  Oct 21: Halloween (P2) beats Autumn (P4). ·
+  Mar 14: Pi Day (P1) beats Spring (P4) and Holi (P3). ·
+  Unchecking Halloween in settings → Oct 21 falls through to Autumn.
+</div>
+
+</main>
+</div>
+</body>
+</html>

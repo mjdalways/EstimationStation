@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet build *)"
+      "Bash(dotnet build *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\Views\\\\Shared\\\\_Layout.cshtml\")",
+      "Bash(Select-String -Pattern 'seasonal|celebration|sea-')"
     ]
   }
 }

@@ -601,7 +601,68 @@ h1, h2, h3, h4, h5, h6 {
 .participant-badge.voted { border-color: var(--card-voted); }
 .participant-badge.revealed { border-color: var(--card-selected); }
 .participant-badge.observer { opacity: 0.65; border-style: dashed; }
+.participant-badge.ghost { opacity: 0.55; border-style: dashed; }
 .participant-badge.me { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent), 0.2); }
+
+@keyframes voice-flash-anim {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+.voice-flash { animation: voice-flash-anim 0.6s ease; }
+
+/* Seasons tab — one row per event */
+.sea-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+.sea-row:hover { background: rgba(128,128,128,0.07); }
+.sea-row label { flex: 1; font-size: 0.85rem; cursor: pointer; margin: 0; }
+.sea-row span { font-size: 0.72rem; color: var(--text-secondary, #6c757d); white-space: nowrap; }
+.sea-row button {
+    font-size: 0.7rem;
+    padding: 1px 7px;
+    line-height: 1.5;
+    border: 1px solid var(--panel-border, #dee2e6);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary, #6c757d);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.sea-row button:hover { background: rgba(128,128,128,0.12); }
+
+.participant-badge { position: relative; }
+.participant-badge.chicken-overlay::after {
+    content: '🐔';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    background: rgba(0,0,0,0.55);
+    border-radius: inherit;
+    animation: chicken-bounce-anim 0.35s ease-in-out infinite alternate;
+}
+@keyframes chicken-bounce-anim {
+    from { transform: scale(1) rotate(-5deg); }
+    to   { transform: scale(1.15) rotate(5deg); }
+}
+.counter-spell-bar {
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, rgba(255,193,7,0.15), rgba(255,152,0,0.08));
+    border: 1px solid rgba(255,193,7,0.45);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
 
 /* Ensure that voted/revealed state is visible for the current user as well.
    .me currently sets the border to the accent color which can hide the voted
@@ -1238,12 +1299,14 @@ h1, h2, h3, h4, h5, h6 {
    Floor is Lava
    ============================================================ */
 @keyframes lava-glow {
-  0%, 100% { box-shadow: 0 0 8px 2px rgba(255,69,0,0.7); border-color: #ff4500; }
-  50%       { box-shadow: 0 0 22px 7px rgba(255,100,0,0.95); border-color: #ff6b00; }
+  0%, 100% { box-shadow: 0 0 8px 2px color-mix(in srgb, var(--lava-color-primary, #ff4500) 70%, transparent);
+             border-color: var(--lava-color-primary, #ff4500); }
+  50%      { box-shadow: 0 0 22px 7px var(--lava-color-primary, #ff4500);
+             border-color: var(--lava-color-secondary, #ff6b00); }
 }
 .lava-outlier {
   animation: lava-glow 0.85s ease-in-out infinite !important;
-  border-color: #ff4500 !important;
+  border-color: var(--lava-color-primary, #ff4500) !important;
 }
 
 

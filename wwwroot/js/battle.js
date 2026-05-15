@@ -664,3 +664,12 @@ function skipBattle() {
     _baSkipped = true;
     _baFinish();
 }
+
+function testBattle() {
+    if (_baActive) return;
+    var s = getBattleSettings();
+    if (!s.enabled) return;
+    var leftData  = { name: '🧪 Outlier',  vote: '13', avatarData: null, isMajority: false };
+    var rightData = { name: '🏆 Majority', vote: '5',  avatarData: null, isMajority: true  };
+    _baRunSequence(leftData, rightData, 0, 2);
+}

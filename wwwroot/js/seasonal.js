@@ -9,11 +9,146 @@ var _seaActive   = false;
 var _seaRafIds   = [];
 var SEA_Z = 9980;
 
+// ── Event lookup table ─────────────────────────────────────────────────────
+// [key, m1, d1, m2, d2, priority, settingKey]
+// m1=0 → variable date, resolved via _seaVariableDates()
+// Priority: 1=specific 1–2 day, 2=holiday, 3=cultural, 4=long season (lower wins)
+var SEA_EVENT_TABLE = [
+    ['newyear',         1, 1,  1,10, 2, 'seasonalNewYear'],
+    ['deepwinter',      1,11,  1,31, 4, 'seasonalDeepWinter'],
+    ['mlkday',          0, 0,  0, 0, 2, 'seasonalMlkDay'],
+    ['lunarnew',        0, 0,  0, 0, 2, 'seasonalLunarNew'],
+    ['awards',          2, 1,  2,28, 3, 'seasonalAwards'],
+    ['valentine',       2,12,  2,16, 2, 'seasonalValentine'],
+    ['presidentsday',   0, 0,  0, 0, 2, 'seasonalPresidentsDay'],
+    ['motheringsunday', 0, 0,  0, 0, 1, 'seasonalMotheringSunday'],
+    ['pancakeday',      0, 0,  0, 0, 1, 'seasonalPancakeDay'],
+    ['piday',           3,14,  3,14, 1, 'seasonalPiDay'],
+    ['stpatricks',      3,15,  3,18, 2, 'seasonalStPatricks'],
+    ['holi',            3, 1,  3,31, 3, 'seasonalHoli'],
+    ['hanami',          3,20,  4,10, 2, 'seasonalHanami'],
+    ['spring',          3, 1,  5,31, 4, 'seasonalSpring'],
+    ['aprilfools',      4, 1,  4, 1, 1, 'seasonalAprilFools'],
+    ['earthday',        4,22,  4,22, 1, 'seasonalEarthDay'],
+    ['ramadan',         0, 0,  0, 0, 3, 'seasonalRamadan'],
+    ['mayday',          5, 1,  5, 1, 2, 'seasonalMayDay'],
+    ['mothersday',      0, 0,  0, 0, 2, 'seasonalMothersDay'],
+    ['memorialday',     0, 0,  0, 0, 2, 'seasonalMemorialDay'],
+    ['starwarsday',     5, 4,  5, 4, 1, 'seasonalStarWarsDay'],
+    ['juneteenth',      6,19,  6,19, 1, 'seasonalJuneteenth'],
+    ['pride',           6, 1,  6,30, 3, 'seasonalPride'],
+    ['fathersday',      0, 0,  0, 0, 2, 'seasonalFathersDay'],
+    ['oceanweek',       6, 8,  6,15, 2, 'seasonalOceanWeek'],
+    ['solstice',        6,20,  6,22, 1, 'seasonalSolstice'],
+    ['summer',          6, 1,  8,31, 4, 'seasonalSummer'],
+    ['independence',    7, 4,  7, 4, 1, 'seasonalIndependence'],
+    ['tanabata',        7, 7,  7, 7, 1, 'seasonalTanabata'],
+    ['bastille',        7,14,  7,14, 1, 'seasonalBastille'],
+    ['augbankholiday',  0, 0,  0, 0, 3, 'seasonalAugBankHoliday'],
+    ['laborday',        0, 0,  0, 0, 2, 'seasonalLaborDay'],
+    ['backtoschool',    9, 1,  9,10, 3, 'seasonalBackToSchool'],
+    ['oktoberfest',     9,15, 10, 1, 3, 'seasonalOktoberfest'],
+    ['midautumn',       0, 0,  0, 0, 2, 'seasonalMidAutumn'],
+    ['spaceweek',      10, 4, 10,10, 2, 'seasonalSpaceWeek'],
+    ['indigenousday',   0, 0,  0, 0, 2, 'seasonalIndigenousDay'],
+    ['halloween',      10,20, 10,31, 2, 'seasonalHalloween'],
+    ['autumn',          9, 1, 11,30, 4, 'seasonalAutumn'],
+    ['dayofthedead',   11, 1, 11, 2, 2, 'seasonalDayOfDead'],
+    ['bonfirenight',   11, 5, 11, 5, 2, 'seasonalBonfireNight'],
+    ['diwali',          0, 0,  0, 0, 2, 'seasonalDiwali'],
+    ['veteransday',    11,11, 11,11, 1, 'seasonalVeteransDay'],
+    ['remembrance',    11,11, 11,11, 2, 'seasonalRemembrance'],
+    ['thanksgiving',   11,20, 11,30, 3, 'seasonalThanksgiving'],
+    ['christmas',      12, 1, 12,25, 2, 'seasonalChristmas'],
+    ['boxingday',      12,26, 12,26, 2, 'seasonalBoxingDay'],
+    ['wintersolstice', 12,21, 12,21, 1, 'seasonalWinterSolstice'],
+    ['endofyear',      12,27, 12,30, 3, 'seasonalEndOfYear']
+];
+
+var LUNAR_DATES = {
+    2024: { lunarNewYear: [2,10],  diwali: [11, 1], midAutumn: [ 9,17] },
+    2025: { lunarNewYear: [1,29],  diwali: [10,20], midAutumn: [10, 6] },
+    2026: { lunarNewYear: [2,17],  diwali: [11, 8], midAutumn: [ 9,25] }
+};
+
+var RAMADAN_DATES = { 2024: [3,11], 2025: [3,1], 2026: [2,18] };
+
+function _seaEaster(y) {
+    var a=y%19, b=Math.floor(y/100), c=y%100;
+    var d=Math.floor(b/4), e=b%4, f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3);
+    var h=(19*a+b-d-g+15)%30, i=Math.floor(c/4), k=c%4;
+    var l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451);
+    return [Math.floor((h+l-7*m+114)/31), ((h+l-7*m+114)%31)+1];
+}
+
+function _seaLastMonday(y, month) {
+    var last = new Date(y, month, 0);
+    return last.getDate() - ((last.getDay() + 6) % 7);
+}
+
+function _seaVariableDates(y) {
+    var r = {}, lunar = LUNAR_DATES[y], ram = RAMADAN_DATES[y];
+    var mkWin = function(m, d, before, after) {
+        var s = new Date(y, m-1, d-before), e = new Date(y, m-1, d+after);
+        return [s.getMonth()+1, s.getDate(), e.getMonth()+1, e.getDate()];
+    };
+    // Returns [month, day] of the Nth occurrence of weekday (0=Sun..6=Sat) in a 1-indexed month
+    var nthWd = function(month, n, weekday) {
+        var first = new Date(y, month-1, 1).getDay();
+        return [month, 1 + ((weekday - first + 7) % 7) + (n-1)*7];
+    };
+    if (lunar) {
+        r.lunarnew  = mkWin(lunar.lunarNewYear[0], lunar.lunarNewYear[1], 2, 2);
+        r.diwali    = mkWin(lunar.diwali[0],       lunar.diwali[1],       1, 1);
+        r.midautumn = mkWin(lunar.midAutumn[0],    lunar.midAutumn[1],    1, 1);
+    }
+    var ea = _seaEaster(y);
+    var shrove = new Date(y, ea[0]-1, ea[1]-47);
+    r.pancakeday     = [shrove.getMonth()+1, shrove.getDate(), shrove.getMonth()+1, shrove.getDate()];
+    var ms = new Date(y, ea[0]-1, ea[1]-21);
+    r.motheringsunday = [ms.getMonth()+1, ms.getDate(), ms.getMonth()+1, ms.getDate()];
+    var bh = _seaLastMonday(y, 8);
+    r.augbankholiday  = [8, bh, 8, bh];
+    if (ram) {
+        var re = new Date(y, ram[0]-1, ram[1]+29);
+        r.ramadan = [ram[0], ram[1], re.getMonth()+1, re.getDate()];
+    }
+    // US federal holidays with variable dates
+    var mlk  = nthWd(1, 3, 1); r.mlkday        = [mlk[0],  mlk[1],  mlk[0],  mlk[1]];
+    var pres = nthWd(2, 3, 1); r.presidentsday = [pres[0], pres[1], pres[0], pres[1]];
+    var mem  = _seaLastMonday(y, 5); r.memorialday = [5, mem, 5, mem];
+    var lab  = nthWd(9, 1, 1); r.laborday      = [lab[0],  lab[1],  lab[0],  lab[1]];
+    var ipd  = nthWd(10,2, 1); r.indigenousday = [ipd[0],  ipd[1],  ipd[0],  ipd[1]];
+    // Family holidays
+    var mday = nthWd(5, 2, 0); r.mothersday    = [mday[0], mday[1], mday[0], mday[1]];
+    var fday = nthWd(6, 3, 0); r.fathersday    = [fday[0], fday[1], fday[0], fday[1]];
+    return r;
+}
+
 function startSeasonalAmbience() {
     if (_seaActive) return;
     _seaActive = true;
     _seaScheduleNext(true);
 }
+var _seaTestIndex = 0;
+var _seaTestIndices = {};
+function testSeasonalAmbience() {
+    var season = _seaGetSeason();
+    if (!season) {
+        var keys = Object.keys(SEA_ANIMS);
+        season = keys[_seaTestIndex % keys.length];
+        _seaTestIndex++;
+    }
+    testSpecificSeason(season);
+}
+function testSpecificSeason(key) {
+    var list = SEA_ANIMS[key];
+    if (!list || !list.length) return;
+    if (_seaTestIndices[key] === undefined) _seaTestIndices[key] = 0;
+    try { list[_seaTestIndices[key] % list.length](); } catch (e) {}
+    _seaTestIndices[key]++;
+}
+
 function stopSeasonalAmbience() {
     _seaActive = false;
     if (_seaTimer) { clearTimeout(_seaTimer); _seaTimer = null; }
@@ -40,16 +175,27 @@ function _seaFire() {
     try { list[Math.floor(Math.random() * list.length)](); } catch (e) { }
 }
 function _seaGetSeason() {
-    var m = new Date().getMonth() + 1, d = new Date().getDate();
-    if (m === 10)                         return 'halloween';
-    if (m === 12 || (m === 1 && d <= 5))  return 'christmas';
-    if (m === 1  && d <= 10)              return 'newyear';
-    if (m === 2  && d >= 12 && d <= 16)   return 'valentine';
-    if (m >= 3   && m <= 5)               return 'spring';
-    if (m >= 6   && m <= 8)               return 'summer';
-    if (m === 9)                          return 'autumn';
-    if (m === 11 && d >= 20)              return 'thanksgiving';
-    return null;
+    var now = new Date(), m = now.getMonth()+1, d = now.getDate(), y = now.getFullYear();
+    var cs = typeof getCelebrationSettings === 'function' ? getCelebrationSettings() : {};
+    if (cs.seasonalTheme === false) return null;
+    var varDates = _seaVariableDates(y);
+    var candidates = [];
+    for (var i = 0; i < SEA_EVENT_TABLE.length; i++) {
+        var row = SEA_EVENT_TABLE[i];
+        var key = row[0], m1 = row[1], d1 = row[2], m2 = row[3], d2 = row[4], pri = row[5], sk = row[6];
+        if (cs[sk] === false) continue;
+        var s, e;
+        if (m1 === 0) {
+            var vd = varDates[key]; if (!vd) continue;
+            s = vd[0]*100+vd[1]; e = vd[2]*100+vd[3];
+        } else { s = m1*100+d1; e = m2*100+d2; }
+        var today = m*100+d;
+        var inRange = (s <= e) ? (today >= s && today <= e) : (today >= s || today <= e);
+        if (inRange) candidates.push({ key: key, pri: pri, dur: e >= s ? e-s : (1231-s)+e });
+    }
+    if (!candidates.length) return null;
+    candidates.sort(function(a, b) { return a.pri !== b.pri ? a.pri - b.pri : a.dur - b.dur; });
+    return candidates[0].key;
 }
 
 // ── Generic element builders ───────────────────────────────
@@ -564,7 +710,7 @@ function _seaChickHatch() {
 }
 
 function _seaBunnyHop() {
-    var wrap = _seaDiv('', 'bottom:65px;left:0;animation:sea-lr 4.2s linear forwards;');
+    var wrap = _seaDiv('', 'bottom:65px;left:0;animation:sea-rl 4.2s linear forwards;');
     var inner = document.createElement('div');
     inner.textContent = '🐇';
     inner.style.cssText = 'font-size:2.8rem;display:inline-block;animation:sea-hop 0.38s ease-in-out infinite;';
@@ -831,26 +977,365 @@ function _seaHayBale() {
 }
 
 // ══════════════════════════════════════════════════════════
+// DEEP WINTER (Jan 11–31)
+// ══════════════════════════════════════════════════════════
+function _seaDeepWinterSnow()   { _seaSnowfall(); }
+function _seaFrostCreep()       { _seaCorner('<div style="font-size:4rem;filter:drop-shadow(0 0 8px #a8d8f0);">🧊</div>', '', Math.random()>0.5?'left':'right', 4200); }
+function _seaBlizzard()         { _seaParticles(['❄','❅','❆','✦'], 30, 'sea-snowfall', [4,8], [0.5,1.5], 1200); }
+
+// ══════════════════════════════════════════════════════════
+// LUNAR NEW YEAR
+// ══════════════════════════════════════════════════════════
+function _seaDragonFly()        { _seaLR('🐉🧧', 15+Math.random()*20, '3rem', 6, true); }
+function _seaLanternRise()      { _seaParticles(['🏮'], 8, 'sea-float-up', [3,5], [1.5,2.5], 2000); }
+function _seaRedEnvelopes()     { _seaParticles(['🧧','🎊','🧧'], 12, 'sea-petal-fall', [3,6], [0.8,1.8], 2500); }
+function _seaFirecracker()      { _seaPopup('🎆', '7rem', 1800); }
+
+// ══════════════════════════════════════════════════════════
+// AWARDS SEASON (Feb)
+// ══════════════════════════════════════════════════════════
+function _seaTrophyPopup()      { _seaPopup('🏆', '8rem', 2500); }
+function _seaStarWalk()         { _seaLR('⭐🎬', 20+Math.random()*40, '2.8rem', 5); }
+function _seaGoldParticles()    { _seaParticles(['🏆','⭐','🌟'], 12, 'sea-float-up', [2,4], [0.8,1.6], 2000); }
+
+// ══════════════════════════════════════════════════════════
+// PANCAKE DAY
+// ══════════════════════════════════════════════════════════
+function _seaPancakeStack()     { _seaPopup('🥞', '8rem', 2400); }
+function _seaLemonSlice()       { _seaCorner('🍋', '5rem', Math.random()>0.5?'left':'right', 3500); }
+function _seaPancakeToss()      { _seaParticles(['🥞','🍋','🧈'], 10, 'sea-float-up', [2,4], [1,2], 2000); }
+
+// ══════════════════════════════════════════════════════════
+// PI DAY (Mar 14)
+// ══════════════════════════════════════════════════════════
+function _seaPiSymbol()         { _seaPopup('π', '10rem', 3000); }
+function _seaPieRoll()          {
+    var w = _seaDiv('', 'bottom:65px;left:0;animation:sea-lr 4.5s linear forwards;');
+    var n = document.createElement('div');
+    n.textContent = '🥧'; n.style.cssText = 'font-size:3rem;display:inline-block;animation:sea-spin 1s linear infinite;';
+    w.appendChild(n); _seaRemove(w, 4800);
+}
+function _seaMathParticles()    { _seaParticles(['π','∞','Σ','√'], 14, 'sea-snowfall', [4,7], [0.9,1.8], 2000); }
+
+// ══════════════════════════════════════════════════════════
+// ST PATRICK'S (Mar 15–18)
+// ══════════════════════════════════════════════════════════
+function _seaShamrockShower()   { _seaParticles(['🍀','☘️','🍀'], 18, 'sea-petal-fall', [3,6], [0.8,1.8], 2000); }
+function _seaRainbowArc()       { _seaPopup('🌈', '9rem', 3500); }
+function _seaGoldPot()          { _seaCorner('<div style="animation:sea-wobble 0.7s ease-in-out infinite;">🍺</div>', '5rem', Math.random()>0.5?'left':'right', 4000); }
+
+// ══════════════════════════════════════════════════════════
+// HOLI (March)
+// ══════════════════════════════════════════════════════════
+function _seaColorBurst()       { _seaParticles(['🎨','💥','🌈','✨'], 20, 'sea-float-up', [2,4], [1,2.2], 1500); }
+function _seaHoliSplash()       { _seaPopup('🎨', '8rem', 1800); }
+function _seaColorRain()        { _seaParticles(['🔴','🟡','🟢','🔵','🟣','🟠'], 24, 'sea-snowfall', [3,6], [0.7,1.5], 1500); }
+
+// ══════════════════════════════════════════════════════════
+// HANAMI (Mar 20–Apr 10)
+// ══════════════════════════════════════════════════════════
+function _seaHanamiBlossoms()   { _seaCherryBlossom(); }
+function _seaPetalDrift()       { _seaParticles(['🌸','🌺','🌼','🌷'], 20, 'sea-petal-fall', [5,9], [0.6,1.4], 3000); }
+function _seaBlossomTree()      { _seaCorner('<div style="animation:sea-flower-grow 1.5s ease-out forwards;">🌸</div>', '6rem', Math.random()>0.5?'left':'right', 4500); }
+
+// ══════════════════════════════════════════════════════════
+// APRIL FOOLS (Apr 1)
+// ══════════════════════════════════════════════════════════
+function _seaGlitchEffect()     {
+    var o = _seaDiv('', 'top:0;left:0;width:100%;height:100%;z-index:9988;pointer-events:none;animation:sea-lightning 0.6s ease-in-out 3;filter:hue-rotate(180deg);opacity:0.15;');
+    _seaRemove(o, 2000);
+}
+function _seaFakeAlert()        { _seaPopup('⚠️', '8rem', 1600); }
+function _seaJokerCard()        { _seaLR('🃏', 30+Math.random()*30, '4rem', 3); }
+
+// ══════════════════════════════════════════════════════════
+// EARTH DAY (Apr 22)
+// ══════════════════════════════════════════════════════════
+function _seaEarthSpin()        { _seaPopup('🌍', '9rem', 3000); }
+function _seaLeafRain()         { _seaParticles(['🌱','🍃','♻️','🌿'], 16, 'sea-petal-fall', [4,7], [0.8,1.6], 2500); }
+function _seaRecycleFloat()     { _seaLR('♻️', 20+Math.random()*40, '3.5rem', 5); }
+
+// ══════════════════════════════════════════════════════════
+// RAMADAN / EID
+// ══════════════════════════════════════════════════════════
+function _seaCrescentMoon()     { _seaPopup('🌙', '9rem', 3000); }
+function _seaStarAndMoon()      { _seaParticles(['🌙','⭐','✨'], 14, 'sea-float-up', [3,5], [1,2], 2000); }
+function _seaLampFloat()        { _seaLR('🪔', 25+Math.random()*30, '3.5rem', 5, true); }
+
+// ══════════════════════════════════════════════════════════
+// MAY DAY (May 1)
+// ══════════════════════════════════════════════════════════
+function _seaFlowerShower()     { _seaParticles(['🌺','🌸','💐','🌼'], 18, 'sea-petal-fall', [4,7], [0.7,1.6], 2000); }
+function _seaRibbonDance()      { _seaLR('🎀', 20+Math.random()*40, '3.5rem', 5, true); }
+function _seaMayPopup()         { _seaPopup('🌺', '8rem', 2200); }
+
+// ══════════════════════════════════════════════════════════
+// STAR WARS DAY (May 4)
+// ══════════════════════════════════════════════════════════
+function _seaSaberCross()       { _seaLR('⚔️', 40+Math.random()*20, '4.5rem', 2.5); }
+function _seaGalaxyParticles()  { _seaParticles(['⭐','✨','🌟'], 20, 'sea-snowfall', [4,7], [0.6,1.4], 1500); }
+function _seaMayTheFourth()     { _seaPopup('May the 4th', '3rem', 2800); }
+function _seaSpaceshipFly()     { _seaLR('🚀', 10+Math.random()*20, '3.5rem', 3.5); }
+
+// ══════════════════════════════════════════════════════════
+// PRIDE (June)
+// ══════════════════════════════════════════════════════════
+function _seaRainbowParticles() { _seaParticles(['❤️','🧡','💛','💚','💙','💜'], 20, 'sea-float-up', [3,5], [1,2.2], 1500); }
+function _seaRainbowFlag()      { _seaLR('🌈', 15+Math.random()*30, '4.5rem', 5, true); }
+function _seaPrideHearts()      { _seaParticles(['💖','❤️','🌈'], 16, 'sea-petal-fall', [4,7], [0.8,1.8], 2000); }
+
+// ══════════════════════════════════════════════════════════
+// MLK DAY (3rd Mon in Jan)
+// ══════════════════════════════════════════════════════════
+function _seaMlkMarch()     { _seaLR('✊🕊️', 20+Math.random()*20, '3rem', 4.5, true); }
+function _seaMlkDoves()     { _seaParticles(['🕊️','✊','🌟','✨'], 16, 'sea-float-up', [2,4], [0.8,1.8], 2000); }
+function _seaMlkPopup()     { _seaPopup('✊', '8rem', 2200); }
+
+// ══════════════════════════════════════════════════════════
+// PRESIDENTS' DAY (3rd Mon in Feb)
+// ══════════════════════════════════════════════════════════
+function _seaPresParade()   { _seaLR('🎩🇺🇸', 20+Math.random()*30, '3rem', 5, true); }
+function _seaPresStars()    { _seaParticles(['⭐','🌟','✨','🇺🇸'], 18, 'sea-snowfall', [3,6], [0.6,1.4], 1500); }
+function _seaPresPopup()    { _seaPopup('🏛️', '8rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// MOTHERING SUNDAY UK (Easter −21 days)
+// ══════════════════════════════════════════════════════════
+function _seaMotheringFlowers() { _seaParticles(['💐','🌸','🌼','🌺','💛'], 18, 'sea-petal-fall', [3,5], [0.8,1.6], 2500); }
+function _seaMotheringLove()    { _seaParticles(['💛','💕','❤️','🌸'], 16, 'sea-float-up', [2,4], [1,2], 2000); }
+function _seaMotheringPop()     { _seaPopup('💐', '8rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// MOTHER'S DAY US (2nd Sun in May)
+// ══════════════════════════════════════════════════════════
+function _seaMomFlowers()   { _seaParticles(['🌸','🌺','🌷','💐','💕'], 18, 'sea-petal-fall', [3,5], [0.8,1.6], 2500); }
+function _seaMomHeart()     { _seaParticles(['❤️','💕','💖','🌸'], 16, 'sea-float-up', [2,4], [1,2], 2000); }
+function _seaMomPopup()     { _seaPopup('💐', '8rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// MEMORIAL DAY US (last Mon in May)
+// ══════════════════════════════════════════════════════════
+function _seaMemPoppies()   { _seaParticles(['🌺','🎖️','⭐','🇺🇸'], 16, 'sea-petal-fall', [3,5], [0.8,1.6], 2000); }
+function _seaMemFlag()      { _seaLR('🇺🇸', 15+Math.random()*20, '3.5rem', 4); }
+function _seaMemPopup()     { _seaPopup('🎖️', '8rem', 2200); }
+
+// ══════════════════════════════════════════════════════════
+// JUNETEENTH (Jun 19)
+// ══════════════════════════════════════════════════════════
+function _seaJuneteenthParade() { _seaLR('🕊️✊', 20+Math.random()*20, '3rem', 4.5, true); }
+function _seaJuneteenthBurst()  { _seaParticles(['✊','🕊️','⭐','🎉','🌟'], 20, 'sea-float-up', [2,4], [0.8,1.8], 2000); }
+function _seaJuneteenthPop()    { _seaPopup('🗽', '8rem', 2200); }
+
+// ══════════════════════════════════════════════════════════
+// FATHER'S DAY US (3rd Sun in Jun)
+// ══════════════════════════════════════════════════════════
+function _seaDadParade()    { _seaLR('👔⚽', 20+Math.random()*30, '3rem', 5, true); }
+function _seaDadBalloons()  { _seaParticles(['🎈','⭐','🎉','🏆'], 14, 'sea-float-up', [2,4], [1,2], 2000); }
+function _seaDadPopup()     { _seaPopup('🎩', '8rem', 2200); }
+
+// ══════════════════════════════════════════════════════════
+// OCEAN WEEK (Jun 8–15)
+// ══════════════════════════════════════════════════════════
+function _seaSharkSwim()        { _seaSharkFin(); }
+function _seaFishSchool()       { _seaLR('🐠🐟🐡', 60+Math.random()*20, '2.5rem', 6, true); }
+function _seaOceanParticles()   { _seaParticles(['🐠','🌊','🐙','🦑'], 14, 'sea-float-up', [3,5], [1,2], 2000); }
+
+// ══════════════════════════════════════════════════════════
+// SUMMER SOLSTICE (Jun 20–22)
+// ══════════════════════════════════════════════════════════
+function _seaBigSun()           { _seaPopup('☀️', '11rem', 3500); }
+function _seaSunRays()          { _seaParticles(['✨','🌟','⭐'], 18, 'sea-snowfall', [3,6], [0.6,1.4], 1000); }
+function _seaSolsticeGlow()     { _seaSummerSun(); }
+
+// ══════════════════════════════════════════════════════════
+// INDEPENDENCE DAY (Jul 4)
+// ══════════════════════════════════════════════════════════
+function _seaFlagParade()       { _seaLR('🇺🇸🎆', 20+Math.random()*30, '3rem', 5, true); }
+function _seaFireworks4th()     { _seaParticles(['<span style="color:#cc0000;">★</span>','<span style="color:#ffffff;text-shadow:0 0 2px #aaa;">★</span>','<span style="color:#002868;">★</span>','<span style="color:#cc0000;">✦</span>','<span style="color:#002868;">✦</span>'], 22, 'sea-float-up', [2,4], [0.9,1.9], 1500); }
+function _seaEagleSoar()        { _seaLR('🦅', 15+Math.random()*20, '3.5rem', 4); }
+function _seaFlagPop()          { _seaPopup('🇺🇸', '8rem', 2200); }
+
+// ══════════════════════════════════════════════════════════
+// TANABATA (Jul 7)
+// ══════════════════════════════════════════════════════════
+function _seaBambooWish()       { _seaCorner('<div style="animation:sea-wobble 1s ease-in-out infinite;">🎋</div>', '5rem', Math.random()>0.5?'left':'right', 4500); }
+function _seaShootingStarT()    { _seaLR('🌠', 10+Math.random()*20, '3.5rem', 2.5); }
+function _seaTanabataStars()    { _seaParticles(['⭐','🌟','✨','🌠'], 16, 'sea-snowfall', [3,6], [0.6,1.4], 2000); }
+
+// ══════════════════════════════════════════════════════════
+// BASTILLE DAY (Jul 14)
+// ══════════════════════════════════════════════════════════
+function _seaTricolorParticles(){ _seaParticles(['🔵','⚪','🔴'], 20, 'sea-float-up', [2,4], [0.9,1.8], 1500); }
+function _seaFireworksBastille(){ _seaLR('🎆', 15+Math.random()*30, '3.5rem', 4); }
+function _seaEiffelTower()      { _seaPopup('🗼', '7rem', 2800); }
+
+// ══════════════════════════════════════════════════════════
+// AUG BANK HOLIDAY
+// ══════════════════════════════════════════════════════════
+function _seaWeatherMix()       { _seaParticles(['🌧️','☀️','🌈','⛅'], 14, 'sea-snowfall', [4,7], [0.8,1.6], 2000); }
+function _seaBaggage()          { _seaCorner('<div style="animation:sea-wobble 0.8s ease-in-out infinite;">🧳</div>', '5rem', Math.random()>0.5?'left':'right', 3800); }
+function _seaHolidayPop()       { _seaPopup('🏖️', '7rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// LABOR DAY US (1st Mon in Sep)
+// ══════════════════════════════════════════════════════════
+function _seaLaborParade()  { _seaLR('👷🔨', 20+Math.random()*30, '3rem', 5, true); }
+function _seaLaborTools()   { _seaParticles(['🔧','⚙️','🔨','🛠️'], 14, 'sea-float-up', [2,4], [1,2], 1500); }
+function _seaLaborPopup()   { _seaPopup('💪', '8rem', 2200); }
+
+// ══════════════════════════════════════════════════════════
+// BACK TO SCHOOL (Sep 1–10)
+// ══════════════════════════════════════════════════════════
+function _seaPencilRun()        { _seaLR('✏️', 30+Math.random()*30, '3.5rem', 4, true); }
+function _seaBookFall()         { _seaParticles(['📚','✏️','📐','📝'], 14, 'sea-petal-fall', [3,6], [0.8,1.6], 2000); }
+function _seaBackpackPop()      { _seaPopup('🎒', '7rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// OKTOBERFEST (Sep 15–Oct 1)
+// ══════════════════════════════════════════════════════════
+function _seaBeerParade()       { _seaLR('🍺🥨', 30+Math.random()*30, '3rem', 5.5, true); }
+function _seaMusicNotes()       { _seaParticles(['🎶','🎵','🎶'], 12, 'sea-float-up', [3,5], [1,2], 2000); }
+function _seaBeerMugPop()       { _seaPopup('🍺', '8rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// MID-AUTUMN
+// ══════════════════════════════════════════════════════════
+function _seaMooncakeParticles(){ _seaParticles(['🥮','🌕','🐰'], 12, 'sea-float-up', [3,5], [1.2,2.2], 2500); }
+function _seaLanternFloat()     { _seaLR('🏮', 20+Math.random()*30, '3.5rem', 5, true); }
+function _seaFullMoonMidAut()   { _seaHarvestMoon(); }
+
+// ══════════════════════════════════════════════════════════
+// SPACE WEEK (Oct 4–10)
+// ══════════════════════════════════════════════════════════
+function _seaRocketLaunch()     { _seaLR('🚀', 5+Math.random()*15, '3.5rem', 3.5); }
+function _seaSpaceParticles()   { _seaParticles(['⭐','🌙','✨','🛸'], 18, 'sea-snowfall', [4,7], [0.6,1.4], 1500); }
+function _seaAstronautPop()     { _seaPopup('👩‍🚀', '8rem', 2600); }
+
+// ══════════════════════════════════════════════════════════
+// INDIGENOUS PEOPLES' DAY (2nd Mon in Oct)
+// ══════════════════════════════════════════════════════════
+function _seaIndigenousFeathers() { _seaParticles(['🪶','🌿','🌎','⭐','🌺'], 16, 'sea-petal-fall', [3,6], [0.7,1.6], 2500); }
+function _seaIndigenousEagle()    { _seaLR('🦅', 10+Math.random()*20, '4rem', 4); }
+function _seaIndigenousPop()      { _seaPopup('🌎', '8rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// DAY OF THE DEAD (Nov 1–2)
+// ══════════════════════════════════════════════════════════
+function _seaSkullFlowers()     { _seaParticles(['💀','🌸','🌺','🕯️'], 16, 'sea-petal-fall', [4,7], [0.7,1.6], 2500); }
+function _seaCandleFlight()     { _seaLR('🕯️', 30+Math.random()*30, '3rem', 5, true); }
+function _seaDayDeadPop()       { _seaPopup('💀', '7rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// VETERANS DAY US (Nov 11) — priority 1 beats Remembrance Day
+// ══════════════════════════════════════════════════════════
+function _seaVetFlag()      { _seaLR('🇺🇸🎖️', 20+Math.random()*20, '3rem', 4.5, true); }
+function _seaVetMedals()    { _seaParticles(['🎖️','⭐','🌟','🇺🇸'], 16, 'sea-float-up', [2,4], [0.8,1.8], 2000); }
+function _seaVetPopup()     { _seaPopup('🎖️', '8rem', 2200); }
+
+// ══════════════════════════════════════════════════════════
+// BONFIRE NIGHT (Nov 5)
+// ══════════════════════════════════════════════════════════
+function _seaBonfireFireworks() { _seaLR('🎆', 10+Math.random()*20, '4rem', 3.5); }
+function _seaSparkleParticles() { _seaParticles(['✨','🔥','⭐','💥'], 20, 'sea-float-up', [2,4], [0.8,1.8], 1200); }
+function _seaBonfireExplosion() { _seaPopup('💥', '8rem', 1400); }
+
+// ══════════════════════════════════════════════════════════
+// DIWALI
+// ══════════════════════════════════════════════════════════
+function _seaDiwaLamps()        { _seaParticles(['🪔','✨','🌟'], 16, 'sea-float-up', [3,5], [1,2.2], 2000); }
+function _seaDiwaFireworks()    { _seaLR('🎆', 10+Math.random()*25, '3.5rem', 4); }
+function _seaDiwaGlow()         { _seaPopup('🪔', '9rem', 3000); }
+
+// ══════════════════════════════════════════════════════════
+// REMEMBRANCE DAY (Nov 11)
+// ══════════════════════════════════════════════════════════
+function _seaRembPoppyFall()    { _seaParticles(['🌺'], 14, 'sea-petal-fall', [6,10], [0.7,1.4], 3500); }
+function _seaRembPoppyPopup()   { _seaPopup('🌺', '7rem', 3500); }
+function _seaDoveFlight()       { _seaLR('🕊️', 20+Math.random()*30, '3.5rem', 6, true); }
+
+// ══════════════════════════════════════════════════════════
+// BOXING DAY (Dec 26)
+// ══════════════════════════════════════════════════════════
+function _seaGiftRun()          { _seaLR('🎁', 30+Math.random()*30, '3.5rem', 4, true); }
+function _seaShoppingBag()      { _seaParticles(['🎁','🛍️','🎀'], 14, 'sea-petal-fall', [3,6], [0.8,1.8], 2000); }
+function _seaBoxingPopup()      { _seaPopup('🎁', '8rem', 2400); }
+
+// ══════════════════════════════════════════════════════════
+// WINTER SOLSTICE (Dec 21)
+// ══════════════════════════════════════════════════════════
+function _seaWinterSnowfall()   { _seaSnowfall(); }
+function _seaNightSky()         { _seaPopup('🌌', '9rem', 3200); }
+function _seaSolsticeSnowman()  { _seaCorner('<div style="animation:sea-wobble 0.9s ease-in-out infinite;">☃️</div>', '5rem', Math.random()>0.5?'left':'right', 4000); }
+
+// ══════════════════════════════════════════════════════════
+// END OF YEAR (Dec 27–30)
+// ══════════════════════════════════════════════════════════
+function _seaEndCountdown()     { _seaPopup('⏰', '9rem', 2800); }
+function _seaEndParticles()     { _seaParticles(['🎉','⌛','⏰','🎆'], 16, 'sea-float-up', [2,4], [0.8,1.8], 1500); }
+function _seaYearReview()       { _seaLR('📅', 20+Math.random()*40, '4rem', 4.5); }
+
+// ══════════════════════════════════════════════════════════
 // Animation registry — at least 10 per season
 // ══════════════════════════════════════════════════════════
 var SEA_ANIMS = {
-    halloween:    [_seaGhostJumpscare, _seaBatSwarm, _seaWitchFly, _seaSpiderDrop, _seaPumpkinRoll,
-                   _seaSkullFloat, _seaCauldronBubble, _seaLightningFlash, _seaBlackCatRun,
-                   _seaHandFromGrave, _seaSkeletonDance, _seaFlyingEye],
-    christmas:    [_seaSantaSleigh, _seaSnowfall, _seaElfRun, _seaPresentBounce, _seaSnowmanWave,
-                   _seaShootingStar, _seaSnowflakeSpin, _seaReindeerFly, _seaChristmasTree,
-                   _seaChristmasBells, _seaGiftDropFromSky],
-    newyear:      [_seaChampagnePop, _seaNewYearBanner, _seaSparkler, _seaTopHatFloat, _seaPartyPopper,
-                   _seaGlitterBall, _seaCountdownClock, _seaStreamers, _seaToastClink, _seaFireworksEmoji],
-    valentine:    [_seaHeartsRise, _seaCupidFly, _seaRoseBlooms, _seaLoveLetter, _seaArrowShoot,
-                   _seaHeartBurst, _seaTeddyBear, _seaPinkBubbles, _seaChocolateBox, _seaKissMark],
-    spring:       [_seaButterflyFloat, _seaFlowerGrow, _seaCherryBlossom, _seaRainbow, _seaBeeWobble,
-                   _seaChickHatch, _seaBunnyHop, _seaAprilShowers, _seaSunPeek, _seaHeartsRise],
-    summer:       [_seaSummerSun, _seaBeachBallBounce, _seaWaveWash, _seaSunglassesSlide, _seaFireflies,
-                   _seaWatermelonRoll, _seaIceCreamDrip, _seaSharkFin, _seaHeatWave, _seaIceCreamTruck],
-    autumn:       [_seaLeavesSwirl, _seaOwlBlink, _seaFoxRun, _seaAcornDrop, _seaFogRoll,
-                   _seaMushroomGrow, _seaHarvestMoon, _seaScarecrow, _seaCiderMug, _seaSpiderWebCorner,
-                   _seaBatSwarm],
-    thanksgiving: [_seaTurkeyRun, _seaPieCooling, _seaCornucopia, _seaThanksgivingLeaves, _seaPilgrimHatFloat,
-                   _seaHarvestWagon, _seaAppleRoll, _seaCornStalk, _seaFeastTable, _seaHayBale]
+    halloween:      [_seaGhostJumpscare, _seaBatSwarm, _seaWitchFly, _seaSpiderDrop, _seaPumpkinRoll,
+                     _seaSkullFloat, _seaCauldronBubble, _seaLightningFlash, _seaBlackCatRun,
+                     _seaHandFromGrave, _seaSkeletonDance, _seaFlyingEye],
+    christmas:      [_seaSantaSleigh, _seaSnowfall, _seaElfRun, _seaPresentBounce, _seaSnowmanWave,
+                     _seaShootingStar, _seaSnowflakeSpin, _seaReindeerFly, _seaChristmasTree,
+                     _seaChristmasBells, _seaGiftDropFromSky],
+    newyear:        [_seaChampagnePop, _seaNewYearBanner, _seaSparkler, _seaTopHatFloat, _seaPartyPopper,
+                     _seaGlitterBall, _seaCountdownClock, _seaStreamers, _seaToastClink, _seaFireworksEmoji],
+    valentine:      [_seaHeartsRise, _seaCupidFly, _seaRoseBlooms, _seaLoveLetter, _seaArrowShoot,
+                     _seaHeartBurst, _seaTeddyBear, _seaPinkBubbles, _seaChocolateBox, _seaKissMark],
+    spring:         [_seaButterflyFloat, _seaFlowerGrow, _seaCherryBlossom, _seaRainbow, _seaBeeWobble,
+                     _seaChickHatch, _seaBunnyHop, _seaAprilShowers, _seaSunPeek, _seaHeartsRise],
+    summer:         [_seaSummerSun, _seaBeachBallBounce, _seaWaveWash, _seaSunglassesSlide, _seaFireflies,
+                     _seaWatermelonRoll, _seaIceCreamDrip, _seaSharkFin, _seaHeatWave, _seaIceCreamTruck],
+    autumn:         [_seaLeavesSwirl, _seaOwlBlink, _seaFoxRun, _seaAcornDrop, _seaFogRoll,
+                     _seaMushroomGrow, _seaHarvestMoon, _seaScarecrow, _seaCiderMug, _seaSpiderWebCorner,
+                     _seaBatSwarm],
+    thanksgiving:   [_seaTurkeyRun, _seaPieCooling, _seaCornucopia, _seaThanksgivingLeaves, _seaPilgrimHatFloat,
+                     _seaHarvestWagon, _seaAppleRoll, _seaCornStalk, _seaFeastTable, _seaHayBale],
+    deepwinter:     [_seaDeepWinterSnow, _seaFrostCreep, _seaBlizzard, _seaSnowflakeSpin],
+    lunarnew:       [_seaDragonFly, _seaLanternRise, _seaRedEnvelopes, _seaFirecracker],
+    awards:         [_seaTrophyPopup, _seaStarWalk, _seaGoldParticles],
+    pancakeday:     [_seaPancakeStack, _seaLemonSlice, _seaPancakeToss],
+    piday:          [_seaPiSymbol, _seaPieRoll, _seaMathParticles],
+    stpatricks:     [_seaShamrockShower, _seaRainbowArc, _seaGoldPot],
+    holi:           [_seaColorBurst, _seaHoliSplash, _seaColorRain],
+    hanami:         [_seaHanamiBlossoms, _seaPetalDrift, _seaBlossomTree],
+    aprilfools:     [_seaGlitchEffect, _seaFakeAlert, _seaJokerCard],
+    earthday:       [_seaEarthSpin, _seaLeafRain, _seaRecycleFloat],
+    ramadan:        [_seaCrescentMoon, _seaStarAndMoon, _seaLampFloat],
+    mayday:         [_seaFlowerShower, _seaRibbonDance, _seaMayPopup],
+    starwarsday:    [_seaSaberCross, _seaGalaxyParticles, _seaMayTheFourth, _seaSpaceshipFly],
+    pride:          [_seaRainbowParticles, _seaRainbowFlag, _seaPrideHearts],
+    oceanweek:      [_seaSharkSwim, _seaFishSchool, _seaOceanParticles],
+    solstice:       [_seaBigSun, _seaSunRays, _seaSolsticeGlow],
+    mlkday:         [_seaMlkMarch, _seaMlkDoves, _seaMlkPopup],
+    presidentsday:  [_seaPresParade, _seaPresStars, _seaPresPopup],
+    motheringsunday:[_seaMotheringFlowers, _seaMotheringLove, _seaMotheringPop],
+    mothersday:     [_seaMomFlowers, _seaMomHeart, _seaMomPopup],
+    memorialday:    [_seaMemPoppies, _seaMemFlag, _seaMemPopup],
+    juneteenth:     [_seaJuneteenthParade, _seaJuneteenthBurst, _seaJuneteenthPop],
+    fathersday:     [_seaDadParade, _seaDadBalloons, _seaDadPopup],
+    laborday:       [_seaLaborParade, _seaLaborTools, _seaLaborPopup],
+    indigenousday:  [_seaIndigenousFeathers, _seaIndigenousEagle, _seaIndigenousPop],
+    veteransday:    [_seaVetFlag, _seaVetMedals, _seaVetPopup],
+    independence:   [_seaFlagParade, _seaFireworks4th, _seaEagleSoar, _seaFlagPop],
+    tanabata:       [_seaBambooWish, _seaShootingStarT, _seaTanabataStars],
+    bastille:       [_seaTricolorParticles, _seaFireworksBastille, _seaEiffelTower],
+    augbankholiday: [_seaWeatherMix, _seaBaggage, _seaHolidayPop],
+    backtoschool:   [_seaPencilRun, _seaBookFall, _seaBackpackPop],
+    oktoberfest:    [_seaBeerParade, _seaMusicNotes, _seaBeerMugPop],
+    midautumn:      [_seaMooncakeParticles, _seaLanternFloat, _seaFullMoonMidAut],
+    spaceweek:      [_seaRocketLaunch, _seaSpaceParticles, _seaAstronautPop],
+    dayofthedead:   [_seaSkullFlowers, _seaCandleFlight, _seaDayDeadPop],
+    bonfirenight:   [_seaBonfireFireworks, _seaSparkleParticles, _seaBonfireExplosion],
+    diwali:         [_seaDiwaLamps, _seaDiwaFireworks, _seaDiwaGlow],
+    remembrance:    [_seaRembPoppyFall, _seaRembPoppyPopup, _seaDoveFlight],
+    boxingday:      [_seaGiftRun, _seaShoppingBag, _seaBoxingPopup],
+    wintersolstice: [_seaWinterSnowfall, _seaNightSky, _seaSolsticeSnowman],
+    endofyear:      [_seaEndCountdown, _seaEndParticles, _seaYearReview]
 };

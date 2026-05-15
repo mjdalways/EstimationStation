@@ -83,7 +83,10 @@
                         <button class="nav-link active settings-tab-btn" id="tab-theme-btn" data-bs-toggle="tab" data-bs-target="#tab-theme" type="button" role="tab">🎨 <span class="tab-label">Theme</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link settings-tab-btn" id="tab-celebration-btn" data-bs-toggle="tab" data-bs-target="#tab-celebration" type="button" role="tab">🎉 <span class="tab-label">Celebration</span></button>
+                        <button class="nav-link settings-tab-btn" id="tab-celebration-btn" data-bs-toggle="tab" data-bs-target="#tab-celebration" type="button" role="tab">🎉 <span class="tab-label">Events</span></button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link settings-tab-btn" id="tab-seasons-btn" data-bs-toggle="tab" data-bs-target="#tab-seasons" type="button" role="tab">🗓️ <span class="tab-label">Seasons</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-profile-btn" data-bs-toggle="tab" data-bs-target="#tab-profile" type="button" role="tab">👤 <span class="tab-label">Profile</span></button>
@@ -346,6 +349,20 @@
                                     </div>
                                 </div>
 
+                                <!-- Events colors section -->
+                                <div class="ct-section mb-2">
+                                    <button class="ct-section-toggle w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#sec-ct-events">
+                                        🎉 Events
+                                    </button>
+                                    <div id="sec-ct-events" class="ct-section-body">
+                                        <div class="ct-swatch-row">
+                                            <div class="ct-swatch-item"><input type="color" id="ct-lava-color-primary" value="#ff4500" oninput="updateThemePreview()" /><span>🌋 Lava</span></div>
+                                            <div class="ct-swatch-item"><input type="color" id="ct-lava-color-secondary" value="#ff6b00" oninput="updateThemePreview()" /><span>🌋 Lava 2</span></div>
+                                            <div class="ct-swatch-item"><input type="color" id="ct-shame-color" value="#dc3545" oninput="updateThemePreview()" /><span>🎯 Shame</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div><!-- end left controls -->
 
                             <!-- Right: live preview (desktop only) -->
@@ -411,22 +428,45 @@
                                 <input class="form-check-input" type="checkbox" id="cel-enable-balloons" />
                                 <label class="form-check-label fw-semibold" for="cel-enable-balloons">🎈 Balloons</label>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="cel-streak-enabled" />
+                            <div class="form-check d-flex align-items-center gap-2">
+                                <input class="form-check-input flex-shrink-0" type="checkbox" id="cel-streak-enabled" />
                                 <label class="form-check-label fw-semibold" for="cel-streak-enabled">🔥 Streak Bonus</label>
+                                <button type="button" class="btn btn-outline-secondary ms-auto" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testStreak()">🧪 Test</button>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="cel-lava-enabled" />
+                            <div class="form-check d-flex align-items-center gap-2">
+                                <input class="form-check-input flex-shrink-0" type="checkbox" id="cel-lava-enabled" onchange="document.getElementById('cel-lava-sub').style.display=this.checked?'':'none'" />
                                 <label class="form-check-label fw-semibold" for="cel-lava-enabled">🌋 Floor is Lava</label>
+                                <button type="button" class="btn btn-outline-secondary ms-auto" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testFloorIsLava()">🧪 Test</button>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="cel-seasonal-theme" />
-                                <label class="form-check-label fw-semibold" for="cel-seasonal-theme">🗓️ Seasonal Theme</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-semibold">🗓️ Seasonal Theme</span>
+                                <button type="button" class="btn btn-outline-secondary ms-auto" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="bootstrap.Tab.getOrCreateInstance(document.getElementById('tab-seasons-btn')).show()">Configure →</button>
                             </div>
                         </div>
 
+                        <!-- Floor is Lava sub-settings -->
+                        <div id="cel-lava-sub" class="mb-3 p-2 border rounded" style="display:none;">
+                            <h6 class="text-muted border-bottom pb-1 mb-2">🌋 Floor is Lava</h6>
+                            <div class="row g-2">
+                                <div class="col-6 col-md-4">
+                                    <label class="form-label small mb-1" for="cel-lava-duration">⏱ Countdown (s)</label>
+                                    <input type="number" class="form-control form-control-sm" id="cel-lava-duration" min="5" max="120" value="30" />
+                                </div>
+                                <div class="col-6 col-md-4 d-flex align-items-end gap-2">
+                                    <div>
+                                        <label class="form-label small mb-1" for="cel-lava-color">🎨 Lava color</label>
+                                        <input type="color" class="form-control form-control-color form-control-sm" id="cel-lava-color" value="#ff4500" title="Lava glow color" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
                         <!-- Confetti -->
-                        <h6 class="text-muted border-bottom pb-1 mb-2">🎊 Confetti</h6>
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
+                            <h6 class="text-muted mb-0 me-auto">🎊 Confetti</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testConfetti()">🧪 Test</button>
+                        </div>
                         <div class="row g-2 mb-3">
                             <div class="col-md-4 col-6">
                                 <label class="form-label small mb-1" for="cel-confetti-type">Particle type</label>
@@ -473,7 +513,10 @@
                         </div>
 
                         <!-- Fireworks -->
-                        <h6 class="text-muted border-bottom pb-1 mb-2">🎆 Fireworks</h6>
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
+                            <h6 class="text-muted mb-0 me-auto">🎆 Fireworks</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testFireworks()">🧪 Test</button>
+                        </div>
                         <div class="row g-2 mb-3">
                             <div class="col-md-4 col-6">
                                 <label class="form-label small mb-1" for="cel-fireworks-duration">Duration</label>
@@ -509,7 +552,10 @@
                         </div>
 
                         <!-- Balloons -->
-                        <h6 class="text-muted border-bottom pb-1 mb-2">🎈 Balloons</h6>
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
+                            <h6 class="text-muted mb-0 me-auto">🎈 Balloons</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testBalloons()">🧪 Test</button>
+                        </div>
                         <div class="row g-2 mb-3">
                             <div class="col-md-4 col-6">
                                 <label class="form-label small mb-1">Count: <span id="cel-balloon-count-val">10</span></label>
@@ -524,8 +570,56 @@
                             </div>
                         </div>
 
+                        <!-- Discussion Timer -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
+                            <h6 class="text-muted mb-0 me-auto">☕ Discussion Timer</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testDiscussionTimer()">🧪 Test</button>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="disc-enabled" onchange="saveDiscussionFromForm()">
+                            <label class="form-check-label small" for="disc-enabled">Show discussion countdown on non-consensus reveal</label>
+                        </div>
+                        <div id="disc-options-wrap">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <label class="form-label mb-0 small" for="disc-duration">⏱ Duration (s)</label>
+                                <input type="number" class="form-control form-control-sm" id="disc-duration" min="10" max="600" value="120" style="width:80px;" oninput="saveDiscussionFromForm()">
+                            </div>
+                            <p class="small text-muted mb-0">When the timer expires, 🌋 Floor is Lava starts automatically (if enabled).</p>
+                        </div>
+
+                        <!-- Voice-Activated Reveal -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
+                            <h6 class="text-muted mb-0 me-auto">🎤 Voice-Activated Reveal</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testVoiceRecognition()">🧪 Test</button>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="voice-enabled" onchange="saveVoiceFromForm()">
+                            <label class="form-check-label small" for="voice-enabled">Reveal votes by voice command</label>
+                        </div>
+                        <div id="voice-options-wrap">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <label class="form-label mb-0 small" for="voice-phrase">Trigger phrase</label>
+                                <input type="text" class="form-control form-control-sm" id="voice-phrase" maxlength="40" placeholder="reveal" style="max-width:160px;" oninput="saveVoiceFromForm()">
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <label class="form-label mb-0 small" for="voice-lang">Language</label>
+                                <select class="form-select form-select-sm" id="voice-lang" style="max-width:160px;" onchange="saveVoiceFromForm()">
+                                    <option value="en-US">English (US)</option>
+                                    <option value="en-GB">English (UK)</option>
+                                    <option value="fr-FR">French</option>
+                                    <option value="de-DE">German</option>
+                                    <option value="es-ES">Spanish</option>
+                                    <option value="ja-JP">Japanese</option>
+                                </select>
+                            </div>
+                            <p class="small text-muted mb-0">Requires microphone permission. Works in Chrome/Edge.</p>
+                        </div>
+
                         <!-- Shame Spotlight -->
-                        <h6 class="text-muted border-bottom pb-1 mb-2">🎯 Shame Spotlight</h6>
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
+                            <h6 class="text-muted mb-0 me-auto">🎯 Shame Spotlight</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testShame()">🧪 Test</button>
+                        </div>
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="shame-enabled" onchange="saveShameFromForm()">
                             <label class="form-check-label small" for="shame-enabled">Spotlight the outlier voter on reveal</label>
@@ -535,14 +629,36 @@
                                 <label class="form-label mb-0 small" for="shame-color">Color</label>
                                 <input type="color" id="shame-color" value="#dc3545" class="form-control form-control-color form-control-sm" style="width:40px;height:28px;" oninput="saveShameFromForm()">
                             </div>
-                            <div class="input-group input-group-sm mb-3">
+                            <div class="input-group input-group-sm mb-2">
                                 <span class="input-group-text small text-muted">{name}</span>
                                 <input type="text" id="shame-message" class="form-control" placeholder="went rogue!" maxlength="60" oninput="saveShameFromForm()">
                             </div>
+                            <div id="shame-preview" class="mt-1 mb-1" style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+                                <div id="shame-preview-badge" style="padding:5px 11px;border-radius:8px;border:2px solid #dee2e6;background:#fff;font-size:0.8rem;font-weight:600;box-shadow:0 0 0 3px #dc3545,0 0 18px #dc354580;white-space:nowrap;color:#333;transition:box-shadow 0.2s;">🎯 OutlierBob <span style="opacity:0.6;font-size:0.73rem;">13</span></div>
+                                <div id="shame-preview-toast" style="padding:4px 11px;border-radius:8px;font-size:0.8rem;font-weight:600;background:#dc3545;color:#fff;white-space:nowrap;">🎯 OutlierBob went rogue!</div>
+                            </div>
                         </div>
 
+                        <!-- Lone Wolf Counter-Spell -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
+                            <h6 class="text-muted mb-0 me-auto">🪄 Lone Wolf Counter-Spell</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testCounterSpell()">🧪 Test</button>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="cs-enabled" onchange="saveCounterSpellFromForm()">
+                            <label class="form-check-label small" for="cs-enabled">Allow the outlier to cast a 🐔 Counter-Spell (once per session)</label>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <label class="form-label mb-0 small" for="cs-duration">⏱ Duration (s)</label>
+                            <input type="number" class="form-control form-control-sm" id="cs-duration" min="1" max="30" value="4" style="width:70px;" oninput="saveCounterSpellFromForm()">
+                        </div>
+                        <p class="small text-muted mb-0">After a non-consensus reveal the lone wolf sees a <strong>🐔 Cast Spell</strong> button. All other voters get a 🐔 overlay for the configured duration.</p>
+
                         <!-- Avatar Battle -->
-                        <h6 class="text-muted border-bottom pb-1 mb-2 mt-3">⚔️ Avatar Battle</h6>
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
+                            <h6 class="text-muted mb-0 me-auto">⚔️ Avatar Battle</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="testBattle()">🧪 Test</button>
+                        </div>
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="battle-enabled" onchange="saveBattleFromForm()">
                             <label class="form-check-label small" for="battle-enabled">Play a battle animation when votes are revealed</label>
@@ -592,10 +708,104 @@
 
                         <div class="d-flex gap-2 flex-wrap border-top pt-3">
                             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetCelebrationSettings()">↩ Reset defaults</button>
-                            <button type="button" class="btn btn-sm btn-outline-success" onclick="testCelebration()">🎉 Test</button>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="testCelebration()">🎉 Test All</button>
                             <button type="button" class="btn btn-sm btn-primary ms-auto" onclick="saveCelebrationSettingsFromForm()">💾 Save</button>
                         </div>
                     </div><!-- end tab-celebration -->
+
+                    <!-- ══════════════════════════════════════════
+                         TAB: 🗓️ Seasons
+                         ══════════════════════════════════════════ -->
+                    <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-seasons" role="tabpanel">
+                        <!-- Master toggle + bulk actions -->
+                        <div class="d-flex align-items-center flex-wrap gap-2 mb-3 p-2 border rounded bg-body-secondary">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="cel-seasonal-theme" />
+                                <label class="form-check-label fw-semibold" for="cel-seasonal-theme">🗓️ Seasonal Theme</label>
+                            </div>
+                            <div class="ms-auto d-flex gap-2 flex-wrap">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_seaSelectAll(true)" style="font-size:0.75rem;">✓ All</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="_seaSelectAll(false)" style="font-size:0.75rem;">✗ None</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="testSeasonalAmbience()" style="font-size:0.75rem;">🧪 Cycle Test</button>
+                            </div>
+                        </div>
+
+                        <!-- Season rows: each has toggle + name + date range + test button -->
+                        <p class="small fw-semibold text-muted mb-1">🌿 Seasons</p>
+                        <div class="mb-3">
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-deepwinter"><label for="cel-seasonal-deepwinter">🧊 Deep Winter</label><span>Jan 11–31</span><button onclick="testSpecificSeason('deepwinter')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-spring"><label for="cel-seasonal-spring">🌸 Spring</label><span>Mar–May</span><button onclick="testSpecificSeason('spring')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-summer"><label for="cel-seasonal-summer">☀️ Summer</label><span>Jun–Aug</span><button onclick="testSpecificSeason('summer')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-autumn"><label for="cel-seasonal-autumn">🍂 Autumn</label><span>Sep–Nov</span><button onclick="testSpecificSeason('autumn')">▶</button></div>
+                        </div>
+                        <p class="small fw-semibold text-muted mb-1">🎉 Major Holidays</p>
+                        <div class="mb-3">
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-newyear"><label for="cel-seasonal-newyear">🎆 New Year</label><span>Jan 1–10</span><button onclick="testSpecificSeason('newyear')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-valentine"><label for="cel-seasonal-valentine">💘 Valentine's</label><span>Feb 12–16</span><button onclick="testSpecificSeason('valentine')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-stpatricks"><label for="cel-seasonal-stpatricks">☘️ St Patrick's</label><span>Mar 15–18</span><button onclick="testSpecificSeason('stpatricks')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-halloween"><label for="cel-seasonal-halloween">🎃 Halloween</label><span>Oct 20–31</span><button onclick="testSpecificSeason('halloween')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-thanksgiving"><label for="cel-seasonal-thanksgiving">🦃 Thanksgiving</label><span>4th Thu Nov</span><button onclick="testSpecificSeason('thanksgiving')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-christmas"><label for="cel-seasonal-christmas">🎄 Christmas</label><span>Dec 1–25</span><button onclick="testSpecificSeason('christmas')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-lunarnew"><label for="cel-seasonal-lunarnew">🧧 Lunar New Year</label><span>Variable</span><button onclick="testSpecificSeason('lunarnew')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-diwali"><label for="cel-seasonal-diwali">🪔 Diwali</label><span>Variable</span><button onclick="testSpecificSeason('diwali')">▶</button></div>
+                        </div>
+                        <p class="small fw-semibold text-muted mb-1">🇺🇸 US Federal Holidays</p>
+                        <div class="mb-3">
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-mlkday"><label for="cel-seasonal-mlkday">✊ MLK Day</label><span>3rd Mon Jan</span><button onclick="testSpecificSeason('mlkday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-presidentsday"><label for="cel-seasonal-presidentsday">🎩 Presidents' Day</label><span>3rd Mon Feb</span><button onclick="testSpecificSeason('presidentsday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-memorialday"><label for="cel-seasonal-memorialday">🎖️ Memorial Day</label><span>Last Mon May</span><button onclick="testSpecificSeason('memorialday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-juneteenth"><label for="cel-seasonal-juneteenth">🕊️ Juneteenth</label><span>Jun 19</span><button onclick="testSpecificSeason('juneteenth')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-independence"><label for="cel-seasonal-independence">🇺🇸 Independence Day</label><span>Jul 4</span><button onclick="testSpecificSeason('independence')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-laborday"><label for="cel-seasonal-laborday">💪 Labor Day</label><span>1st Mon Sep</span><button onclick="testSpecificSeason('laborday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-indigenousday"><label for="cel-seasonal-indigenousday">🪶 Indigenous Peoples' Day</label><span>2nd Mon Oct</span><button onclick="testSpecificSeason('indigenousday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-veteransday"><label for="cel-seasonal-veteransday">🎖️ Veterans Day</label><span>Nov 11</span><button onclick="testSpecificSeason('veteransday')">▶</button></div>
+                        </div>
+                        <p class="small fw-semibold text-muted mb-1">💐 Family</p>
+                        <div class="mb-3">
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-motheringsunday"><label for="cel-seasonal-motheringsunday">💐 Mothering Sunday <span class="text-muted">(UK)</span></label><span>Easter −21</span><button onclick="testSpecificSeason('motheringsunday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-mothersday"><label for="cel-seasonal-mothersday">🌷 Mother's Day <span class="text-muted">(US)</span></label><span>2nd Sun May</span><button onclick="testSpecificSeason('mothersday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-fathersday"><label for="cel-seasonal-fathersday">👔 Father's Day <span class="text-muted">(US)</span></label><span>3rd Sun Jun</span><button onclick="testSpecificSeason('fathersday')">▶</button></div>
+                        </div>
+                        <p class="small fw-semibold text-muted mb-1">🇬🇧 British</p>
+                        <div class="mb-3">
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-pancakeday"><label for="cel-seasonal-pancakeday">🥞 Pancake Day</label><span>Easter −47</span><button onclick="testSpecificSeason('pancakeday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-bonfirenight"><label for="cel-seasonal-bonfirenight">🎆 Bonfire Night</label><span>Nov 5</span><button onclick="testSpecificSeason('bonfirenight')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-boxingday"><label for="cel-seasonal-boxingday">🎁 Boxing Day</label><span>Dec 26</span><button onclick="testSpecificSeason('boxingday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-remembrance"><label for="cel-seasonal-remembrance">🌺 Remembrance Day</label><span>Nov 11</span><button onclick="testSpecificSeason('remembrance')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-augbankholiday"><label for="cel-seasonal-augbankholiday">🧳 Aug Bank Holiday</label><span>Last Mon Aug</span><button onclick="testSpecificSeason('augbankholiday')">▶</button></div>
+                        </div>
+                        <p class="small fw-semibold text-muted mb-1">🌍 Global &amp; Cultural</p>
+                        <div class="mb-3">
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-pride"><label for="cel-seasonal-pride">🌈 Pride</label><span>Jun 1–30</span><button onclick="testSpecificSeason('pride')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-holi"><label for="cel-seasonal-holi">🎨 Holi</label><span>Mar</span><button onclick="testSpecificSeason('holi')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-hanami"><label for="cel-seasonal-hanami">🌸 Hanami</label><span>Mar 20–Apr 10</span><button onclick="testSpecificSeason('hanami')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-ramadan"><label for="cel-seasonal-ramadan">🌙 Ramadan/Eid</label><span>Variable</span><button onclick="testSpecificSeason('ramadan')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-midautumn"><label for="cel-seasonal-midautumn">🥮 Mid-Autumn</label><span>Variable</span><button onclick="testSpecificSeason('midautumn')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-tanabata"><label for="cel-seasonal-tanabata">🎋 Tanabata</label><span>Jul 7</span><button onclick="testSpecificSeason('tanabata')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-bastille"><label for="cel-seasonal-bastille">🗼 Bastille Day</label><span>Jul 14</span><button onclick="testSpecificSeason('bastille')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-earthday"><label for="cel-seasonal-earthday">🌍 Earth Day</label><span>Apr 22</span><button onclick="testSpecificSeason('earthday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-mayday"><label for="cel-seasonal-mayday">🌺 May Day</label><span>May 1</span><button onclick="testSpecificSeason('mayday')">▶</button></div>
+                        </div>
+                        <p class="small fw-semibold text-muted mb-1">🎭 Niche / Pop Culture</p>
+                        <div class="mb-3">
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-awards"><label for="cel-seasonal-awards">🏆 Awards Season</label><span>Feb</span><button onclick="testSpecificSeason('awards')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-piday"><label for="cel-seasonal-piday">🥧 Pi Day</label><span>Mar 14</span><button onclick="testSpecificSeason('piday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-aprilfools"><label for="cel-seasonal-aprilfools">🃏 April Fools</label><span>Apr 1</span><button onclick="testSpecificSeason('aprilfools')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-starwarsday"><label for="cel-seasonal-starwarsday">⚔️ Star Wars Day</label><span>May 4</span><button onclick="testSpecificSeason('starwarsday')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-oceanweek"><label for="cel-seasonal-oceanweek">🐠 Ocean Week</label><span>Jun 8–15</span><button onclick="testSpecificSeason('oceanweek')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-solstice"><label for="cel-seasonal-solstice">☀️ Summer Solstice</label><span>Jun 20–22</span><button onclick="testSpecificSeason('solstice')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-spaceweek"><label for="cel-seasonal-spaceweek">🚀 Space Week</label><span>Oct 4–10</span><button onclick="testSpecificSeason('spaceweek')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-backtoschool"><label for="cel-seasonal-backtoschool">🎒 Back to School</label><span>Sep 1–10</span><button onclick="testSpecificSeason('backtoschool')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-oktoberfest"><label for="cel-seasonal-oktoberfest">🍺 Oktoberfest</label><span>Sep 15–Oct 1</span><button onclick="testSpecificSeason('oktoberfest')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-dayofthedead"><label for="cel-seasonal-dayofthedead">💀 Day of the Dead</label><span>Nov 1–2</span><button onclick="testSpecificSeason('dayofthedead')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-wintersolstice"><label for="cel-seasonal-wintersolstice">❄️ Winter Solstice</label><span>Dec 21</span><button onclick="testSpecificSeason('wintersolstice')">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-endofyear"><label for="cel-seasonal-endofyear">⏰ End of Year</label><span>Dec 27–30</span><button onclick="testSpecificSeason('endofyear')">▶</button></div>
+                        </div>
+
+                        <div class="border-top pt-2 d-flex gap-2 justify-content-end">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="saveCelebrationSettingsFromForm()">💾 Save</button>
+                        </div>
+                    </div><!-- end tab-seasons -->
 
                     <!-- ══════════════════════════════════════════
                          TAB: 👤 Profile
@@ -721,9 +931,40 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/15/2026 (6)</strong></p>
+                        <ul class="mb-2">
+                            <li>🇺🇸 10 new US Federal Holidays — MLK Day, Presidents' Day, Memorial Day, Juneteenth, Labor Day, Indigenous Peoples' Day, and Veterans Day each have unique animations and are toggleable in the Seasons tab. Veterans Day (Nov 11) takes priority over UK Remembrance Day when enabled.</li>
+                            <li>💐 3 new family holidays — Mothering Sunday (UK, Easter −21 days), Mother's Day (US, 2nd Sun May), Father's Day (US, 3rd Sun Jun), each with flower/celebration animations.</li>
+                            <li>🇺🇸 Independence Day moved to the new <strong>US Federal Holidays</strong> section in the Seasons tab; July 4th animations now show fireworks 🎆, flag parade 🇺🇸, and soaring eagle 🦅.</li>
+                            <li>🗓️ New <strong>Seasons tab</strong> in Settings — all 49 seasonal events in a clean list with date ranges, enable/disable toggles, and per-event test buttons grouped by category (Seasons, Major Holidays, US Federal, Family, British, Global &amp; Cultural, Niche / Pop Culture).</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/15/2026 (4)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪄 Lone Wolf Counter-Spell — after a non-consensus reveal, the outlier voter sees a <strong>🐔 Cast Spell</strong> button. Clicking it overlays all other participants with a bouncing chicken for a configurable duration (default 4s). Once per session. Enable/configure in Events settings.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/15/2026 (3)</strong></p>
+                        <ul class="mb-2">
+                            <li>👻 Ghost Mode — any participant can toggle ghost mode; latecomers who join mid-vote are marked as ghosts (watch only). A Teams-style info bar notifies all participants when the mode changes. Toggle button in room controls.</li>
+                            <li>☕ Discussion Timer — after a non-consensus reveal, an optional countdown banner gives the team time to discuss before 🌋 Floor is Lava kicks in. Configurable duration in Events settings.</li>
+                            <li>🎤 Voice-Activated Reveal — say a configurable trigger phrase (default: "reveal") to reveal votes hands-free. A 🎤 Listening badge appears in the navbar while active. Configurable phrase and language in Events settings. Works in Chrome/Edge.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/15/2026 (2)</strong></p>
+                        <ul class="mb-2">
+                            <li>🐇 Spring rabbit now hops in the correct direction.</li>
+                            <li>▶ Per-season test buttons — click <strong>▶</strong> next to any of the 39 seasonal events in settings to preview its animation immediately.</li>
+                            <li>🎯 Shame Spotlight settings now show a live inline preview of the badge glow and toast as you adjust the colour and message.</li>
+                            <li>📋 Feature Plan 3.0 reorganised — v2.0 remaining features moved into the v3 pipeline; #17–20 formally marked Will Not Do.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/15/2026</strong></p>
                         <ul class="mb-2">
-                            <li>🌋 Floor is Lava — when there's an outlier after reveal, their badge glows red and a 30-second countdown banner appears. When time runs out, a lava confetti burst fires. Toggle in Celebration settings.</li>
+                            <li>🗓️ Seasonal expansion — 39 events now supported (was 8). New events include Lunar New Year, Diwali, Pi Day, Star Wars Day, Pride, Bonfire Night, Oktoberfest, Space Week, and more. Priority resolver picks the most specific active event when dates overlap. Settings panel reorganised into 5 groups (Seasons, Major Holidays, British, Global &amp; Cultural, Niche / Pop Culture) with ✓ All / ✗ None quick-toggles.</li>
+                            <li>🧪 Individual test buttons for every celebration effect — Confetti, Fireworks, Balloons, Streak, Floor is Lava, Shame Spotlight, Avatar Battle, and Seasonal Animation each have their own 🧪 Test button in the Events settings tab.</li>
+                            <li>🎉 Celebration tab renamed to <strong>Events</strong>.</li>
+                            <li>🌋 Floor is Lava: configurable countdown duration and lava color (Events tab → 🌋 sub-panel). Lava glow now respects your chosen color across all themes.</li>
+                            <li>🗓️ Seasonal Theme: per-season enable/disable toggles (Halloween, Christmas, New Year, Valentine's, Spring, Summer, Autumn, Thanksgiving) in the Events tab.</li>
+                            <li>🎨 Event colors in Theme editor — Lava primary, Lava secondary, and Shame spotlight are now proper CSS variables available in both the Theme editor and Events tab.</li>
+                            <li>🤖 RoboHash sets 3 (Robot Heads), 4 (Cats), and 5 (Humans) disabled — these returned blank images for many seeds. Robots and Monsters remain. Saved preferences auto-migrate.</li>
+                            <li>🌋 Floor is Lava — when there's an outlier after reveal, their badge glows red and a 30-second countdown banner appears. When time runs out, a lava confetti burst fires. Toggle in Events settings.</li>
                             <li>🌡️ Anonymous Vibe Check — before voting, teammates can react with 🚀😱😴🤔💪🤷. Counts shown live; no names attached. Resets with votes.</li>
                             <li>🎨 DiceBear background color — optional color picker inside the DiceBear avatar panel; color baked into the preview and synced to the room.</li>
                             <li>🗓️ Seasonal Theme — when enabled, celebrations auto-use seasonal confetti colors and emojis (Halloween, Christmas, Spring, Summer, etc.). Toggle in Celebration settings.</li>
@@ -882,6 +1123,9 @@
     <script src="~/js/battle.js" asp-append-version="true"></script>
     <script src="~/js/awards.js" asp-append-version="true"></script>
     <script src="~/js/seasonal.js" asp-append-version="true"></script>
+    <script src="~/js/discussion.js" asp-append-version="true"></script>
+    <script src="~/js/voice.js" asp-append-version="true"></script>
+    <script src="~/js/counter-spell.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
     <script>
         // Register service worker for PWA

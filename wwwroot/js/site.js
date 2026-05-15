@@ -98,6 +98,9 @@ function openSettingsModal(tab) {
     if (typeof populateAvatarTab === 'function') populateAvatarTab();
     if (typeof populateShameSection === 'function') populateShameSection();
     if (typeof populateBattleSection === 'function') populateBattleSection();
+    if (typeof populateDiscussionSection === 'function') populateDiscussionSection();
+    if (typeof populateVoiceSection === 'function') populateVoiceSection();
+    if (typeof populateCounterSpellSection === 'function') populateCounterSpellSection();
 
     _settingsSaved = false; // reset the save flag for this session
 
@@ -293,7 +296,8 @@ const CUSTOM_COLOR_FIELDS = [
     'navbar-bg', 'navbar-text',
     'panel-bg', 'panel-border',
     'stats-bg', 'chat-bg', 'chat-bubble',
-    'story-active', 'story-completed', 'timer-color'
+    'story-active', 'story-completed', 'timer-color',
+    'lava-color-primary', 'lava-color-secondary', 'shame-color'
 ];
 
 const CUSTOM_DEFAULTS = {
@@ -326,7 +330,10 @@ const CUSTOM_DEFAULTS = {
     'chat-bubble':         '#e9ecef',
     'story-active':        '#cfe2ff',
     'story-completed':     '#d1e7dd',
-    'timer-color':         '#dc3545'
+    'timer-color':         '#dc3545',
+    'lava-color-primary':  '#ff4500',
+    'lava-color-secondary':'#ff6b00',
+    'shame-color':         '#dc3545'
 };
 
 function setCustomizerFormValues(vars) {

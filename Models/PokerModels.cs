@@ -14,6 +14,8 @@ public class Room
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastActivity { get; set; } = DateTime.UtcNow;
     public Dictionary<string, string> Vibes { get; set; } = new();
+    public bool GhostModeEnabled { get; set; } = false;
+    public string? ShameParticipantId { get; set; }
 }
 
 public class Participant
@@ -22,6 +24,8 @@ public class Participant
     public string Name { get; set; } = string.Empty;
     public string? Vote { get; set; }
     public bool IsObserver { get; set; } = false;
+    public bool IsGhost { get; set; } = false;
+    public bool CounterUsed { get; set; } = false;
     public string? AvatarData { get; set; }
 }
 

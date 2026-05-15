@@ -28,6 +28,7 @@ function populateShameSection() {
     var msgEl = document.getElementById('shame-message');
     if (msgEl) msgEl.value = s.message || '';
     updateShameOptionsVisibility();
+    _updateShamePreview();
 }
 
 function updateShameOptionsVisibility() {
@@ -40,12 +41,30 @@ function saveShameFromForm() {
     var enabledEl = document.getElementById('shame-enabled');
     var colorEl = document.getElementById('shame-color');
     var msgEl = document.getElementById('shame-message');
+    var color = (colorEl ? colorEl.value : '') || '#dc3545';
     saveShameSettings({
         enabled: !!(enabledEl && enabledEl.checked),
-        color: (colorEl ? colorEl.value : '') || '#dc3545',
+        color: color,
         message: (msgEl ? msgEl.value.trim() : '') || 'went rogue!'
     });
+    document.documentElement.style.setProperty('--shame-color', color);
     updateShameOptionsVisibility();
+    _updateShamePreview();
+}
+
+function _updateShamePreview() {
+    var color = ((document.getElementById('shame-color') || {}).value) || '#dc3545';
+    var msg = (((document.getElementById('shame-message') || {}).value) || '').trim() || 'went rogue!';
+    var badge = document.getElementById('shame-preview-badge');
+    var toast = document.getElementById('shame-preview-toast');
+    if (badge) badge.style.boxShadow = '0 0 0 3px ' + color + ',0 0 18px ' + color + '80';
+    if (toast) { toast.style.background = color; toast.textContent = '🎯 OutlierBob ' + msg; }
+}
+
+function testShame() {
+    var badge = document.querySelector('[data-connection-id]');
+    var fakeId = badge ? badge.dataset.connectionId : '__test__';
+    triggerShame({ shameParticipantId: fakeId, shameVote: '13', majorityVote: '5', majorityCount: 3, totalVoters: 4 });
 }
 
 // ── Trigger ──────────────────────────────────────────────────
@@ -56,6 +75,7 @@ function triggerShame(stats) {
     if (!s.enabled) return;
 
     var color = s.color || '#dc3545';
+    document.documentElement.style.setProperty('--shame-color', color);
 
     var card = document.querySelector('[data-connection-id="' + stats.shameParticipantId + '"]');
     if (!card) return;

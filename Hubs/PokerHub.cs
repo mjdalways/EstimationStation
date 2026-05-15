@@ -38,6 +38,8 @@ public class PokerHub : Hub
 
         lock (room)
         {
+            bool midVote = !room.VotesRevealed && room.Participants.Any(p => !p.IsObserver && p.Vote != null);
+            participant.IsGhost = room.GhostModeEnabled && midVote;
             room.Participants.RemoveAll(p => p.ConnectionId == Context.ConnectionId);
             room.Participants.Add(participant);
             room.LastActivity = DateTime.UtcNow;
@@ -54,6 +56,7 @@ public class PokerHub : Hub
             connectionId = participant.ConnectionId,
             name = participant.Name,
             isObserver = participant.IsObserver,
+            isGhost = participant.IsGhost,
             hasVoted = participant.Vote != null,
             avatarData = participant.AvatarData
         });
@@ -117,7 +120,7 @@ public class PokerHub : Hub
         lock (room)
         {
             var participant = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-            if (participant == null || participant.IsObserver) return;
+            if (participant == null || participant.IsObserver || participant.IsGhost) return;
             participant.Vote = vote;
 
             if (room.AutoReveal && !room.VotesRevealed && vote != null)
@@ -151,6 +154,7 @@ public class PokerHub : Hub
             room.VotesRevealed = true;
             votes = room.Participants.ToDictionary(p => p.ConnectionId, p => p.Vote);
             stats = CalculateStats(room);
+            room.ShameParticipantId = FindShameParticipantId(room);
         }
 
         await Clients.Group(roomName).SendAsync("VotesRevealed", votes, stats);
@@ -183,13 +187,52 @@ public class PokerHub : Hub
         lock (room)
         {
             foreach (var p in room.Participants)
+            {
                 p.Vote = null;
+                p.IsGhost = false;
+            }
             room.VotesRevealed = false;
+            room.ShameParticipantId = null;
             room.Vibes.Clear();
         }
 
         await Clients.Group(roomName).SendAsync("VotesReset");
         await Clients.Group(roomName).SendAsync("VibeUpdated", new Dictionary<string, int>());
+    }
+
+    public async Task ToggleGhostMode(bool enabled)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        string togglerName;
+        lock (room)
+        {
+            room.GhostModeEnabled = enabled;
+            togglerName = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name ?? "Someone";
+        }
+        await Clients.Group(roomName).SendAsync("GhostModeToggled", enabled, togglerName);
+    }
+
+    public async Task CastCounterSpell()
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        string casterName;
+        lock (room)
+        {
+            if (!room.VotesRevealed) return;
+            if (room.ShameParticipantId != Context.ConnectionId) return;
+            var participant = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+            if (participant == null || participant.CounterUsed) return;
+            participant.CounterUsed = true;
+            casterName = participant.Name;
+        }
+        await Clients.Group(roomName).SendAsync("CounterSpellCast", Context.ConnectionId, casterName);
     }
 
     public async Task CastVibe(string emoji)
@@ -434,6 +477,35 @@ public class PokerHub : Hub
         await Clients.Group(roomName).SendAsync("AvatarUpdated", Context.ConnectionId, avatarData);
     }
 
+    private static string? FindShameParticipantId(Room room)
+    {
+        var numericVoters = room.Participants
+            .Where(p => !p.IsObserver && p.Vote != null && double.TryParse(p.Vote!.Replace("½", "0.5"), out _))
+            .Select(p => (participant: p, val: double.Parse(p.Vote!.Replace("½", "0.5"))))
+            .ToList();
+
+        if (numericVoters.Count < 3) return null;
+
+        var groups = numericVoters
+            .GroupBy(x => x.participant.Vote!)
+            .OrderByDescending(g => g.Count())
+            .ToList();
+
+        var topGroup = groups[0];
+        if (topGroup.Count() * 2 < numericVoters.Count) return null;
+
+        var majorityNum = double.Parse(topGroup.Key.Replace("½", "0.5"));
+        var outliers = numericVoters
+            .Where(x => x.participant.Vote != topGroup.Key)
+            .OrderByDescending(x => Math.Abs(x.val - majorityNum))
+            .ToList();
+
+        if (outliers.Count == 0) return null;
+        var maxDist = Math.Abs(outliers[0].val - majorityNum);
+        var farthest = outliers.Where(x => Math.Abs(x.val - majorityNum) == maxDist).ToList();
+        return farthest.Count == 1 ? farthest[0].participant.ConnectionId : null;
+    }
+
     private static object BuildRoomState(Room room)
     {
         string[] estimateValues;
@@ -455,6 +527,7 @@ public class PokerHub : Hub
             name = room.Name,
             autoReveal = room.AutoReveal,
             votesRevealed = room.VotesRevealed,
+            ghostModeEnabled = room.GhostModeEnabled,
             currentStoryId = room.CurrentStoryId,
             estimateSet = room.EstimateSet,
             estimateValues,
@@ -464,6 +537,8 @@ public class PokerHub : Hub
                 connectionId = p.ConnectionId,
                 name = p.Name,
                 isObserver = p.IsObserver,
+                isGhost = p.IsGhost,
+                counterUsed = p.CounterUsed,
                 hasVoted = p.Vote != null,
                 vote = room.VotesRevealed ? p.Vote : null,
                 avatarData = p.AvatarData
