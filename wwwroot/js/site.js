@@ -3,7 +3,7 @@
 // ============================================================
 const BASE_THEMES = [
     'classic', 'dark', 'forest', 'ocean', 'retro',
-    'floral', 'eighties', 'redyellow', 'blueyellow', 'myspace', 'geocities'
+    'floral', 'eighties', 'redyellow', 'blueyellow', 'myspace', 'geocities', 'crt'
 ];
 
 const BASE_THEME_LABELS = {
@@ -17,7 +17,8 @@ const BASE_THEME_LABELS = {
     redyellow: 'Red & Yellow',
     blueyellow: 'Blue & Yellow',
     myspace: 'MySpace',
-    geocities: 'GeoCities'
+    geocities: 'GeoCities',
+    crt: 'CRT'
 };
 
 const CUSTOM_THEMES_KEY = 'es_customThemes';
@@ -95,12 +96,19 @@ function openSettingsModal(tab) {
     populateThemeTab();
 
     if (typeof populateCelebrationTab === 'function') populateCelebrationTab();
+    if (typeof populateAmbientTab === 'function') populateAmbientTab();
     if (typeof populateAvatarTab === 'function') populateAvatarTab();
     if (typeof populateShameSection === 'function') populateShameSection();
     if (typeof populateBattleSection === 'function') populateBattleSection();
     if (typeof populateDiscussionSection === 'function') populateDiscussionSection();
     if (typeof populateVoiceSection === 'function') populateVoiceSection();
     if (typeof populateCounterSpellSection === 'function') populateCounterSpellSection();
+    if (typeof _seaAddConfigButtons === 'function') _seaAddConfigButtons();
+    if (typeof populateSoundReceiveSection === 'function') populateSoundReceiveSection();
+    if (typeof renderCustomSoundSlots === 'function') renderCustomSoundSlots();
+    populateJiraTab();
+    applyCardBackDesign();
+    if (typeof populateTimerAudioSection === 'function') populateTimerAudioSection();
 
     _settingsSaved = false; // reset the save flag for this session
 
@@ -261,7 +269,6 @@ document.addEventListener('DOMContentLoaded', loadTheme);
 let _pwaInstallPrompt = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
     _pwaInstallPrompt = e;
     const btn = document.getElementById('installAppBtn');
     if (btn) btn.classList.remove('d-none');
@@ -749,6 +756,84 @@ function openCelebrationSettings() {
     openSettingsModal('celebration');
 }
 
+// ── Jira settings (localStorage only) ──────────────────────
+var ES_JIRA_KEY = 'es_jiraSettings';
 
+function getJiraSettings() {
+    try { return JSON.parse(localStorage.getItem(ES_JIRA_KEY) || '{}'); } catch { return {}; }
+}
 
+function populateJiraTab() {
+    var s = getJiraSettings();
+    var d = document.getElementById('jiraDomain');
+    var e = document.getElementById('jiraEmail');
+    var t = document.getElementById('jiraToken');
+    var j = document.getElementById('jiraJql');
+    if (d) d.value = s.domain || '';
+    if (e) e.value = s.email || '';
+    if (t) t.value = s.token || '';
+    if (j) j.value = s.jql || '';
+    var f = document.getElementById('jiraFieldId');
+    if (f) f.value = s.fieldId || 'customfield_10016';
+}
+
+function saveJiraSettings() {
+    var domain   = (document.getElementById('jiraDomain')?.value  || '').trim();
+    var email    = (document.getElementById('jiraEmail')?.value   || '').trim();
+    var token    = (document.getElementById('jiraToken')?.value   || '').trim();
+    var jql      = (document.getElementById('jiraJql')?.value     || '').trim();
+    var fieldId  = (document.getElementById('jiraFieldId')?.value || '').trim() || 'customfield_10016';
+    localStorage.setItem(ES_JIRA_KEY, JSON.stringify({ domain, email, token, jql, fieldId }));
+    var status = document.getElementById('jiraSettingsStatus');
+    if (status) {
+        status.textContent = '✅ Saved';
+        setTimeout(function() { status.textContent = ''; }, 2000);
+    }
+}
+
+function clearJiraSettings() {
+    localStorage.removeItem(ES_JIRA_KEY);
+    ['jiraDomain','jiraEmail','jiraToken','jiraJql'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    var status = document.getElementById('jiraSettingsStatus');
+    if (status) status.textContent = '🗑️ Cleared';
+    setTimeout(function() { if (status) status.textContent = ''; }, 2000);
+}
+
+// ── Card Back Design ──────────────────────────────────────────
+var ES_CARD_BACK_KEY = 'es_cardBack';
+var _cardBackClasses = ['card-back-baize','card-back-space','card-back-retro','card-back-seasonal'];
+var _seasonClasses   = ['season-winter','season-spring','season-summer','season-autumn'];
+
+function getCardBackDesign() {
+    return localStorage.getItem(ES_CARD_BACK_KEY) || 'default';
+}
+
+function setCardBackDesign(design) {
+    localStorage.setItem(ES_CARD_BACK_KEY, design);
+    applyCardBackDesign();
+}
+
+function applyCardBackDesign() {
+    _cardBackClasses.forEach(function(c) { document.body.classList.remove(c); });
+    var design = getCardBackDesign();
+    if (design && design !== 'default') {
+        document.body.classList.add('card-back-' + design);
+    }
+    if (design === 'seasonal') {
+        _seasonClasses.forEach(function(c) { document.body.classList.remove(c); });
+        var m = new Date().getMonth();
+        var season = (m <= 1 || m === 11) ? 'season-winter'
+                   : m <= 4              ? 'season-spring'
+                   : m <= 7              ? 'season-summer'
+                   :                       'season-autumn';
+        document.body.classList.add(season);
+    }
+    var sel = document.getElementById('cardBackSelect');
+    if (sel) sel.value = design;
+}
+
+document.addEventListener('DOMContentLoaded', applyCardBackDesign);
 

@@ -98,7 +98,19 @@ const DEFAULT_CELEBRATION = {
     balloonCount:            10,
     balloonDuration:         6000,
     finisherEnabled:         true,
-    finisherThreshold:       4
+    finisherThreshold:       4,
+    pokerReveal:             true,
+    revealSpeedBadges:       true,
+    revealHotCold:           true,
+    revealVoteDist:          true,
+    revealParticles:         true,
+    revealParticleType:      'star',
+    revealParticleCount:     8,
+    suspenseReveal:          true,
+    suspenseSpeed:           'normal',
+    suspenseOrdering:        true,
+    consensusSupernova:      true,
+    mobileAnimations:        false
 };
 
 function getCelebrationSettings() {
@@ -143,16 +155,16 @@ const SEA_CONFETTI_OVERRIDES = {
     oceanweek:      { colors: ['#0077b6','#0096c7','#00b4d8','#48cae4','#90e0ef'], emojis: ['🐠','🌊','🐙','🦈','🐬'] },
     solstice:       { colors: ['#ffd700','#ff8c00','#ffffe0','#fffff0','#fff8dc'], emojis: ['☀️','✨','🌟','🌞','💛'] },
     mlkday:         { colors: ['#cc0000','#ffffff','#0000cc','#8b0000','#1c4587'], emojis: ['✊','🕊️','🌟','⭐','🙏'] },
-    presidentsday:  { colors: ['#cc0000','#ffffff','#0000cc','#b8860b','#ffd700'], emojis: ['🎩','🇺🇸','⭐','🏛️','🌟'] },
+    presidentsday:  { colors: ['#cc0000','#ffffff','#0000cc','#b8860b','#ffd700'], emojis: ['🎩','🌟','⭐','🏛️','🌟'] },
     motheringsunday:{ colors: ['#ff69b4','#ffd700','#98fb98','#ffb6c1','#ffffff'], emojis: ['💐','🌸','🌼','💛','❤️'] },
     mothersday:     { colors: ['#ff69b4','#ff1493','#ffb6c1','#dc143c','#ff6347'], emojis: ['🌸','💐','💕','🌷','❤️'] },
-    memorialday:    { colors: ['#cc0000','#ffffff','#0000cc','#8b0000','#002868'], emojis: ['🌺','🎖️','⭐','🇺🇸','🕊️'] },
+    memorialday:    { colors: ['#cc0000','#ffffff','#0000cc','#8b0000','#002868'], emojis: ['🌺','🎖️','⭐','🕊️','🕊️'] },
     juneteenth:     { colors: ['#cc0000','#000000','#ffffff','#228b22','#ffd700'], emojis: ['✊','🕊️','⭐','🗽','🎉'] },
     fathersday:     { colors: ['#4169e1','#1e90ff','#0000cd','#ffd700','#87ceeb'], emojis: ['🎈','👔','⭐','🏆','🎉'] },
     laborday:       { colors: ['#cc0000','#ffffff','#0000cc','#ffd700','#ff6347'], emojis: ['🔧','⚙️','💪','🛠️','🔨'] },
     indigenousday:  { colors: ['#8b4513','#228b22','#ffd700','#dc143c','#ffffff'], emojis: ['🪶','🌿','🌎','🦅','⭐'] },
-    veteransday:    { colors: ['#cc0000','#ffffff','#0000cc','#b8860b','#ffd700'], emojis: ['🎖️','⭐','🇺🇸','🕊️','🌟'] },
-    independence:   { colors: ['#cc0000','#ffffff','#0000cc','#ff0000','#002868'], emojis: ['🇺🇸','🎆','🎇','⭐','🦅'] },
+    veteransday:    { colors: ['#cc0000','#ffffff','#0000cc','#b8860b','#ffd700'], emojis: ['🎖️','⭐','🌟','🕊️','🌟'] },
+    independence:   { colors: ['#cc0000','#ffffff','#0000cc','#ff0000','#002868'], emojis: ['🎇','🎆','🎇','⭐','🦅'] },
     tanabata:       { colors: ['#191970','#4169e1','#87ceeb','#ffd700','#ffffff'], emojis: ['🎋','🌠','⭐','🌟','🎐'] },
     bastille:       { colors: ['#002395','#ffffff','#ed2939','#0055a4','#ef4135'], emojis: ['🔵','⚪','🔴','🎆','🗼'] },
     augbankholiday: { colors: ['#87ceeb','#d3d3d3','#90ee90','#ffd700','#ff6347'], emojis: ['🌧️','☀️','🧳','🍺','🌈'] },
@@ -181,6 +193,7 @@ function _getSeasonalOverride() {
 // ============================================================
 function triggerCelebration() {
     const s = getCelebrationSettings();
+    if (typeof _isMobile !== 'undefined' && _isMobile && !s.mobileAnimations) return;
     let effective = s;
     if (s.seasonalTheme) {
         const override = _getSeasonalOverride();
@@ -273,6 +286,15 @@ function triggerFinisher(streak) {
     overlay.onclick = function() { overlay.remove(); };
     document.body.appendChild(overlay);
     setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 4000);
+}
+
+function triggerCardBurst(originX, originY) {
+    if (typeof confetti === 'undefined') return;
+    confetti({
+        particleCount: 18, spread: 55, startVelocity: 28, decay: 0.88,
+        origin: { x: originX, y: originY },
+        colors: ['#ffd700','#ff6b6b','#00ff88','#ffffff','#00cfff']
+    });
 }
 
 // ============================================================
@@ -654,6 +676,20 @@ function populateCelebrationTab() {
     _celSet('cel-lava-color',        'value',   s.lavaColor    || DEFAULT_CELEBRATION.lavaColor);
     var lavaSub = document.getElementById('cel-lava-sub');
     if (lavaSub) lavaSub.style.display = s.lavaEnabled !== false ? '' : 'none';
+    _celSet('cel-poker-reveal',        'checked', s.pokerReveal        !== false);
+    _celSet('cel-suspense-reveal',     'checked', s.suspenseReveal     !== false);
+    _celSet('cel-suspense-speed',      'value',   s.suspenseSpeed      || 'normal');
+    _celSet('cel-suspense-ordering',   'checked', s.suspenseOrdering   !== false);
+    _celSet('cel-consensus-supernova', 'checked', s.consensusSupernova !== false);
+    _celSet('cel-mobile-animations',   'checked', s.mobileAnimations   === true);
+    _celSet('cel-speed-badges',        'checked', s.revealSpeedBadges  !== false);
+    _celSet('cel-hot-cold',            'checked', s.revealHotCold      !== false);
+    _celSet('cel-vote-dist',           'checked', s.revealVoteDist     !== false);
+    _celSet('cel-reveal-particles',     'checked', s.revealParticles    !== false);
+    _celSet('cel-reveal-particle-type', 'value',   s.revealParticleType || 'star');
+    _celSet('cel-reveal-particle-count','value',   s.revealParticleCount || 8);
+    var revPartSub = document.getElementById('cel-reveal-particles-sub');
+    if (revPartSub) revPartSub.style.display = s.revealParticles !== false ? '' : 'none';
 
     _celSet('cel-seasonal-theme',    'checked', s.seasonalTheme !== false);
     _celSet('cel-seasonal-halloween',    'checked', s.seasonalHalloween    !== false);
@@ -740,6 +776,18 @@ function saveCelebrationSettingsFromForm() {
         finisherThreshold:      _celGetInt('cel-finisher-threshold', DEFAULT_CELEBRATION.finisherThreshold),
         lavaEnabled:            _celGet('cel-lava-enabled',         'checked') !== false,
         lavaDuration:           _celGetInt('cel-lava-duration', DEFAULT_CELEBRATION.lavaDuration),
+        pokerReveal:            _celGet('cel-poker-reveal',        'checked') !== false,
+        suspenseReveal:         _celGet('cel-suspense-reveal',     'checked') !== false,
+        suspenseSpeed:          _celGet('cel-suspense-speed',      'value')   || 'normal',
+        suspenseOrdering:       _celGet('cel-suspense-ordering',   'checked') !== false,
+        consensusSupernova:     _celGet('cel-consensus-supernova', 'checked') !== false,
+        mobileAnimations:       _celGet('cel-mobile-animations',  'checked') === true,
+        revealSpeedBadges:      _celGet('cel-speed-badges',   'checked') !== false,
+        revealHotCold:          _celGet('cel-hot-cold',        'checked') !== false,
+        revealVoteDist:         _celGet('cel-vote-dist',        'checked') !== false,
+        revealParticles:        _celGet('cel-reveal-particles', 'checked') !== false,
+        revealParticleType:     _celGet('cel-reveal-particle-type', 'value') || 'star',
+        revealParticleCount:    _celGetInt('cel-reveal-particle-count', 8),
         lavaColor:              _celGet('cel-lava-color', 'value') || DEFAULT_CELEBRATION.lavaColor,
         seasonalTheme:          _celGet('cel-seasonal-theme',    'checked') !== false,
         seasonalHalloween:      _celGet('cel-seasonal-halloween',    'checked') !== false,
@@ -825,6 +873,56 @@ function testFireworks() { stopFireworks(); triggerFireworks(getCelebrationSetti
 function testBalloons()  { stopBalloons();  triggerBalloons(getCelebrationSettings()); }
 function testStreak()    { triggerStreakCelebration(5); }
 
+function previewParticlesAt(el) {
+    if (typeof confetti === 'undefined') return;
+    var s = typeof getCelebrationSettings === 'function' ? getCelebrationSettings() : {};
+    var r = el.getBoundingClientRect();
+    confetti({
+        particleCount: s.revealParticleCount || 8,
+        spread: 50,
+        startVelocity: 18,
+        decay: 0.88,
+        origin: { x: (r.left + r.width / 2) / window.innerWidth, y: (r.top + r.height / 2) / window.innerHeight },
+        shapes: [s.revealParticleType || 'star'],
+        colors: ['#ffd700', '#ff6b6b', '#00ff88', '#ffffff', '#00cfff']
+    });
+}
+
+function testRevealParticles() {
+    var s = getCelebrationSettings();
+    if (typeof confetti === 'undefined') return;
+    confetti({
+        particleCount: s.revealParticleCount || 8,
+        spread: 50,
+        startVelocity: 18,
+        decay: 0.88,
+        origin: { x: 0.5, y: 0.5 },
+        shapes: [s.revealParticleType || 'star'],
+        colors: ['#ffd700', '#ff6b6b', '#00ff88', '#ffffff', '#00cfff']
+    });
+}
+
+function testPokerReveal() {
+    var badges = document.querySelectorAll('.participant-badge[data-connection-id]');
+    if (!badges.length) {
+        var demo = document.createElement('div');
+        demo.className = 'participant-badge voted';
+        demo.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'
+            + 'z-index:2000;font-size:2rem;padding:20px 32px;';
+        demo.innerHTML = '<span class="participant-vote">8</span>';
+        document.body.appendChild(demo);
+        setTimeout(function() { demo.classList.add('poker-flip'); }, 100);
+        setTimeout(function() { demo.remove(); }, 1500);
+        return;
+    }
+    badges.forEach(function(badge, i) {
+        setTimeout(function() {
+            badge.classList.add('poker-flip');
+            setTimeout(function() { badge.classList.remove('poker-flip'); }, 450);
+        }, i * 380);
+    });
+}
+
 function testFloorIsLava() {
     var badge = document.querySelector('[data-connection-id]');
     var fakeId = badge ? (badge.dataset.connectionId || '__test__') : '__test__';
@@ -890,3 +988,57 @@ function _celSetRange(rangeId, labelId, value, suffix) {
     const lbl = document.getElementById(labelId);
     if (lbl) lbl.textContent = value + (suffix || '');
 }
+
+// ============================================================
+// Consensus Supernova
+// ============================================================
+function triggerConsensusSupernova() {
+    var existing = document.getElementById('consensusSupernova');
+    if (existing) existing.remove();
+
+    // Triple confetti burst
+    if (typeof confetti !== 'undefined') {
+        confetti({ particleCount: 180, spread: 120, startVelocity: 50, origin: { x: 0.5, y: 0.6 } });
+        setTimeout(function() {
+            confetti({ particleCount: 100, spread: 160, startVelocity: 35, angle: 60,  origin: { x: 0, y: 0.6 } });
+            confetti({ particleCount: 100, spread: 160, startVelocity: 35, angle: 120, origin: { x: 1, y: 0.6 } });
+        }, 250);
+    }
+
+    var el = document.createElement('div');
+    el.id = 'consensusSupernova';
+    el.innerHTML = '<div class="supernova-text">✨ CONSENSUS ✨</div>';
+    document.body.appendChild(el);
+
+    _playSupernovaSound();
+
+    setTimeout(function() {
+        var txt = el.querySelector('.supernova-text');
+        if (txt) txt.classList.add('supernova-fade-out');
+        setTimeout(function() { el.remove(); }, 500);
+    }, 2200);
+}
+
+function testConsensusSupernova() { triggerConsensusSupernova(); }
+
+function _playSupernovaSound() {
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
+        notes.forEach(function(freq, i) {
+            var osc  = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            var t = ctx.currentTime + i * 0.13;
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.25, t + 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+            osc.start(t);
+            osc.stop(t + 0.7);
+        });
+    } catch(e) {}
+}
+

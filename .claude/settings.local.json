@@ -6,7 +6,20 @@
       "Bash(Select-String -Pattern 'seasonal|celebration|sea-')",
       "Bash(findstr /i \"error\\\\|warning\\\\|succeeded\\\\|failed\")",
       "Bash(findstr /v \"MSB3026\\\\|MSB3027\\\\|MSB3021\\\\|locked\\\\|retry\")",
-      "PowerShell(cd \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\"; dotnet build 2>&1 | Select-String -Pattern \"error|Build succeeded|Build FAILED\" | Where-Object { $_ -notmatch \"MSB302\" })"
+      "PowerShell(cd \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\"; dotnet build 2>&1 | Select-String -Pattern \"error|Build succeeded|Build FAILED\" | Where-Object { $_ -notmatch \"MSB302\" })",
+      "Bash(curl -L --max-time 30 -o \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/audio/rain.mp3\" \"https://cdn.freesound.org/previews/346/346166_5121236-lq.mp3\" -w \"rain: %{http_code} %{size_download} bytes\\\\n\")",
+      "Bash(curl -L --max-time 30 -o \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/audio/cafe.mp3\" \"https://cdn.freesound.org/previews/476/476178_9090977-lq.mp3\" -w \"cafe: %{http_code} %{size_download} bytes\\\\n\")",
+      "Bash(curl -L --max-time 60 -o \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/audio/lofi.mp3\" \"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3\" -w \"lofi: %{http_code} %{size_download} bytes\\\\n\")",
+      "Bash(wait)",
+      "WebFetch(domain:cdn.freesound.org)",
+      "WebFetch(domain:freesound.org)",
+      "Bash(curl -L --max-time 30 -o \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/audio/rain.mp3\" \"https://cdn.freesound.org/previews/321/321176_5121236-lq.mp3\" -w \"rain: %{http_code} %{size_download} bytes\\\\n\")",
+      "Bash(curl -L --max-time 60 -o \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/audio/cafe.mp3\" \"https://cdn.freesound.org/previews/656/656618_12172648-lq.mp3\" -w \"cafe: %{http_code} %{size_download} bytes\\\\n\")",
+      "Bash(curl -L --max-time 30 -o \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/vendor/confetti.min.js\" \"https://cdn.jsdelivr.net/npm/canvas-confetti@1/dist/confetti.browser.min.js\" -w \"confetti: %{http_code} %{size_download} bytes\\\\n\")",
+      "Bash(curl -L --max-time 30 -o \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/vendor/fireworks.umd.js\" \"https://cdn.jsdelivr.net/npm/fireworks-js@2/dist/index.umd.js\" -w \"fireworks: %{http_code} %{size_download} bytes\\\\n\")",
+      "Bash(Select-String -Path \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\\\\js\\\\room.js\" -Pattern \"^function \")",
+      "Bash(Select-Object -Last 20)",
+      "Bash(grep -n \"^function \" /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/room.js | tail -20)"
     ]
   }
 }

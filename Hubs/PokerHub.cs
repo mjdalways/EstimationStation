@@ -7,10 +7,12 @@ namespace EstimationStation.Hubs;
 public class PokerHub : Hub
 {
     private readonly RoomService _roomService;
+    private readonly JiraService _jiraService;
 
-    public PokerHub(RoomService roomService)
+    public PokerHub(RoomService roomService, JiraService jiraService)
     {
         _roomService = roomService;
+        _jiraService = jiraService;
     }
 
     public override async Task OnConnectedAsync()
@@ -24,9 +26,17 @@ public class PokerHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task JoinRoom(string roomName, string userName, bool isObserver)
+    public async Task JoinRoom(string roomName, string userName, bool isObserver, string? pin = null)
     {
         var room = _roomService.GetOrCreateRoom(roomName);
+
+        // PIN check — skip for the very first joiner (they set the PIN after joining)
+        if (room.Participants.Count > 0 && room.Pin != null && room.Pin != pin)
+        {
+            await Clients.Caller.SendAsync("Error", "PIN_REQUIRED");
+            return;
+        }
+
         _roomService.MapConnection(Context.ConnectionId, roomName);
 
         var participant = new Participant
@@ -46,6 +56,7 @@ public class PokerHub : Hub
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
+        _roomService.SaveRoom(room);
 
         // Send full state to the joining participant
         await Clients.Caller.SendAsync("RoomState", BuildRoomState(room));
@@ -105,6 +116,7 @@ public class PokerHub : Hub
                 participant.Name = newName;
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("NameUpdated", Context.ConnectionId, newName);
     }
 
@@ -131,6 +143,7 @@ public class PokerHub : Hub
         }
 
         // Broadcast whether this participant now has a vote (false when they unselected)
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("VoteCast", Context.ConnectionId, vote != null);
 
         if (shouldAutoReveal)
@@ -157,6 +170,7 @@ public class PokerHub : Hub
             room.ShameParticipantId = FindShameParticipantId(room);
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("VotesRevealed", votes, stats);
     }
 
@@ -173,6 +187,7 @@ public class PokerHub : Hub
             room.VotesRevealed = false;
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("VotesHidden");
     }
 
@@ -190,12 +205,14 @@ public class PokerHub : Hub
             {
                 p.Vote = null;
                 p.IsGhost = false;
+                p.Confidence = null;
             }
             room.VotesRevealed = false;
             room.ShameParticipantId = null;
             room.Vibes.Clear();
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("VotesReset");
         await Clients.Group(roomName).SendAsync("VibeUpdated", new Dictionary<string, int>());
     }
@@ -212,7 +229,23 @@ public class PokerHub : Hub
             room.GhostModeEnabled = enabled;
             togglerName = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name ?? "Someone";
         }
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("GhostModeToggled", enabled, togglerName);
+    }
+
+    public async Task SetRoomPin(string? pin)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        lock (room)
+        {
+            room.Pin = string.IsNullOrWhiteSpace(pin) ? null : pin.Trim();
+            room.LastActivity = DateTime.UtcNow;
+        }
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("RoomPinSet", room.Pin != null);
     }
 
     public async Task CastCounterSpell()
@@ -254,6 +287,7 @@ public class PokerHub : Hub
                 .ToDictionary(g => g.Key, g => g.Count());
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("VibeUpdated", counts);
     }
 
@@ -272,6 +306,7 @@ public class PokerHub : Hub
             room.LastActivity = DateTime.UtcNow;
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("StoryAdded", new
         {
             id = story.Id,
@@ -296,7 +331,29 @@ public class PokerHub : Hub
             if (story != null) story.Title = title;
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("StoryUpdated", storyId, title);
+    }
+
+    public async Task UpdateStoryNotes(string storyId, string? notes)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        if (notes != null && notes.Length > 2000)
+            notes = notes[..2000];
+
+        lock (room)
+        {
+            var story = room.Stories.FirstOrDefault(s => s.Id == storyId);
+            if (story != null) story.Notes = notes;
+        }
+
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("StoryNotesUpdated", storyId, notes);
     }
 
     public async Task SetCurrentStory(string storyId)
@@ -316,6 +373,7 @@ public class PokerHub : Hub
             room.VotesRevealed = false;
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("CurrentStoryChanged", storyId);
         await Clients.Group(roomName).SendAsync("VotesReset");
     }
@@ -335,6 +393,7 @@ public class PokerHub : Hub
                 room.CurrentStoryId = null;
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("StoryDeleted", storyId);
     }
 
@@ -351,6 +410,7 @@ public class PokerHub : Hub
             room.AutoReveal = enabled;
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("AutoRevealToggled", enabled);
     }
 
@@ -381,6 +441,7 @@ public class PokerHub : Hub
             }
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("EstimateSetChanged", setName, values);
     }
 
@@ -450,6 +511,7 @@ public class PokerHub : Hub
             }
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("StoryCompleted", storyId, estimate);
     }
 
@@ -474,7 +536,149 @@ public class PokerHub : Hub
             participant.AvatarData = avatarData;
         }
 
+        _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("AvatarUpdated", Context.ConnectionId, avatarData);
+    }
+
+    public async Task CastConfidence(int level)
+    {
+        if (level < 1 || level > 5) return;
+
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        lock (room)
+        {
+            var participant = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+            if (participant == null) return;
+            participant.Confidence = level;
+        }
+
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("ConfidenceCast", Context.ConnectionId, level);
+    }
+
+    public async Task TriggerSound(string soundId)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+
+        var valid = new[] { "fanfare", "drumroll", "bell", "airhorn" };
+        if (!valid.Contains(soundId)) return;
+
+        var room = _roomService.GetRoom(roomName);
+        var senderName = room?.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name ?? "Someone";
+
+        await Clients.Group(roomName).SendAsync("SoundTriggered", soundId, senderName);
+    }
+
+    public async Task ImportFromJira(string domain, string email, string token, string jql)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        if (string.IsNullOrWhiteSpace(domain) || string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(jql)) return;
+
+        // Strip protocol if user pasted a full URL
+        domain = domain.Replace("https://", "").Replace("http://", "").TrimEnd('/');
+        if (!domain.Contains(".atlassian.net"))
+        {
+            await Clients.Caller.SendAsync("Error", "Jira domain must end in .atlassian.net");
+            return;
+        }
+
+        List<JiraIssue> issues;
+        try
+        {
+            issues = await _jiraService.FetchIssuesAsync(domain, email, token, jql);
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", $"Jira import failed: {ex.Message}");
+            return;
+        }
+
+        var stories = new List<Story>();
+        lock (room)
+        {
+            foreach (var issue in issues)
+            {
+                var story = new Story
+                {
+                    Title = $"[{issue.Key}] {issue.Summary}",
+                    JiraKey = issue.Key,
+                    JiraUrl = issue.Url,
+                    Description = issue.Description,
+                    IssueType = issue.IssueType
+                };
+                room.Stories.Add(story);
+                stories.Add(story);
+            }
+            room.LastActivity = DateTime.UtcNow;
+        }
+
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("StoriesImported", stories.Select(s => new
+        {
+            id = s.Id,
+            title = s.Title,
+            isCompleted = s.IsCompleted,
+            finalEstimate = s.FinalEstimate,
+            createdAt = s.CreatedAt,
+            jiraKey = s.JiraKey,
+            jiraUrl = s.JiraUrl,
+            description = s.Description,
+            issueType = s.IssueType
+        }));
+    }
+
+    public async Task TriggerCustomSound(string base64Data, string label)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        if (string.IsNullOrEmpty(base64Data) || base64Data.Length > 700_000) return;
+
+        var room = _roomService.GetRoom(roomName);
+        var senderName = room?.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name ?? "Someone";
+        var safeLabel = string.IsNullOrWhiteSpace(label) ? "Custom" : label[..Math.Min(label.Length, 30)];
+
+        await Clients.Group(roomName).SendAsync("CustomSoundTriggered", base64Data, senderName, safeLabel);
+    }
+
+    public async Task WriteJiraEstimate(string domain, string email, string token,
+        string jiraKey, string estimate, string fieldId = "customfield_10016")
+    {
+        if (string.IsNullOrWhiteSpace(jiraKey) || string.IsNullOrWhiteSpace(estimate)) return;
+
+        if (!double.TryParse(estimate, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out double numericEstimate))
+        {
+            return;
+        }
+
+        domain = domain.Replace("https://", "").Replace("http://", "").TrimEnd('/');
+        if (!domain.EndsWith(".atlassian.net", StringComparison.OrdinalIgnoreCase))
+        {
+            await Clients.Caller.SendAsync("JiraWriteResult", jiraKey, false, "Invalid domain");
+            return;
+        }
+
+        try
+        {
+            await _jiraService.WriteEstimateAsync(domain, email, token, jiraKey, numericEstimate, fieldId);
+            await Clients.Caller.SendAsync("JiraWriteResult", jiraKey, true, null);
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("JiraWriteResult", jiraKey, false, ex.Message);
+        }
     }
 
     private static string? FindShameParticipantId(Room room)
@@ -528,6 +732,7 @@ public class PokerHub : Hub
             autoReveal = room.AutoReveal,
             votesRevealed = room.VotesRevealed,
             ghostModeEnabled = room.GhostModeEnabled,
+            hasPin = room.Pin != null,
             currentStoryId = room.CurrentStoryId,
             estimateSet = room.EstimateSet,
             estimateValues,
@@ -541,7 +746,8 @@ public class PokerHub : Hub
                 counterUsed = p.CounterUsed,
                 hasVoted = p.Vote != null,
                 vote = room.VotesRevealed ? p.Vote : null,
-                avatarData = p.AvatarData
+                avatarData = p.AvatarData,
+                confidence = room.VotesRevealed ? p.Confidence : null
             }),
             stories = room.Stories.Select(s => new
             {
@@ -549,7 +755,12 @@ public class PokerHub : Hub
                 title = s.Title,
                 isCompleted = s.IsCompleted,
                 finalEstimate = s.FinalEstimate,
-                createdAt = s.CreatedAt
+                createdAt = s.CreatedAt,
+                jiraKey = s.JiraKey,
+                jiraUrl = s.JiraUrl,
+                description = s.Description,
+                notes = s.Notes,
+                issueType = s.IssueType
             })
         };
     }

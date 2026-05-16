@@ -1,0 +1,41 @@
+[data-theme="crt"] {
+    --bg-primary:          #0a0f0a;
+    --bg-secondary:        #0d150d;
+    --panel-bg:            #0d150d;
+    --panel-border:        #1a3a1a;
+    --text-primary:        #33ff33;
+    --text-secondary:      #228b22;
+    --accent-color:        #00ff41;
+    --accent-hover:        #33ff33;
+    --navbar-bg:           #060c06;
+    --navbar-text:         #33ff33;
+    --card-bg:             #0d150d;
+    --card-border:         #1a3a1a;
+    --card-hover:          #1a2e1a;
+    --card-selected-bg:    #003300;
+    --card-selected-border:#00ff41;
+    --stats-bg:            #060c06;
+    --badge-bg:            #0d150d;
+    --btn-primary-bg:      #00cc33;
+    --btn-primary-text:    #000;
+    --shadow:              0 0 8px rgba(0,255,65,0.3);
+    --border-radius:       2px;
+    font-family: 'Courier New', Courier, monospace !important;
+}
+
+[data-theme="crt"]::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent, transparent 2px,
+        rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 99998;
+}
+
+[data-theme="crt"] * { text-shadow: 0 0 4px currentColor; }
+
+[data-theme="crt"] .participant-badge,
+[data-theme="crt"] .card-btn { border-color: #1a3a1a !important; }

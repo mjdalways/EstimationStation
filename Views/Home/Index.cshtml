@@ -5,7 +5,8 @@
 
 <div class="lobby-container">
     <div class="lobby-card">
-        <div class="lobby-header">
+        <div class="lobby-header" style="position:relative;">
+            <button class="btn btn-sm btn-outline-secondary" style="position:absolute;top:0;right:0;" onclick="openSettingsModal()" title="Settings">⚙️</button>
             <h1 class="lobby-title">🃏 EstimationStation</h1>
             <p class="lobby-subtitle">Collaborative Planning Poker for your team</p>
             @if (!string.IsNullOrWhiteSpace(inviteRoom))

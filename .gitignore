@@ -48,3 +48,6 @@ desktop.ini
 
 # Test results
 TestResults/
+
+# Room persistence storage
+/rooms/

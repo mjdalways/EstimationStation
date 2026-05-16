@@ -16,6 +16,11 @@ let _counterSpellOutlierId = null;
 const VIBE_EMOJIS = ['🚀','😱','😴','🤔','💪','🤷'];
 let _roundVoteOrder  = [];                // connectionIds in order votes were cast this round
 let _roundFlipCounts = {};                // connectionId → number of vote changes this round
+let _pendingRoomName = null;              // PIN: used when re-joining after PIN_REQUIRED
+let _pendingUserName = null;
+var _isMobile = window.innerWidth <= 600;
+window.addEventListener('resize', function() { _isMobile = window.innerWidth <= 600; });
+let _pendingIsObserver = false;
 let _roundStartMs    = Date.now();        // reset on VotesReset, used for relative timestamps
 let roomState = {
     participants: [],
@@ -42,7 +47,8 @@ async function initSignalR() {
     try {
         await connection.start();
         myConnectionId = connection.connectionId;
-        await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver);
+        const _savedPin = sessionStorage.getItem('es_roomPin_' + ROOM_CONFIG.roomName) || null;
+        await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver, _savedPin);
         if (typeof initVoiceRecognition === 'function') initVoiceRecognition();
     } catch (err) {
         console.error('SignalR connection failed:', err);
@@ -71,11 +77,18 @@ function registerHandlers() {
             if (state.customEstimates) document.getElementById('customEstimatesInput').value = state.customEstimates;
         }
 
+        // Sync PIN badge
+        const _pinBadge = document.getElementById('pinBadge');
+        if (_pinBadge) _pinBadge.style.display = state.hasPin ? '' : 'none';
+        const _pinBtn = document.getElementById('pinBtn');
+        if (_pinBtn) _pinBtn.classList.toggle('btn-warning', !!state.hasPin);
+
         renderCards();
         renderParticipants();
         renderStories();
         updateCurrentStoryDisplay();
         _updateGhostToggleBtn();
+        _updateSprintDashboard();
 
         if (state.votesRevealed) {
             const votes = {};
@@ -112,6 +125,7 @@ function registerHandlers() {
     connection.on('VoteCast', (connectionId, hasVoted) => {
         const p = roomState.participants.find(p => p.connectionId === connectionId);
         if (p) {
+            const wasVoted = p.hasVoted;
             if (hasVoted) {
                 if (p.hasVoted) {
                     // already voted — this is a flip
@@ -122,19 +136,42 @@ function registerHandlers() {
             }
             p.hasVoted = hasVoted;
             renderParticipants();
+            if (connectionId === connection.connectionId) {
+                const sel = document.getElementById('confidenceSelector');
+                if (sel) sel.style.display = hasVoted ? 'block' : 'none';
+            }
+            if (hasVoted && !wasVoted && typeof triggerCardBurst === 'function') {
+                const badge = document.querySelector('[data-connection-id="' + connectionId + '"]');
+                if (badge) {
+                    const r = badge.getBoundingClientRect();
+                    triggerCardBurst((r.left + r.width / 2) / window.innerWidth,
+                                    (r.top  + r.height / 2) / window.innerHeight);
+                }
+            }
         }
     });
 
     connection.on('VotesRevealed', (votes, stats) => {
         roomState.votesRevealed = true;
+        if (typeof stopTimerAudio === 'function') stopTimerAudio();
         const vibePanel = document.getElementById('vibeCheckPanel');
         if (vibePanel) vibePanel.style.display = 'none';
+        const confSel = document.getElementById('confidenceSelector');
+        if (confSel) confSel.style.display = 'none';
         roomState.participants.forEach(p => {
             if (votes[p.connectionId] !== undefined) p.vote = votes[p.connectionId];
         });
         document.getElementById('revealBtn').style.display = 'none';
         document.getElementById('hideBtn').style.display = 'block';
-        renderParticipants();
+        const _revealContainer = document.getElementById('participantsContainer');
+        const _usePokerReveal = typeof getCelebrationSettings === 'function' && getCelebrationSettings().pokerReveal !== false;
+        if (_usePokerReveal) {
+            _sequentialReveal(votes, stats);
+        } else {
+            if (_revealContainer) _revealContainer.classList.add('revealing');
+            renderParticipants();
+            setTimeout(() => { if (_revealContainer) _revealContainer.classList.remove('revealing'); }, 600);
+        }
         if (stats) { if (stats.isConsensus) { _esConsensusStreak++; } else { _esConsensusStreak = 0; } }
         showStats(votes, stats, true);
         if (stats && stats.isConsensus && _esConsensusStreak >= 3 && typeof triggerStreakCelebration === 'function') {
@@ -169,6 +206,7 @@ function registerHandlers() {
             flipCounts: Object.assign({}, _roundFlipCounts)
         });
         renderVoteHistory();
+        if (typeof saveVelocityForSession === 'function') saveVelocityForSession();
     });
 
     connection.on('VotesHidden', () => {
@@ -189,7 +227,9 @@ function registerHandlers() {
         _hideCounterSpellButton();
         if (typeof stopFloorIsLava === 'function') stopFloorIsLava();
         if (typeof stopDiscussionTimer === 'function') stopDiscussionTimer();
-        roomState.participants.forEach(p => { p.vote = null; p.hasVoted = false; p.isGhost = false; });
+        roomState.participants.forEach(p => { p.vote = null; p.hasVoted = false; p.isGhost = false; p.confidence = null; });
+        const confSel = document.getElementById('confidenceSelector');
+        if (confSel) { confSel.style.display = 'none'; _updateConfidenceUI(0); }
         document.getElementById('revealBtn').style.display = 'block';
         document.getElementById('hideBtn').style.display = 'none';
         document.getElementById('statsBar').style.display = 'none';
@@ -221,9 +261,33 @@ function registerHandlers() {
         renderStories();
     });
 
+    connection.on('StoriesImported', (stories) => {
+        stories.forEach(s => roomState.stories.push(s));
+        renderStories();
+        const status = document.getElementById('jiraImportStatus');
+        if (status) {
+            status.textContent = `✅ Imported ${stories.length} stor${stories.length === 1 ? 'y' : 'ies'}`;
+            setTimeout(() => { status.textContent = ''; }, 3000);
+        }
+    });
+
+    connection.on('JiraWriteResult', (jiraKey, success, error) => {
+        var iconEl = document.getElementById('jira-wb-' + jiraKey);
+        if (iconEl) {
+            iconEl.textContent = success ? '✅' : '❌';
+            iconEl.title = success ? 'Written to Jira' : ('Write failed: ' + (error || 'unknown'));
+            setTimeout(function() { if (iconEl) iconEl.textContent = ''; }, 8000);
+        }
+    });
+
     connection.on('StoryUpdated', (storyId, title) => {
         const s = roomState.stories.find(s => s.id === storyId);
         if (s) { s.title = title; renderStories(); updateCurrentStoryDisplay(); }
+    });
+
+    connection.on('StoryNotesUpdated', (storyId, notes) => {
+        const s = roomState.stories.find(s => s.id === storyId);
+        if (s) { s.notes = notes; renderStories(); _updateCurrentStoryNote(); }
     });
 
     connection.on('CurrentStoryChanged', (storyId) => {
@@ -244,6 +308,11 @@ function registerHandlers() {
     connection.on('StoryCompleted', (storyId, estimate) => {
         const s = roomState.stories.find(s => s.id === storyId);
         if (s) { s.isCompleted = true; s.finalEstimate = estimate; renderStories(); }
+        _updateSprintDashboard();
+        // If all stories are now complete, save this session's velocity
+        const allDone = roomState.stories.length > 0
+            && roomState.stories.every(function(st) { return st.isCompleted; });
+        if (allDone && typeof saveSessionSummary === 'function') saveSessionSummary();
     });
 
     connection.on('AutoRevealToggled', (enabled) => {
@@ -267,10 +336,18 @@ function registerHandlers() {
     connection.on('TimerStarted', (seconds, startedBy) => {
         startLocalTimer(seconds);
         appendChat('System', `${startedBy} started a ${seconds}s timer`, null);
+        // Start audio immediately if timer is at or below trigger point
+        if (typeof getTimerAudioSettings === 'function') {
+            const _ta = getTimerAudioSettings();
+            if (seconds <= (_ta.triggerAt || 10) && typeof startTimerAudio === 'function') {
+                startTimerAudio(seconds);
+            }
+        }
     });
 
     connection.on('TimerStopped', () => {
         stopLocalTimer();
+        if (typeof stopTimerAudio === 'function') stopTimerAudio();
     });
 
     connection.on('AvatarUpdated', (connectionId, avatarData) => {
@@ -279,9 +356,48 @@ function registerHandlers() {
     });
 
     connection.on('VibeUpdated', (counts) => { renderVibeDisplay(counts); });
+    connection.on('SoundTriggered', (soundId, senderName) => {
+        const sr = _getSoundReceiveSettings();
+        if (sr.receive !== false) {
+            _playSoundLocal(soundId);
+        } else if (sr.subtitle !== false) {
+            _showSoundSubtitle(soundId, senderName || 'Someone');
+        }
+    });
+    connection.on('CustomSoundTriggered', (base64Data, senderName, label) => {
+        const sr = _getSoundReceiveSettings();
+        if (sr.receive !== false) {
+            try { new Audio(base64Data).play().catch(() => {}); } catch(e) {}
+        } else if (sr.subtitle !== false) {
+            _showSoundSubtitle('custom:' + (label || 'Custom'), senderName || 'Someone');
+        }
+    });
+    connection.on('ConfidenceCast', (connectionId, level) => {
+        const p = roomState.participants.find(p => p.connectionId === connectionId);
+        if (p) { p.confidence = level; renderParticipants(); }
+    });
 
     connection.onreconnected(() => {
-        connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver);
+        const _rPin = sessionStorage.getItem('es_roomPin_' + ROOM_CONFIG.roomName) || null;
+        connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver, _rPin);
+    });
+
+    connection.on('Error', (msg) => {
+        if (msg === 'PIN_REQUIRED') {
+            _pendingRoomName = ROOM_CONFIG.roomName;
+            _pendingUserName = ROOM_CONFIG.playerName;
+            _pendingIsObserver = isObserver;
+            openPinModal(true);
+            return;
+        }
+        console.error('Server error:', msg);
+    });
+
+    connection.on('RoomPinSet', (hasPin) => {
+        const badge = document.getElementById('pinBadge');
+        if (badge) badge.style.display = hasPin ? '' : 'none';
+        const btn = document.getElementById('pinBtn');
+        if (btn) btn.classList.toggle('btn-warning', hasPin);
     });
 }
 
@@ -318,6 +434,7 @@ function renderParticipants() {
             (p.isObserver ? ' observer' : '') +
             (p.isGhost ? ' ghost' : '') +
             (isMe ? ' me' : '');
+        if (_esConsensusStreak >= 3) div.classList.add('streak-active');
         div.dataset.connectionId = p.connectionId;
 
         let voteDisplay = '';
@@ -348,6 +465,33 @@ function renderParticipants() {
         }
 
         container.appendChild(div);
+
+        if (roomState.votesRevealed && _roundVoteOrder.length > 0
+                && (typeof getCelebrationSettings !== 'function' || getCelebrationSettings().revealSpeedBadges !== false)) {
+            const firstId = _roundVoteOrder[0];
+            const lastId  = _roundVoteOrder[_roundVoteOrder.length - 1];
+            if (p.connectionId === firstId) {
+                const speedBadge = document.createElement('span');
+                speedBadge.className = 'speed-badge speed-first';
+                speedBadge.textContent = '⚡';
+                speedBadge.title = 'First to vote';
+                div.appendChild(speedBadge);
+            } else if (p.connectionId === lastId && _roundVoteOrder.length > 1) {
+                const speedBadge = document.createElement('span');
+                speedBadge.className = 'speed-badge speed-last';
+                speedBadge.textContent = '🐢';
+                speedBadge.title = 'Last to vote';
+                div.appendChild(speedBadge);
+            }
+        }
+
+        if (roomState.votesRevealed && p.confidence) {
+            const confEl = document.createElement('span');
+            confEl.className = 'confidence-stars';
+            confEl.title = 'Confidence: ' + p.confidence + '/5';
+            confEl.textContent = '★'.repeat(p.confidence) + '☆'.repeat(5 - p.confidence);
+            div.appendChild(confEl);
+        }
     });
 }
 
@@ -360,16 +504,96 @@ function renderStories() {
             (s.id === roomState.currentStoryId ? ' active' : '') +
             (s.isCompleted ? ' completed' : '');
 
+        const _typeMap = {
+            'Story':    { color: '#0052cc', bg: '#deebff' }, 'Bug':  { color: '#bf2600', bg: '#ffebe6' },
+            'Task':     { color: '#344563', bg: '#ebecf0' }, 'Spike':{ color: '#5243aa', bg: '#eae6ff' },
+            'Sub-task': { color: '#0052cc', bg: '#e3fcef' }, 'Epic': { color: '#6554c0', bg: '#eae6ff' }
+        };
+        const _ti = s.issueType && _typeMap[s.issueType];
+        const typeChip = s.issueType
+            ? `<span class="jira-type-chip" style="background:${_ti ? _ti.bg : '#ebecf0'};color:${_ti ? _ti.color : '#344563'};">${escHtml(s.issueType)}</span>`
+            : '';
+        const jiraBadge = s.jiraKey
+            ? `${typeChip}<a class="jira-key-badge" href="${escHtml(s.jiraUrl || '#')}" target="_blank" rel="noopener"
+                  title="Open in Jira">${escHtml(s.jiraKey)} ↗</a><span id="jira-wb-${escHtml(s.jiraKey)}" class="jira-wb-icon" title="Write estimate to Jira"></span>`
+            : '';
+        const _descTooltip = s.description
+            ? ` title="${escHtml(s.description.substring(0, 200).replace(/\n/g, ' '))}"`
+            : '';
+        const displayTitle = s.jiraKey
+            ? escHtml(s.title.replace(`[${s.jiraKey}] `, ''))
+            : escHtml(s.title);
+        const hasNote = s.notes && s.notes.trim().length > 0;
+        const noteBtnClass = hasNote ? 'btn-warning' : 'btn-outline-secondary';
         div.innerHTML = `
-            <span class="story-item-title" title="${escHtml(s.title)}">${escHtml(s.title)}</span>
+            <span class="story-item-title"${_descTooltip || ` title="${escHtml(s.title)}"`}>${jiraBadge}${displayTitle}</span>
             ${s.isCompleted ? `<span class="story-item-estimate">${escHtml(s.finalEstimate || '')}</span>` : ''}
             <div class="story-item-actions">
+                <button class="btn btn-xs btn-sm ${noteBtnClass} story-note-btn py-0 px-1" style="font-size:0.7rem;" onclick="_toggleStoryNote('${s.id}')" title="${hasNote ? 'Edit note' : 'Add note'}">📝</button>
                 ${!s.isCompleted ? `<button class="btn btn-xs btn-sm btn-outline-primary py-0 px-1" style="font-size:0.7rem;" onclick="setCurrentStory('${s.id}')">▶</button>` : ''}
                 <button class="btn btn-xs btn-sm btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteStory('${s.id}')">✕</button>
+            </div>
+            ${hasNote ? `<div class="story-notes-preview">${escHtml(s.notes.substring(0, 80))}${s.notes.length > 80 ? '…' : ''}</div>` : ''}
+            <div class="story-notes-area" id="noteArea_${s.id}" style="display:none;">
+                <textarea class="form-control form-control-sm" rows="3" placeholder="Add notes for this story…" onblur="updateStoryNotes('${s.id}', this.value)">${escHtml(s.notes || '')}</textarea>
             </div>
         `;
         list.appendChild(div);
     });
+    _updateSprintDashboard();
+}
+
+function _updateSprintDashboard() {
+    var dash = document.getElementById('sprintDashboard');
+    if (!dash) return;
+    var completed = (roomState.stories || []).filter(function(s) { return s.isCompleted && s.finalEstimate; });
+    var numeric = completed.map(function(s) { return parseFloat(s.finalEstimate); }).filter(function(v) { return !isNaN(v); });
+    dash.style.display = completed.length > 0 ? '' : 'none';
+
+    var totalEl = document.getElementById('sprintTotal');
+    if (totalEl) totalEl.textContent = numeric.reduce(function(a,b){return a+b;}, 0) + ' pts';
+
+    var spark = document.getElementById('sprintSparkline');
+    if (spark) {
+        if (numeric.length >= 2) {
+            var max = Math.max.apply(null, numeric);
+            var w = spark.offsetWidth || 160;
+            var h = 28;
+            var step = w / Math.max(numeric.length - 1, 1);
+            var pts = numeric.map(function(v,i) {
+                return (i * step).toFixed(1) + ',' + (h - 2 - (max > 0 ? (v / max) * (h - 6) : 0)).toFixed(1);
+            }).join(' ');
+            var dots = numeric.map(function(v,i) {
+                var cx = (i * step).toFixed(1);
+                var cy = (h - 2 - (max > 0 ? (v / max) * (h - 6) : 0)).toFixed(1);
+                return '<circle cx="' + cx + '" cy="' + cy + '" r="3" fill="var(--accent,#0d6efd)"/>';
+            }).join('');
+            spark.innerHTML = '<svg width="100%" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">'
+                + '<polyline points="' + pts + '" fill="none" stroke="var(--accent,#0d6efd)" stroke-width="1.8"/>'
+                + dots + '</svg>';
+        } else {
+            spark.innerHTML = '';
+        }
+    }
+
+    var hist = typeof _getVelocityHistory === 'function' ? _getVelocityHistory() : [];
+    var velWrap = document.getElementById('sprintVelocityWrap');
+    var velChart = document.getElementById('sprintVelocityChart');
+    if (velWrap && velChart && hist.length >= 2) {
+        velWrap.style.display = '';
+        var max2 = Math.max.apply(null, hist.map(function(entry){return entry.pts;}));
+        var w2 = velChart.offsetWidth || 160;
+        var h2 = 22;
+        var step2 = w2 / Math.max(hist.length - 1, 1);
+        var pts2 = hist.map(function(entry, i) {
+            return (i * step2).toFixed(1) + ',' + (h2 - 2 - (max2 > 0 ? (entry.pts / max2) * (h2 - 4) : 0)).toFixed(1);
+        }).join(' ');
+        velChart.innerHTML = '<svg width="100%" height="' + h2 + '" viewBox="0 0 ' + w2 + ' ' + h2 + '" preserveAspectRatio="none">'
+            + '<polyline points="' + pts2 + '" fill="none" stroke="var(--text-secondary,#888)" stroke-width="1.4" stroke-dasharray="3,2"/>'
+            + '</svg>';
+    } else if (velWrap) {
+        velWrap.style.display = 'none';
+    }
 }
 
 function updateCurrentStoryDisplay() {
@@ -377,14 +601,134 @@ function updateCurrentStoryDisplay() {
     if (roomState.currentStoryId) {
         const story = roomState.stories.find(s => s.id === roomState.currentStoryId);
         el.textContent = story ? story.title : 'No story selected';
+        if (story) {
+            const prefix = story.jiraKey ? story.jiraKey + ' — ' : '';
+            const title = (story.title || '').replace(/^\[.*?\]\s*/, '').substring(0, 45);
+            document.title = prefix + title + ' | EstimationStation';
+        }
     } else {
         el.textContent = 'No story selected';
+        document.title = 'EstimationStation';
+    }
+    _updateCurrentStoryNote();
+}
+
+function _updateCurrentStoryNote() {
+    const banner = document.getElementById('currentStoryNote');
+    if (!banner) return;
+    if (roomState.currentStoryId) {
+        const story = roomState.stories.find(s => s.id === roomState.currentStoryId);
+        if (story && story.notes && story.notes.trim()) {
+            banner.textContent = '📝 ' + story.notes.trim();
+            banner.style.display = '';
+            return;
+        }
+    }
+    banner.style.display = 'none';
+}
+
+function _toggleStoryNote(storyId) {
+    const area = document.getElementById('noteArea_' + storyId);
+    if (!area) return;
+    const isOpen = area.style.display !== 'none';
+    area.style.display = isOpen ? 'none' : '';
+    if (!isOpen) {
+        const ta = area.querySelector('textarea');
+        if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
     }
 }
+
+function updateStoryNotes(storyId, notes) {
+    const story = (roomState.stories || []).find(s => s.id === storyId);
+    if (story) story.notes = notes;
+    if (connection && connection.state === 'Connected') {
+        connection.invoke('UpdateStoryNotes', storyId, notes || null).catch(console.error);
+    }
+}
+
+async function acceptEstimate() {
+    if (!roomState.currentStoryId) return;
+    var overrideInput = document.getElementById('acceptEstimateInput');
+    var override = overrideInput ? overrideInput.value.trim() : '';
+    var avgEl = document.getElementById('statAverage');
+    var estimate = override || (avgEl ? avgEl.textContent : '') || '';
+    if (!estimate || estimate === '-') return;
+
+    try {
+        await connection.invoke('CompleteStory', roomState.currentStoryId, estimate);
+    } catch(e) { console.error(e); return; }
+
+    // Attempt Jira write-back if this story has a jiraKey
+    const story = (roomState.stories || []).find(s => s.id === roomState.currentStoryId);
+    if (story && story.jiraKey) {
+        var jiraS = typeof getJiraSettings === 'function' ? getJiraSettings() : {};
+        if (jiraS.domain && jiraS.email && jiraS.token) {
+            connection.invoke('WriteJiraEstimate',
+                jiraS.domain, jiraS.email, jiraS.token,
+                story.jiraKey, estimate,
+                jiraS.fieldId || 'customfield_10016'
+            ).catch(console.error);
+        }
+    }
+}
+
+function togglePresentationMode() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(function() {});
+        document.body.classList.add('presentation-mode');
+    } else {
+        document.exitFullscreen().catch(function() {});
+        document.body.classList.remove('presentation-mode');
+    }
+}
+document.addEventListener('fullscreenchange', function() {
+    if (!document.fullscreenElement) document.body.classList.remove('presentation-mode');
+});
+
+function _openStoriesSheet() {
+    var panel = document.getElementById('storiesPanel');
+    var backdrop = document.getElementById('storiesPanelBackdrop');
+    if (panel) panel.classList.add('mobile-visible');
+    if (backdrop) backdrop.classList.add('visible');
+}
+function _closeStoriesSheet() {
+    var panel = document.getElementById('storiesPanel');
+    var backdrop = document.getElementById('storiesPanelBackdrop');
+    if (panel) panel.classList.remove('mobile-visible');
+    if (backdrop) backdrop.classList.remove('visible');
+}
+
+(function() {
+    var backdrop = document.getElementById('storiesPanelBackdrop');
+    if (backdrop) backdrop.addEventListener('click', _closeStoriesSheet);
+})();
+
+(function() {
+    var jiraDetails = document.getElementById('jiraImportDetails');
+    if (jiraDetails) {
+        jiraDetails.addEventListener('toggle', function() {
+            if (jiraDetails.open) {
+                var saved = typeof getJiraSettings === 'function' ? getJiraSettings() : {};
+                var jqlEl = document.getElementById('jiraImportJql');
+                if (jqlEl && !jqlEl.value && saved.jql) jqlEl.value = saved.jql;
+            }
+        });
+    }
+})();
 
 function showStats(votes, stats, fresh = false) {
     const bar = document.getElementById('statsBar');
     bar.style.display = 'flex';
+
+    // Populate accept button value
+    const acceptVal = document.getElementById('acceptEstimateValue');
+    const acceptInput = document.getElementById('acceptEstimateInput');
+    if (acceptVal && stats && stats.average !== null) {
+        acceptVal.textContent = '(' + stats.average + ')';
+    } else if (acceptVal) {
+        acceptVal.textContent = '';
+    }
+    if (acceptInput) acceptInput.value = '';
 
     if (stats) {
         document.getElementById('statAverage').textContent = stats.average !== null ? stats.average : '-';
@@ -414,6 +758,48 @@ function showStats(votes, stats, fresh = false) {
             }
         }
     }
+    _renderVoteDistribution(votes);
+    _renderHotColdMeter();
+}
+
+function _renderVoteDistribution(votes) {
+    const el = document.getElementById('voteDistBar');
+    if (!el) return;
+    if (typeof getCelebrationSettings === 'function' && getCelebrationSettings().revealVoteDist === false) { el.style.display = 'none'; return; }
+    const counts = {};
+    Object.values(votes).filter(Boolean).forEach(v => { counts[v] = (counts[v] || 0) + 1; });
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    if (total === 0) { el.style.display = 'none'; return; }
+    const sorted = Object.entries(counts).sort((a, b) => (parseFloat(a[0]) || 0) - (parseFloat(b[0]) || 0));
+    const colors = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#0dcaf0','#fd7e14'];
+    const bars = sorted.map((kv, i) => {
+        const pct = Math.round(kv[1] / total * 100);
+        return '<div style="flex:' + kv[1] + ';background:' + colors[i % colors.length]
+             + ';display:flex;align-items:center;justify-content:center;'
+             + 'font-size:0.72rem;color:#fff;font-weight:700;min-width:24px;padding:0 4px;'
+             + 'border-radius:3px;transition:flex 0.4s ease;" title="' + escHtml(kv[0]) + ': ' + kv[1]
+             + ' vote' + (kv[1] !== 1 ? 's' : '') + '">'
+             + escHtml(kv[0]) + '</div>';
+    });
+    el.innerHTML = '<div style="font-size:0.7rem;color:var(--text-secondary,#6c757d);margin-bottom:3px;">Vote spread</div>'
+        + '<div style="display:flex;gap:3px;height:26px;border-radius:5px;overflow:hidden;">' + bars.join('') + '</div>';
+    el.style.display = '';
+}
+
+function _renderHotColdMeter() {
+    const el = document.getElementById('hotColdMeter');
+    if (!el) return;
+    if (typeof getCelebrationSettings === 'function' && getCelebrationSettings().revealHotCold === false) { el.style.display = 'none'; return; }
+    if (roomState.history.length < 2) { el.style.display = 'none'; return; }
+    const last = roomState.history.slice(0, Math.min(3, roomState.history.length));
+    const consensusCount = last.filter(r => r.stats && r.stats.isConsensus).length;
+    let icon, label, color;
+    if (consensusCount === last.length)  { icon = '🔥'; label = 'ON FIRE';    color = '#ff6b35'; }
+    else if (consensusCount === 0)       { icon = '❄️'; label = 'ICY';        color = '#4fc3f7'; }
+    else                                 { icon = '🌡️'; label = 'WARMING UP'; color = '#ffd700'; }
+    el.innerHTML = icon + ' <span style="font-weight:700;color:' + color + ';">' + label + '</span>'
+        + ' <span style="font-size:0.7rem;opacity:0.55;">(last ' + last.length + ' rounds)</span>';
+    el.style.display = '';
 }
 
 function appendChat(author, message, timestamp) {
@@ -458,6 +844,41 @@ async function revealVotes() {
 
 async function toggleGhostMode() {
     try { await connection.invoke('ToggleGhostMode', !roomState.ghostModeEnabled); } catch(e) { console.error(e); }
+}
+
+function openPinModal(forJoin) {
+    const modal = document.getElementById('pinModal');
+    if (!modal) return;
+    const titleEl = document.getElementById('pinModalTitle');
+    const submitEl = document.getElementById('pinSubmitBtn');
+    const msgEl = document.getElementById('pinModalMsg');
+    if (forJoin) {
+        if (titleEl) titleEl.textContent = '🔒 PIN Required';
+        if (submitEl) submitEl.textContent = 'Join';
+        if (msgEl) { msgEl.textContent = 'This room has a PIN. Enter it to join.'; msgEl.style.display = ''; }
+    } else {
+        if (titleEl) titleEl.textContent = '🔒 Set Room PIN';
+        if (submitEl) submitEl.textContent = 'Set PIN';
+        if (msgEl) msgEl.style.display = 'none';
+    }
+    const inp = document.getElementById('pinInput');
+    if (inp) inp.value = '';
+    new bootstrap.Modal(modal).show();
+    setTimeout(() => { if (inp) inp.focus(); }, 350);
+}
+
+function submitPin() {
+    const pin = (document.getElementById('pinInput')?.value || '').trim();
+    const bsModal = bootstrap.Modal.getInstance(document.getElementById('pinModal'));
+    if (bsModal) bsModal.hide();
+    if (_pendingRoomName) {
+        // Re-join after PIN prompt
+        sessionStorage.setItem('es_roomPin_' + _pendingRoomName, pin);
+        connection.invoke('JoinRoom', _pendingRoomName, _pendingUserName, _pendingIsObserver, pin).catch(console.error);
+        _pendingRoomName = null;
+    } else {
+        connection.invoke('SetRoomPin', pin || null).catch(console.error);
+    }
 }
 
 function _updateGhostToggleBtn() {
@@ -549,6 +970,7 @@ async function addStory() {
 
 async function setCurrentStory(storyId) {
     try { await connection.invoke('SetCurrentStory', storyId); } catch(e) { console.error(e); }
+    if (_isMobile) _closeStoriesSheet();
 }
 
 async function deleteStory(storyId) {
@@ -567,7 +989,8 @@ async function toggleObserver(enabled) {
     // Re-join as observer/participant
     try {
         await connection.invoke('LeaveRoom');
-        await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, enabled);
+        const _pin2 = sessionStorage.getItem('es_roomPin_' + ROOM_CONFIG.roomName) || null;
+        await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, enabled, _pin2);
     } catch(e) { console.error(e); }
 }
 
@@ -640,8 +1063,14 @@ function startLocalTimer(seconds) {
     timerInterval = setInterval(() => {
         timerSeconds--;
         value.textContent = timerSeconds;
+        // Start timer audio when countdown hits the trigger point
+        if (typeof getTimerAudioSettings === 'function' && typeof startTimerAudio === 'function') {
+            const _ta = getTimerAudioSettings();
+            if (timerSeconds === (_ta.triggerAt || 10)) startTimerAudio(timerSeconds);
+        }
         if (timerSeconds <= 0) {
             stopLocalTimer();
+            if (typeof stopTimerAudio === 'function') stopTimerAudio();
             value.textContent = '⏰';
         }
     }, 1000);
@@ -668,6 +1097,15 @@ function toggleStoriesPanel() {
 // ============================================================
 function toggleChat() {
     const panel = document.getElementById('chatPanel');
+    const isCurrentlyExpanded = panel.classList.contains('expanded');
+    if (!isCurrentlyExpanded && roomState.participants.length <= 1) {
+        var t = document.createElement('div');
+        t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);color:#fff;padding:8px 16px;border-radius:20px;font-size:0.82rem;z-index:2000;pointer-events:none;';
+        t.textContent = '💬 No one else is here yet — chat will appear when others join';
+        document.body.appendChild(t);
+        setTimeout(function() { if (t.parentNode) t.remove(); }, 3000);
+        return;
+    }
     const body = document.getElementById('chatBody');
     const icon = document.getElementById('chatToggleIcon');
     const isExpanded = panel.classList.toggle('expanded');
@@ -678,9 +1116,6 @@ function toggleChat() {
     const basePad = isMobile ? '56px' : '48px';
     document.getElementById('roomLayout').style.paddingBottom = isExpanded ? '280px' : basePad;
 
-    // Highlight chat button on mobile
-    const chatBtn = document.getElementById('mobileChatBtn');
-    if (chatBtn) chatBtn.classList.toggle('active', isExpanded);
 }
 
 // ============================================================
@@ -714,6 +1149,8 @@ function renderVoteHistory() {
 
     const awardsBtn = document.getElementById('awards-trigger-btn');
     if (awardsBtn) awardsBtn.style.display = roomState.history.length >= 2 ? '' : 'none';
+    const analyticsBtn = document.getElementById('analytics-trigger-btn');
+    if (analyticsBtn) analyticsBtn.style.display = roomState.history.length >= 2 ? '' : 'none';
 
     list.innerHTML = '';
     roomState.history.forEach(entry => {
@@ -759,6 +1196,33 @@ async function importStories() {
     if (details) details.removeAttribute('open');
 }
 
+async function importFromJira() {
+    const s = typeof getJiraSettings === 'function' ? getJiraSettings() : {};
+    const domain = (s.domain || '').trim();
+    const email  = (s.email  || '').trim();
+    const token  = (s.token  || '').trim();
+    const jqlEl  = document.getElementById('jiraImportJql');
+    const jql    = (jqlEl?.value || s.jql || '').trim();
+    const creds  = document.getElementById('jiraImportCreds');
+    const status = document.getElementById('jiraImportStatus');
+
+    if (!domain || !email || !token) {
+        if (creds) creds.style.display = '';
+        return;
+    }
+    if (creds) creds.style.display = 'none';
+    if (!jql) { if (status) status.textContent = '⚠️ Enter a JQL filter first'; return; }
+
+    if (status) status.textContent = '⏳ Importing…';
+    try {
+        await connection.invoke('ImportFromJira', domain, email, token, jql);
+        const details = document.getElementById('jiraImportDetails');
+        if (details) details.removeAttribute('open');
+    } catch(e) {
+        if (status) status.textContent = `❌ ${e.message || 'Import failed'}`;
+    }
+}
+
 // ============================================================
 // Skip Vote Toggle
 // ============================================================
@@ -776,7 +1240,23 @@ document.addEventListener('keydown', (e) => {
     if (document.querySelector('.modal.show')) return;
 
     if (e.code === 'Space' && !roomState.votesRevealed) { e.preventDefault(); revealVotes(); }
+    if (e.key === 'Enter' && !roomState.votesRevealed) { e.preventDefault(); revealVotes(); }
     if (e.code === 'KeyR' && !e.ctrlKey) resetVotes();
+    if (e.code === 'KeyF') togglePresentationMode();
+    if (e.code === 'KeyN') {
+        e.preventDefault();
+        const inp = document.getElementById('newStoryInput');
+        if (inp) { inp.focus(); inp.select(); }
+    }
+    if (e.key === '?') {
+        if (typeof openSettingsModal === 'function') openSettingsModal('about');
+    }
+    // 0: select ☕ card
+    if (e.code === 'Digit0') {
+        const coffeeCard = Array.from(document.querySelectorAll('.poker-card'))
+            .find(c => c.dataset.value === '☕');
+        if (coffeeCard) coffeeCard.click();
+    }
     // 1–9: select nth card by position
     const numMatch = e.code.match(/^Digit([1-9])$/);
     if (numMatch && !e.ctrlKey && !e.altKey) {
@@ -826,6 +1306,18 @@ function castVibeLocal(emoji) {
     document.querySelectorAll('.vibe-btn').forEach(b =>
         b.classList.toggle('vibe-selected', b.dataset.vibe === emoji));
     connection.invoke('CastVibe', emoji).catch(e => console.error(e));
+
+    const btn = document.querySelector('.vibe-btn[data-vibe="' + emoji + '"]');
+    if (btn) {
+        const floater = document.createElement('div');
+        floater.className = 'vibe-float-emoji';
+        floater.textContent = emoji;
+        const r = btn.getBoundingClientRect();
+        floater.style.left = (r.left + r.width / 2 - 14) + 'px';
+        floater.style.top  = (r.top - 10) + 'px';
+        document.body.appendChild(floater);
+        setTimeout(() => floater.remove(), 950);
+    }
 }
 
 function renderVibeDisplay(counts) {
@@ -843,6 +1335,568 @@ function renderVibeDisplay(counts) {
     if (total === 0) { summary.textContent = ''; return; }
     summary.textContent = total + ' teammate' + (total !== 1 ? 's' : '') + ' checked in';
 }
+
+// ============================================================
+// Sequential Reveal (Poker Hand)
+// ============================================================
+function _sequentialReveal(votes, stats) {
+    const cs = typeof getCelebrationSettings === 'function' ? getCelebrationSettings() : {};
+    const useSuspense  = cs.suspenseReveal     !== false;
+    const useOrdering  = cs.suspenseOrdering   !== false;
+
+    // Build base order (vote-cast order, then any remaining)
+    const base = _roundVoteOrder.slice();
+    roomState.participants.forEach(p => {
+        if (votes[p.connectionId] && !base.includes(p.connectionId)) base.push(p.connectionId);
+    });
+    const voters = base.filter(cid => votes[cid] != null);
+
+    // Consensus ordering: majority first, outlier last (extra pause)
+    let revealOrder = voters;
+    const outlierId = (useOrdering && stats && !stats.isConsensus) ? stats.shameParticipantId : null;
+    if (outlierId && voters.includes(outlierId)) {
+        revealOrder = [...voters.filter(cid => cid !== outlierId), outlierId];
+    }
+
+    // Render with votes hidden
+    roomState.votesRevealed = false;
+    renderParticipants();
+    roomState.votesRevealed = true;
+
+    // Timing config
+    const speeds   = { fast: 500, normal: 800, dramatic: 1300 };
+    const slotMs   = useSuspense ? (speeds[cs.suspenseSpeed || 'normal'] || 800) : 0;
+    const flipGap  = 380;
+    const outlierPause = outlierId ? 700 : 0;
+
+    revealOrder.forEach((cid, i) => {
+        const isOutlier = cid === outlierId;
+        // Outlier gets the extra dramatic pause before its flip
+        const delay = i * flipGap + (isOutlier ? outlierPause : 0);
+
+        setTimeout(() => {
+            const badge = document.querySelector('[data-connection-id="' + cid + '"]');
+            if (!badge) return;
+            badge.classList.add('poker-flip');
+
+            if (useSuspense && votes[cid]) {
+                _slotMachineReveal(badge, votes[cid], slotMs, () => {
+                    badge.classList.remove('poker-flip');
+                    _emitRevealParticles(badge, cs);
+                });
+            } else {
+                setTimeout(() => {
+                    badge.classList.remove('poker-flip');
+                    const voteSpan = badge.querySelector('.vote-hidden, .vote-waiting');
+                    if (voteSpan && votes[cid]) {
+                        voteSpan.className = 'participant-vote';
+                        voteSpan.textContent = votes[cid];
+                    }
+                    _emitRevealParticles(badge, cs);
+                }, 225);
+            }
+        }, delay);
+    });
+
+    // Supernova fires after all cards have landed
+    if (stats && stats.isConsensus && cs.consensusSupernova !== false) {
+        const totalMs = revealOrder.length * flipGap + slotMs + 300;
+        setTimeout(() => {
+            if (typeof triggerConsensusSupernova === 'function') triggerConsensusSupernova();
+        }, totalMs);
+    }
+}
+
+function _slotMachineReveal(badge, finalValue, duration, onComplete) {
+    const voteSpan = badge.querySelector('.vote-hidden, .vote-waiting, .participant-vote');
+    if (!voteSpan) { if (onComplete) onComplete(); return; }
+
+    voteSpan.className = 'participant-vote slot-cycling';
+    const pool = currentEstimateValues.length > 1 ? currentEstimateValues : ['1','2','3','5','8','13'];
+    const totalCycles = Math.max(8, Math.round(duration / 75));
+    let cycle = 0;
+
+    const tick = () => {
+        cycle++;
+        if (cycle >= totalCycles) {
+            voteSpan.textContent = finalValue;
+            voteSpan.className   = 'participant-vote slot-landed';
+            setTimeout(() => {
+                voteSpan.classList.remove('slot-landed');
+                if (onComplete) onComplete();
+            }, 160);
+            return;
+        }
+        voteSpan.textContent = pool[Math.floor(Math.random() * pool.length)];
+        // Ease-out: starts at ~50ms, slows to ~250ms near the end
+        const t = cycle / totalCycles;
+        const delay = 50 + t * t * 250;
+        setTimeout(tick, delay);
+    };
+    tick();
+}
+
+function _emitRevealParticles(badge, cs) {
+    if (cs.revealParticles !== false && typeof confetti !== 'undefined') {
+        const r = badge.getBoundingClientRect();
+        confetti({
+            particleCount: cs.revealParticleCount || 8,
+            spread: 50,
+            startVelocity: 18,
+            decay: 0.88,
+            origin: {
+                x: (r.left + r.width / 2) / window.innerWidth,
+                y: (r.top  + r.height / 2) / window.innerHeight
+            },
+            shapes: [cs.revealParticleType || 'star'],
+            colors: ['#ffd700', '#ff6b6b', '#00ff88', '#ffffff', '#00cfff']
+        });
+    }
+}
+
+// ============================================================
+// Decider Wheel
+// ============================================================
+var _deciderSpinning = false;
+
+function openDecider() {
+    _drawDeciderWheel();
+    document.getElementById('deciderResult').textContent = '';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deciderModal')).show();
+}
+
+function _drawDeciderWheel(highlightIdx) {
+    const canvas = document.getElementById('deciderCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const names = roomState.participants
+        .filter(p => !p.isObserver && !p.isGhost)
+        .map(p => p.name);
+    if (names.length === 0) {
+        ctx.clearRect(0, 0, 280, 280);
+        ctx.fillStyle = '#888';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No participants', 140, 145);
+        return;
+    }
+    const arc = (2 * Math.PI) / names.length;
+    const colors = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#0dcaf0','#fd7e14','#20c997'];
+    const cx = 140, cy = 140, r = 130;
+    ctx.clearRect(0, 0, 280, 280);
+    names.forEach((name, i) => {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, i * arc - Math.PI / 2, (i + 1) * arc - Math.PI / 2);
+        ctx.fillStyle = i === highlightIdx ? '#ffd700' : colors[i % colors.length];
+        ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(i * arc + arc / 2 - Math.PI / 2);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold ' + Math.min(14, Math.floor(110 / names.length) + 6) + 'px sans-serif';
+        ctx.fillText(name.substring(0, 12), r - 8, 5);
+        ctx.restore();
+    });
+    ctx.beginPath(); ctx.arc(cx, cy, 18, 0, 2 * Math.PI); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx, cy - r + 4); ctx.lineTo(cx - 8, cy - r + 18); ctx.lineTo(cx + 8, cy - r + 18);
+    ctx.fillStyle = '#333'; ctx.fill();
+}
+
+function spinDecider() {
+    if (_deciderSpinning) return;
+    const names = roomState.participants
+        .filter(p => !p.isObserver && !p.isGhost)
+        .map(p => p.name);
+    if (names.length === 0) return;
+    _deciderSpinning = true;
+    document.getElementById('deciderResult').textContent = '...';
+    const winner = Math.floor(Math.random() * names.length);
+    const totalFrames = 60;
+    let frame = 0;
+    function tick() {
+        const progress = frame / totalFrames;
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const spins = 4 + (winner / names.length);
+        const currentAngle = eased * spins * 2 * Math.PI;
+        const segArc = 2 * Math.PI / names.length;
+        _drawDeciderWheel(frame < totalFrames ? undefined : winner);
+        frame++;
+        if (frame <= totalFrames) {
+            setTimeout(tick, 16 + progress * 24);
+        } else {
+            _deciderSpinning = false;
+            document.getElementById('deciderResult').innerHTML =
+                '🎯 <strong>' + escHtml(names[winner]) + '</strong> goes first!';
+        }
+    }
+    tick();
+}
+
+// ============================================================
+// Confidence Indicator
+// ============================================================
+function castConfidence(level) {
+    connection.invoke('CastConfidence', level).catch(() => {});
+    _updateConfidenceUI(level);
+}
+
+function _updateConfidenceUI(level) {
+    document.querySelectorAll('#confidenceSelector .conf-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', i < level);
+    });
+}
+
+// ============================================================
+// Sound receive settings
+// ============================================================
+var _SOUND_RECEIVE_KEY = 'es_soundReceiveSettings';
+function _getSoundReceiveSettings() {
+    try { return Object.assign({ receive: true, subtitle: true }, JSON.parse(localStorage.getItem(_SOUND_RECEIVE_KEY) || '{}')); }
+    catch(e) { return { receive: true, subtitle: true }; }
+}
+function saveSoundReceiveSettings() {
+    var recv = document.getElementById('sound-receive-enabled');
+    var sub  = document.getElementById('sound-show-subtitle');
+    localStorage.setItem(_SOUND_RECEIVE_KEY, JSON.stringify({
+        receive:  !!(recv && recv.checked),
+        subtitle: !!(sub  && sub.checked)
+    }));
+    var subWrap = document.getElementById('sound-subtitle-wrap');
+    if (subWrap) subWrap.style.display = (recv && recv.checked) ? 'none' : '';
+}
+function populateSoundReceiveSection() {
+    var s = _getSoundReceiveSettings();
+    var recv = document.getElementById('sound-receive-enabled');
+    if (recv) recv.checked = s.receive !== false;
+    var sub = document.getElementById('sound-show-subtitle');
+    if (sub) sub.checked = s.subtitle !== false;
+    var subWrap = document.getElementById('sound-subtitle-wrap');
+    if (subWrap) subWrap.style.display = s.receive !== false ? 'none' : '';
+}
+function _showSoundSubtitle(soundId, senderName) {
+    var icons = { bell: '🔔', fanfare: '🎉', drumroll: '🥁', airhorn: '📯' };
+    var icon = icons[soundId] || (soundId.startsWith('custom:') ? '🎵' : '🔊');
+    var label = soundId.startsWith('custom:') ? soundId.slice(7) : (soundId.charAt(0).toUpperCase() + soundId.slice(1));
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);'
+        + 'background:rgba(30,30,30,0.88);color:#fff;padding:6px 16px;border-radius:20px;'
+        + 'font-size:0.85rem;z-index:9000;pointer-events:none;white-space:nowrap;'
+        + 'animation:sea-popup-in 0.3s ease-out forwards;';
+    toast.textContent = icon + ' ' + senderName + ' played ' + label;
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 2800);
+}
+
+// ============================================================
+// Custom Sounds
+// ============================================================
+var _customSounds = {};
+var _CUSTOM_SOUNDS_KEY = 'es_customSounds';
+
+function _loadCustomSounds() {
+    try { _customSounds = JSON.parse(localStorage.getItem(_CUSTOM_SOUNDS_KEY) || '{}'); } catch(e) { _customSounds = {}; }
+}
+function _saveCustomSounds() {
+    try { localStorage.setItem(_CUSTOM_SOUNDS_KEY, JSON.stringify(_customSounds)); } catch(e) {}
+}
+
+function addCustomSoundSlot() {
+    var list = document.getElementById('custom-sounds-list');
+    if (!list) return;
+    var existing = list.querySelectorAll('.custom-sound-slot').length;
+    if (existing >= 3) return;
+    var slotId = 'custom' + (existing + 1);
+    var slot = document.createElement('div');
+    slot.className = 'custom-sound-slot d-flex align-items-center gap-2 mt-2';
+    slot.dataset.slotId = slotId;
+    var saved = _customSounds[slotId];
+    slot.innerHTML = '<span class="small text-muted" style="min-width:60px;">' + slotId + '</span>'
+        + (saved ? '<span class="small text-success">✓ ' + (saved.label || slotId) + '</span>' : '<span class="small text-muted">No file</span>')
+        + '<input type="file" accept="audio/*" style="display:none;" />'
+        + '<button type="button" class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;">📂 Choose</button>'
+        + (saved ? '<button type="button" class="btn btn-outline-primary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="playCustomSoundLocal(\'' + slotId + '\')">▶ Play</button>'
+                 + '<button type="button" class="btn btn-outline-success btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="broadcastCustomSound(\'' + slotId + '\')">📡 Broadcast</button>' : '')
+        + (saved ? '<button type="button" class="btn btn-outline-danger btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="removeCustomSound(\'' + slotId + '\')">✕</button>' : '');
+    var fileInput = slot.querySelector('input[type=file]');
+    var chooseBtn = slot.querySelector('button');
+    chooseBtn.onclick = function() { fileInput.click(); };
+    fileInput.onchange = function() {
+        var file = fileInput.files[0];
+        if (!file) return;
+        if (file.size > 600_000) { alert('File too large (max ~600KB). Please use a shorter clip.'); return; }
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            var base64 = ev.target.result;
+            _validateAudioDuration(base64, function(ok, dur) {
+                if (!ok) { alert('Audio too long (' + Math.round(dur) + 's). Max 5 seconds.'); return; }
+                var label = file.name.replace(/\.[^.]+$/, '').slice(0, 20);
+                _customSounds[slotId] = { label: label, data: base64 };
+                _saveCustomSounds();
+                renderCustomSoundSlots();
+            });
+        };
+        reader.readAsDataURL(file);
+    };
+    list.appendChild(slot);
+}
+function renderCustomSoundSlots() {
+    var list = document.getElementById('custom-sounds-list');
+    if (!list) return;
+    list.innerHTML = '';
+    _loadCustomSounds();
+    var keys = Object.keys(_customSounds);
+    for (var i = 0; i < Math.max(keys.length, 0); i++) {
+        var slotId = 'custom' + (i + 1);
+        if (!_customSounds[slotId]) continue;
+        var saved = _customSounds[slotId];
+        var slot = document.createElement('div');
+        slot.className = 'custom-sound-slot d-flex align-items-center gap-2 mt-2';
+        slot.dataset.slotId = slotId;
+        var sid = slotId;
+        slot.innerHTML = '<span class="small text-muted" style="min-width:60px;">' + sid + '</span>'
+            + '<span class="small text-success flex-grow-1">✓ ' + (saved.label || sid) + '</span>'
+            + '<button type="button" class="btn btn-outline-primary btn-sm" style="font-size:0.7rem;padding:1px 7px;">▶ Play</button>'
+            + '<button type="button" class="btn btn-outline-success btn-sm" style="font-size:0.7rem;padding:1px 7px;">📡 Broadcast</button>'
+            + '<button type="button" class="btn btn-outline-danger btn-sm" style="font-size:0.7rem;padding:1px 7px;">✕</button>';
+        (function(s) {
+            slot.querySelectorAll('button')[0].onclick = function() { playCustomSoundLocal(s); };
+            slot.querySelectorAll('button')[1].onclick = function() { broadcastCustomSound(s); };
+            slot.querySelectorAll('button')[2].onclick = function() { removeCustomSound(s); };
+        })(sid);
+        list.appendChild(slot);
+    }
+    var addBtn = document.getElementById('custom-sound-add-btn');
+    if (addBtn) addBtn.style.display = keys.length >= 3 ? 'none' : '';
+}
+function playCustomSoundLocal(slotId) {
+    var s = _customSounds[slotId];
+    if (!s || !s.data) return;
+    try { new Audio(s.data).play().catch(() => {}); } catch(e) {}
+}
+function broadcastCustomSound(slotId) {
+    var s = _customSounds[slotId];
+    if (!s || !s.data) return;
+    try { new Audio(s.data).play().catch(() => {}); } catch(e) {}
+    if (typeof connection !== 'undefined' && connection.state === 'Connected') {
+        connection.invoke('TriggerCustomSound', s.data, s.label || slotId).catch(() => {});
+    }
+}
+function removeCustomSound(slotId) {
+    delete _customSounds[slotId];
+    // Re-pack to keep keys contiguous
+    var vals = Object.values(_customSounds);
+    _customSounds = {};
+    vals.forEach(function(v, i) { _customSounds['custom' + (i + 1)] = v; });
+    _saveCustomSounds();
+    renderCustomSoundSlots();
+}
+function _validateAudioDuration(base64, cb) {
+    try {
+        var AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) { cb(true, 0); return; }
+        var ctx = new AudioCtx();
+        // Convert base64 data URL to ArrayBuffer
+        var parts = base64.split(',');
+        var raw = atob(parts[1]);
+        var buf = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+        ctx.decodeAudioData(buf.buffer, function(decoded) {
+            ctx.close();
+            cb(decoded.duration <= 5, decoded.duration);
+        }, function() { ctx.close(); cb(true, 0); });
+    } catch(e) { cb(true, 0); }
+}
+
+// ============================================================
+// Soundboard
+// ============================================================
+function playSound(soundId) {
+    _playSoundLocal(soundId);
+    const broadcast = document.getElementById('soundBroadcastCheck');
+    if (broadcast && broadcast.checked) {
+        connection.invoke('TriggerSound', soundId).catch(() => {});
+    }
+}
+
+function _playSoundLocal(soundId) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        switch (soundId) {
+            case 'fanfare':   _soundFanfare(ctx);  break;
+            case 'drumroll':  _soundDrumroll(ctx); break;
+            case 'bell':      _soundBell(ctx);     break;
+            case 'airhorn':   _soundAirhorn(ctx);  break;
+        }
+        setTimeout(() => ctx.close(), 2500);
+    } catch (e) {}
+}
+
+function _soundBell(ctx) {
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 1.2);
+}
+
+function _soundFanfare(ctx) {
+    [523, 659, 784, 1047].forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        const t = ctx.currentTime + i * 0.13;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.12, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+        osc.start(t); osc.stop(t + 0.35);
+    });
+}
+
+function _soundDrumroll(ctx) {
+    for (let i = 0; i < 14; i++) {
+        const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.04), ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let j = 0; j < data.length; j++) data[j] = Math.random() * 2 - 1;
+        const src = ctx.createBufferSource(), gain = ctx.createGain();
+        src.buffer = buf;
+        src.connect(gain); gain.connect(ctx.destination);
+        const t = ctx.currentTime + i * 0.07;
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+        src.start(t); src.stop(t + 0.04);
+    }
+}
+
+function _soundAirhorn(ctx) {
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(130, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(85, ctx.currentTime + 0.7);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.75);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.75);
+}
+
+// ============================================================
+// Test helpers (settings modal)
+// ============================================================
+function testDecider() {
+    if (typeof openDecider === 'function') openDecider();
+}
+
+function testConfidenceIndicator() {
+    var sel = document.getElementById('confidenceSelector');
+    if (!sel) return;
+    var orig = sel.style.cssText;
+    sel.style.cssText = 'display:block;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2000;';
+    setTimeout(function() { sel.style.cssText = orig; sel.style.display = 'none'; }, 3000);
+}
+
+function testSoundboard() {
+    _playSoundLocal('bell');
+    setTimeout(function() { _playSoundLocal('fanfare'); }, 800);
+    setTimeout(function() { _playSoundLocal('drumroll'); }, 1600);
+}
+
+function testSpeedBadges() {
+    var badges = document.querySelectorAll('.participant-badge[data-connection-id]');
+    if (!badges.length) return;
+    var first = badges[0], last = badges[badges.length - 1];
+    function _addTemp(el, cls, text, title) {
+        var s = document.createElement('span');
+        s.className = 'speed-badge ' + cls; s.textContent = text; s.title = title;
+        el.appendChild(s);
+        setTimeout(function() { if (s.parentNode) s.parentNode.removeChild(s); }, 3000);
+    }
+    _addTemp(first, 'speed-first', '⚡', 'First to vote');
+    if (badges.length > 1) _addTemp(last, 'speed-last', '🐢', 'Last to vote');
+}
+
+function testHotCold() {
+    var el = document.getElementById('hotColdMeter');
+    if (!el) return;
+    var orig = el.style.cssText, origHtml = el.innerHTML;
+    el.innerHTML = '🔥 <span style="font-weight:700;color:#ff6b35;">ON FIRE</span>'
+        + ' <span style="font-size:0.7rem;opacity:0.55;">(last 3 rounds) (TEST)</span>';
+    el.style.display = '';
+    setTimeout(function() { el.innerHTML = origHtml; el.style.cssText = orig; }, 3000);
+}
+
+function testVoteDist() {
+    var el = document.getElementById('voteDistBar');
+    if (!el) return;
+    var origHtml = el.innerHTML, origDisplay = el.style.display;
+    var fakeCounts = { '1': 2, '3': 1, '8': 3 };
+    var total = 6;
+    var bars = Object.keys(fakeCounts).map(function(v) {
+        var pct = Math.round(fakeCounts[v] / total * 100);
+        return '<div style="flex:' + fakeCounts[v] + ';display:flex;align-items:center;justify-content:center;'
+            + 'font-size:0.65rem;font-weight:700;color:#fff;background:hsl('
+            + (parseInt(v) * 22) + ',65%,45%);min-width:24px;" title="' + v + ': ' + fakeCounts[v] + ' votes">'
+            + v + '</div>';
+    });
+    el.innerHTML = '<div style="font-size:0.7rem;color:var(--text-secondary,#6c757d);margin-bottom:3px;">Vote spread (TEST)</div>'
+        + '<div style="display:flex;gap:3px;height:26px;border-radius:5px;overflow:hidden;">' + bars.join('') + '</div>';
+    el.style.display = '';
+    setTimeout(function() { el.innerHTML = origHtml; el.style.display = origDisplay; }, 3500);
+}
+
+function testSlotMachine() {
+    var cs = typeof getCelebrationSettings === 'function' ? getCelebrationSettings() : {};
+    var speeds = { fast: 500, normal: 800, dramatic: 1300 };
+    var slotMs = speeds[cs.suspenseSpeed || 'normal'] || 800;
+    var fakeVotes = ['3', '5', '8', '13', '21'];
+    var badges = Array.from(document.querySelectorAll('.participant-badge[data-connection-id]'));
+    var cleanup = null;
+
+    if (!badges.length) {
+        var demo = document.createElement('div');
+        demo.style.cssText = 'position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);z-index:2000;display:flex;gap:12px;';
+        ['3', '5', '8'].forEach(function(v) {
+            var b = document.createElement('div');
+            b.className = 'participant-badge voted';
+            b.style.cssText = 'padding:14px 20px;font-size:1.2rem;';
+            b.innerHTML = '<span class="vote-hidden">' + v + '</span>';
+            demo.appendChild(b);
+            badges.push(b);
+        });
+        document.body.appendChild(demo);
+        var totalTime = badges.length * 380 + slotMs + 800;
+        cleanup = setTimeout(function() { demo.remove(); }, totalTime);
+    }
+
+    badges.forEach(function(badge, i) {
+        var val = fakeVotes[i % fakeVotes.length];
+        var span = badge.querySelector('.vote-hidden, .vote-waiting, .participant-vote');
+        if (!span) {
+            span = document.createElement('span');
+            span.className = 'vote-hidden';
+            span.textContent = val;
+            badge.appendChild(span);
+        }
+        setTimeout(function() {
+            badge.classList.add('poker-flip');
+            _slotMachineReveal(badge, val, slotMs, function() {
+                badge.classList.remove('poker-flip');
+            });
+        }, i * 380);
+    });
+}
+
+// Expose test helpers globally (onclick attributes reference by name)
+window.testSpeedBadges = testSpeedBadges;
+window.testHotCold = testHotCold;
+window.testVoteDist = testVoteDist;
+window.testDecider = testDecider;
+window.testSlotMachine = testSlotMachine;
 
 // ============================================================
 // Init

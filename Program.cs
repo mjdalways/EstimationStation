@@ -6,8 +6,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 1_048_576); // 1 MB for custom audio broadcast
+builder.Services.AddSingleton<IRoomRepository, FileRoomRepository>();
 builder.Services.AddSingleton<RoomService>();
+builder.Services.AddHostedService<RoomCleanupService>();
+builder.Services.AddHttpClient("jira");
+builder.Services.AddTransient<JiraService>();
 
 var app = builder.Build();
 

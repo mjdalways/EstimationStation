@@ -16,6 +16,7 @@ public class Room
     public Dictionary<string, string> Vibes { get; set; } = new();
     public bool GhostModeEnabled { get; set; } = false;
     public string? ShameParticipantId { get; set; }
+    public string? Pin { get; set; }
 }
 
 public class Participant
@@ -27,6 +28,7 @@ public class Participant
     public bool IsGhost { get; set; } = false;
     public bool CounterUsed { get; set; } = false;
     public string? AvatarData { get; set; }
+    public int? Confidence { get; set; }
 }
 
 public class Story
@@ -36,6 +38,11 @@ public class Story
     public string? FinalEstimate { get; set; }
     public bool IsCompleted { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? JiraKey { get; set; }
+    public string? JiraUrl { get; set; }
+    public string? Description { get; set; }
+    public string? Notes { get; set; }
+    public string? IssueType { get; set; }
 }
 
 public class ChatMessage

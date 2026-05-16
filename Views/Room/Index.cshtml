@@ -7,7 +7,10 @@
 <div class="d-flex align-items-center gap-2 flex-wrap">
     <span class="navbar-text" id="navRoomName">🏠 @Model.RoomName</span>
     <span class="navbar-text" id="navPlayerName">👤 <span id="displayName">@Model.PlayerName</span></span>
-    <span id="voice-mic-indicator" style="display:none;" title="Voice recognition active" class="badge bg-danger ms-1">🎤 Listening</span>
+    <span id="voice-mic-indicator" style="display:none;" title="Voice recognition active" class="badge bg-danger ms-1">
+        🎤
+        <span class="voice-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+    </span>
     <button class="btn btn-sm btn-outline-info" onclick="copyInviteLink()" title="Copy room invite link">🔗 Invite</button>
     <button class="btn btn-sm btn-outline-light" onclick="promptRename()">✏️</button>
     <button class="btn btn-sm btn-outline-warning" onclick="leaveRoom()">🚪 Leave</button>
@@ -19,7 +22,7 @@
     <div class="stories-panel" id="storiesPanel">
         <div class="panel-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0">📋 Stories</h6>
-            <button class="btn btn-sm btn-primary" onclick="toggleStoriesPanel()">◀</button>
+            <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="_closeStoriesSheet()">✕</button>
         </div>
         <div class="add-story-form">
             <input type="text" id="newStoryInput" class="form-control form-control-sm" placeholder="Add story..." maxlength="200" />
@@ -30,12 +33,32 @@
                           placeholder="Paste one story per line..."></textarea>
                 <button class="btn btn-sm btn-outline-primary w-100 mt-1" onclick="importStories()">Import All</button>
             </details>
+            <details class="mt-2" id="jiraImportDetails">
+                <summary class="small text-muted" style="cursor:pointer;">🔗 Import from Jira…</summary>
+                <div class="mt-1">
+                    <input type="text" id="jiraImportJql" class="form-control form-control-sm"
+                           placeholder="JQL — e.g. sprint in openSprints() ORDER BY rank" />
+                    <div id="jiraImportCreds" class="small text-warning mt-1" style="display:none;">
+                        ⚠️ Jira credentials not set — <a href="#" onclick="openSettingsModal('jira');return false;">configure in Settings → Jira</a>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary w-100 mt-1" onclick="importFromJira()">🔗 Import from Jira</button>
+                    <div id="jiraImportStatus" class="small mt-1"></div>
+                </div>
+            </details>
         </div>
         <div id="storiesList" class="stories-list"></div>
+        <div id="sprintDashboard" class="px-1 pt-1 border-top" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-muted" style="font-size:0.72rem;">Sprint total</span>
+                <span id="sprintTotal" class="fw-bold text-success" style="font-size:0.8rem;">0 pts</span>
+            </div>
+            <div id="sprintSparkline" style="height:30px; overflow:hidden;"></div>
+            <div id="sprintVelocityWrap" class="mt-1" style="display:none;">
+                <span class="text-muted" style="font-size:0.65rem;">Past sessions</span>
+                <div id="sprintVelocityChart" style="height:26px; overflow:hidden;"></div>
+            </div>
+        </div>
     </div>
-
-    <!-- Stories collapsed toggle -->
-    <button class="stories-toggle-btn" id="storiesToggleBtn" onclick="toggleStoriesPanel()" style="display:none;" title="Show Stories">▶</button>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -44,11 +67,13 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span class="story-label">Current Story:</span>
                 <span id="currentStoryDisplay" class="current-story-title">No story selected</span>
+                <span id="pinBadge" style="display:none;" class="badge bg-warning text-dark ms-1" title="Room has PIN">🔒</span>
                 <div id="timerDisplay" class="timer-display" style="display:none;">
                     <span id="timerIcon">⏱️</span> <span id="timerValue">0</span>s
                 </div>
             </div>
         </div>
+        <div id="currentStoryNote" class="current-story-note" style="display:none;"></div>
 
         <!-- Stats Bar (shown when votes revealed) -->
         <div id="statsBar" class="stats-bar" style="display:none;">
@@ -66,6 +91,14 @@
             </div>
             <div id="consensusBadge" class="consensus-badge" style="display:none;">
                 🎉 Consensus!
+            </div>
+            <div id="voteDistBar" style="display:none;flex:0 0 100%;margin-top:4px;"></div>
+            <div id="hotColdMeter" style="display:none;flex:0 0 100%;font-size:0.8rem;margin-top:2px;"></div>
+            <div style="flex:0 0 100%;margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button id="acceptEstimateBtn" class="btn btn-sm btn-success py-0 px-2"
+                        onclick="acceptEstimate()" style="font-size:0.8rem;">✅ Accept <span id="acceptEstimateValue"></span></button>
+                <input id="acceptEstimateInput" type="text" class="form-control form-control-sm"
+                       style="width:70px;font-size:0.8rem;" placeholder="override" />
             </div>
         </div>
 
@@ -85,6 +118,18 @@
             <div id="cardContainer" class="card-container"></div>
         </div>
 
+        <!-- Confidence selector (shown after voting, hidden on reveal/reset) -->
+        <div id="confidenceSelector" style="display:none; margin-bottom:12px; text-align:center;">
+            <div class="small text-muted mb-1">How confident are you?</div>
+            <div class="btn-group btn-group-sm" role="group">
+                <button class="conf-btn btn btn-outline-warning" onclick="castConfidence(1)" title="Low">★</button>
+                <button class="conf-btn btn btn-outline-warning" onclick="castConfidence(2)" title="">★★</button>
+                <button class="conf-btn btn btn-outline-warning" onclick="castConfidence(3)" title="Medium">★★★</button>
+                <button class="conf-btn btn btn-outline-warning" onclick="castConfidence(4)" title="">★★★★</button>
+                <button class="conf-btn btn btn-outline-warning" onclick="castConfidence(5)" title="High">★★★★★</button>
+            </div>
+        </div>
+
         <!-- Participants -->
         <div class="participants-section">
             <h6 class="section-label">Participants</h6>
@@ -99,6 +144,8 @@
                 </button>
                 <button class="btn btn-sm btn-outline-warning py-0 px-2" id="awards-trigger-btn"
                         onclick="showSessionAwards()" style="display:none;" title="Session Awards">🏆 Awards</button>
+                <button class="btn btn-sm btn-outline-info py-0 px-2" id="analytics-trigger-btn"
+                        onclick="showAnalyticsModal()" style="display:none;" title="Session Analytics">📊 Analytics</button>
             </div>
             <div id="voteHistoryList" class="vote-history-list" style="display:none;"></div>
         </div>
@@ -111,7 +158,9 @@
             <button class="btn btn-success w-100 mb-2" id="revealBtn" onclick="revealVotes()">👁️ Reveal</button>
             <button class="btn btn-secondary w-100 mb-2" id="hideBtn" onclick="hideVotes()" style="display:none;">🙈 Hide</button>
             <button class="btn btn-warning w-100 mb-2" onclick="resetVotes()">🔄 Reset</button>
+            <button class="btn btn-outline-info w-100 mb-2" onclick="openDecider()">🎡 Decider</button>
             <button class="btn btn-outline-secondary w-100 mb-2" id="ghostToggleBtn" onclick="toggleGhostMode()" title="Latecomers join as ghosts (watch only) when on">👻 Ghost: Off</button>
+            <button id="pinBtn" class="btn btn-outline-secondary w-100 mb-2" onclick="openPinModal(false)" title="Set or clear room PIN">🔒 PIN</button>
         </div>
 
         <div class="control-group">
@@ -158,6 +207,20 @@
         </div>
 
         <div class="control-group">
+            <h6 class="control-title">🔊 Sounds</h6>
+            <div class="d-flex flex-wrap gap-1 mb-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="playSound('bell')" title="Bell">🔔</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="playSound('fanfare')" title="Fanfare">🎉</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="playSound('drumroll')" title="Drumroll">🥁</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="playSound('airhorn')" title="Air Horn">📯</button>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="soundBroadcastCheck" />
+                <label class="form-check-label" for="soundBroadcastCheck">Broadcast to room</label>
+            </div>
+        </div>
+
+        <div class="control-group">
             <button class="btn btn-sm btn-outline-secondary w-100" onclick="exportCSV()">📥 Export CSV</button>
         </div>
     </div>
@@ -179,23 +242,35 @@
 
 <!-- Mobile Bottom Navigation Bar -->
 <nav class="mobile-bottom-nav d-lg-none" id="mobileBottomNav">
-    <button class="mobile-nav-btn" onclick="toggleMobilePanel('stories')" id="mobileStoriesBtn">
-        <span class="mobile-nav-icon">📋</span>
-        <span class="mobile-nav-label">Stories</span>
-    </button>
-    <button class="mobile-nav-btn mobile-nav-vote" onclick="scrollToCards()">
-        <span class="mobile-nav-icon">🃏</span>
-        <span class="mobile-nav-label">Vote</span>
-    </button>
-    <button class="mobile-nav-btn" onclick="toggleChat()" id="mobileChatBtn">
-        <span class="mobile-nav-icon">💬</span>
-        <span class="mobile-nav-label">Chat</span>
-    </button>
     <button class="mobile-nav-btn" onclick="toggleMobilePanel('controls')" id="mobileControlsBtn">
         <span class="mobile-nav-icon">⚙️</span>
         <span class="mobile-nav-label">Controls</span>
     </button>
 </nav>
+
+<!-- PIN Modal -->
+<div id="pinModal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title mb-0" id="pinModalTitle">🔒 Room PIN</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body py-2">
+                <div id="pinModalMsg" class="text-muted small mb-2" style="display:none;"></div>
+                <input id="pinInput" type="password" class="form-control form-control-sm"
+                       maxlength="8" placeholder="Enter PIN (blank to remove)"
+                       onkeydown="if(event.key==='Enter') submitPin()">
+            </div>
+            <div class="modal-footer py-1 gap-2">
+                <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-sm btn-primary" onclick="submitPin()" id="pinSubmitBtn">Set PIN</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="storiesPanelBackdrop" onclick="_closeStoriesSheet()"></div>
 
 @section Scripts {
 <script>
@@ -207,24 +282,20 @@
     // Mobile panel toggling
     function toggleMobilePanel(panel) {
         const panels = {
-            stories: { el: document.getElementById('storiesPanel'), btn: document.getElementById('mobileStoriesBtn') },
             controls: { el: document.querySelector('.controls-panel'), btn: document.getElementById('mobileControlsBtn') }
         };
         const target = panels[panel];
+        if (!target) return;
         const isVisible = target.el.classList.contains('mobile-visible');
-
-        // Close all panels first
-        Object.values(panels).forEach(p => { p.el.classList.remove('mobile-visible'); p.btn.classList.remove('active'); });
-
-        // Toggle the requested one
-        if (!isVisible) {
-            target.el.classList.add('mobile-visible');
-            target.btn.classList.add('active');
-        }
+        Object.values(panels).forEach(p => { p.el.classList.remove('mobile-visible'); if (p.btn) p.btn.classList.remove('active'); });
+        if (!isVisible) { target.el.classList.add('mobile-visible'); if (target.btn) target.btn.classList.add('active'); }
     }
 
     function scrollToCards() {
-        document.getElementById('cardContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const el = document.getElementById('cardContainer');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('card-flash');
+        setTimeout(() => el.classList.remove('card-flash'), 700);
     }
 
     async function copyInviteLink() {

@@ -43,5 +43,23 @@ function triggerChickenOverlay(outlierConnectionId) {
 }
 
 function testCounterSpell() {
-    triggerChickenOverlay('__none__');
+    // Show the counter-spell bar fixed above the modal
+    var bar = document.getElementById('counterSpellBar');
+    if (bar) {
+        var orig = bar.style.cssText;
+        bar.style.cssText = 'display:flex;position:fixed;bottom:80px;left:50%;'
+            + 'transform:translateX(-50%);z-index:2000;'
+            + 'background:var(--bg-secondary,#f8f9fa);'
+            + 'border:2px solid #ffc107;border-radius:10px;'
+            + 'padding:8px 16px;gap:12px;align-items:center;'
+            + 'box-shadow:0 4px 16px rgba(0,0,0,0.3);';
+        bar.innerHTML = '<span style="font-size:0.85rem;">🪄 You\'re the outlier — retaliate! (TEST)</span>'
+            + '<button class="btn btn-sm btn-warning" disabled>🐔 Cast Spell</button>';
+        setTimeout(function () {
+            bar.style.cssText = orig;
+            bar.style.display = 'none';
+            bar.innerHTML = '';
+        }, 3500);
+    }
+    setTimeout(function () { triggerChickenOverlay('__none__'); }, 500);
 }

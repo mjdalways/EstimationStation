@@ -102,13 +102,6 @@
   a:hover { text-decoration: underline; }
   .muted { color: var(--muted); font-size: 0.85rem; }
 
-  .done-card { background: rgba(52,211,153,0.06); border: 1px solid rgba(52,211,153,0.25);
-               border-radius: 12px; padding: 16px 20px; margin: 12px 0;
-               display: flex; align-items: flex-start; gap: 12px; }
-  .done-card .done-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 2px; }
-  .done-card .done-body h4 { color: var(--green); margin: 0 0 4px; font-size: 0.95rem; }
-  .done-card .done-body p  { color: var(--muted); font-size: 0.84rem; margin: 0; }
-
   .feature-card { background: var(--bg2); border: 1px solid var(--border);
                   border-radius: 12px; padding: 16px 20px; margin: 12px 0; }
   .feature-card h4 { color: var(--yellow); margin: 0 0 6px; font-size: 0.95rem; }
@@ -116,12 +109,20 @@
   .feature-card ul { margin: 6px 0 0 18px; }
   .feature-card ul li { color: var(--text); font-size: 0.84rem; margin-bottom: 3px; }
 
-  .patch-card { background: var(--bg2); border: 1px solid rgba(91,141,238,0.3);
+  .group-card { background: var(--bg2); border: 1px solid rgba(91,141,238,0.3);
                 border-radius: 12px; padding: 20px 24px; margin: 16px 0; }
-  .patch-card h3 { color: var(--accent); margin: 0 0 10px; font-size: 1rem; }
-  .patch-card .tag { font-size: 0.72rem; background: rgba(91,141,238,0.15); color: var(--accent);
+  .group-card h3 { color: var(--accent); margin: 0 0 6px; font-size: 1.05rem; }
+  .group-card .tag { font-size: 0.72rem; background: rgba(91,141,238,0.15); color: var(--accent);
                      border: 1px solid rgba(91,141,238,0.3); padding: 2px 8px; border-radius: 8px;
                      margin-right: 6px; }
+  .group-card.hard { border-color: rgba(248,113,113,0.35); }
+  .group-card.hard h3 { color: var(--red); }
+  .group-card.hard .tag { background: rgba(248,113,113,0.12); color: var(--red);
+                           border-color: rgba(248,113,113,0.3); }
+
+  .plan-file { font-size:0.75rem; background: rgba(52,211,153,0.1); color: var(--green);
+               border: 1px solid rgba(52,211,153,0.3); padding: 2px 8px;
+               border-radius: 6px; margin-left: 6px; font-family: monospace; }
 
   .seasonal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
   .sea-event { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
@@ -135,11 +136,10 @@
   .p3 { background: rgba(34,211,238,0.2); color: var(--cyan); }
   .p4 { background: rgba(52,211,153,0.2); color: var(--green); }
 
-  .ranking-table th { background: rgba(91,141,238,0.15); }
-  .ranking-table td.rank { text-align: center; font-weight: 700; color: var(--accent); }
-  .ranking-table td.effort-cell { text-align: center; }
-  td.status-done { color: var(--green); font-weight: 600; }
-  td.status-todo { color: var(--muted); }
+  td.status-done   { color: var(--green); font-weight: 600; }
+  td.status-pending { color: var(--yellow); }
+  td.status-invest { color: var(--cyan); }
+  td.status-wontdo { color: var(--red); opacity: 0.7; }
 
   @media (max-width: 900px) {
     nav.sidebar { display: none; }
@@ -156,399 +156,333 @@
     <h2>🃏 EstimationStation</h2>
     <p>Feature Plan v3.0</p>
   </div>
-  <div class="nav-section">Overview</div>
-  <a href="#completed">✅ Completed Features</a>
-  <a href="#ranking">Master Priority Table</a>
-  <div class="nav-section">v3 Pipeline</div>
-  <a href="#carried">Carried from v2.0</a>
-  <a href="#patch1">P1 — Visual Polish</a>
-  <a href="#patch2">P2 — Voting Enhancements</a>
-  <a href="#patch3">P3 — Party Tools</a>
-  <a href="#patch4">P4 — Analytics</a>
-  <a href="#patch5">P5 — Game Modes</a>
-  <a href="#patch6">P6 — Atmosphere</a>
-  <a href="#patch7">P7 — Jira Integration</a>
-  <a href="#polish">Polish &amp; Fixes</a>
-  <div class="nav-section">Not Planned</div>
-  <a href="#wont-do">Will Not Do (4)</a>
-  <div class="nav-section">Seasonal Expansion</div>
-  <a href="#seasonal-overview">Overview &amp; Priority</a>
+  <div class="nav-section">Remaining Work</div>
+  <a href="#priority">Priority Table</a>
+  <a href="#groups-easy">Groups A–E (Easy)</a>
+  <a href="#groups-med">Groups F–I (Medium)</a>
+  <a href="#groups-hard">Groups J–N (Investigations)</a>
+  <div class="nav-section">Seasonal</div>
+  <a href="#seasonal-overview">Priority System</a>
   <a href="#seasonal-events">All 39 Events</a>
+  <div class="nav-section">Archive</div>
+  <a href="#archive">Done &amp; Won't Do</a>
 </nav>
 
 <main>
 
 <div class="hero">
   <h1>EstimationStation — Feature Plan v3.0</h1>
-  <p>Progress snapshot, new roadmap items, and the expanded seasonal event system.</p>
+  <p>Remaining roadmap, grouped by context-window fit. Each group has a companion plan file for single-session implementation.</p>
   <div class="meta">
-    <span>📅 <b>Updated 2026-05-15</b></span>
-    <span>🏆 <b>7 / 20 v2.0 features complete</b></span>
+    <span>📅 <b>Updated 2026-05-16</b></span>
+    <span>✅ <b>27 items complete</b></span>
+    <span>⏳ <b>1 group remaining (M2/M3: Jira write-back &amp; polish)</b></span>
     <span>🔧 Stack: <b>ASP.NET Core 10 / C# / SignalR / Bootstrap 5 / Vanilla JS</b></span>
-    <span>🗓️ Seasonal: <b>8 → 39 events</b></span>
   </div>
 </div>
 
 <div class="callout good">
-  <strong>What changed in v3.0</strong>
-  Seven of the original 20 features are shipped. New v3.0 patches add 28 more smaller feature ideas across 7 delivery batches.
-  The seasonal system has been redesigned with 39 events, a priority/overlap resolver, and variable-date support for lunar calendar events.
-  Every feature module now ships with a <code>testX()</code> function and an in-tab test button — no more waiting for a real vote reveal.
+  <strong>How to use this plan</strong>
+  Each group (A–N) maps to a plan file in <code>C:\Users\mjdal\.claude\plans\</code>.
+  Open the plan file for that group to get exact code snippets, file locations, and verification steps — without re-reading source files.
+  Groups A–I are client-only or single-file backend changes. Groups J–N require investigation before implementation.
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<h2 id="completed">✅ Completed Features</h2>
+<h2 id="priority">📋 Priority Table — Remaining Work</h2>
 
-<h3>Core Mechanics (v1.0 / v2.0)</h3>
-
-<div class="done-card">
-  <div class="done-icon">😤</div>
-  <div class="done-body">
-    <h4>Shame (Lone Wolf) — <span class="badge badge-pink">TOP PRIORITY</span></h4>
-    <p>Outlier badge highlighted with animated spotlight on reveal. Configurable color and toast message. Syncs <code>--shame-color</code> CSS variable.</p>
-  </div>
-</div>
-<div class="done-card">
-  <div class="done-icon">🤖</div>
-  <div class="done-body">
-    <h4>User Avatars — <span class="badge badge-pink">TOP PRIORITY</span></h4>
-    <p>Initials circles, DiceBear illustrated styles (20+ packs), RoboHash (Robots &amp; Monsters), social photo upload. Real-time sync via SignalR. Sets 3/4/5 disabled (blank-image bug).</p>
-  </div>
-</div>
-<div class="done-card">
-  <div class="done-icon">⚔️</div>
-  <div class="done-body">
-    <h4>Avatar Battle Arena — <span class="badge badge-pink">TOP PRIORITY</span></h4>
-    <p>Animated fighter duel with weapon scaling (vote value → dagger through infinity gauntlet). 3 speed modes, 3 round lengths, 5 outcome modes. Configurable auto-dismiss. 🧪 Test button added.</p>
-  </div>
-</div>
-<div class="done-card">
-  <div class="done-icon">🌡️</div>
-  <div class="done-body">
-    <h4>Anonymous Vibe Check — <span class="badge badge-green">EASY</span></h4>
-    <p>Pre-vote emoji reactions (🚀😱😴🤔💪🤷). Counts shown live, no names attached. Resets with votes. SignalR broadcast.</p>
-  </div>
-</div>
-<div class="done-card">
-  <div class="done-icon">🏅</div>
-  <div class="done-body">
-    <h4>End-of-Session Awards — <span class="badge badge-green">EASY</span></h4>
-    <p>After 2+ rounds, a trophy button appears in Vote History. Computes: The Anchor, Lone Wolf, The Dreamer, The Pragmatist. Pure client-side calculation over history.</p>
-  </div>
-</div>
-<div class="done-card">
-  <div class="done-icon">🔥</div>
-  <div class="done-body">
-    <h4>Estimate Streaks &amp; Godlike Mode — <span class="badge badge-yellow">MED</span></h4>
-    <p>Consecutive consensus votes trigger Triple Consensus → GODLIKE toasts with golden overlay and boosted fireworks. 🧪 Test button added (simulates 5-streak).</p>
-  </div>
-</div>
-<div class="done-card">
-  <div class="done-icon">🗓️</div>
-  <div class="done-body">
-    <h4>Seasonal Themes — <span class="badge badge-yellow">MED</span></h4>
-    <p>8 original seasons with ambient on-screen animations (~80 total) + seasonal confetti override. Per-season enable/disable toggles. Being expanded to 39 events in this release.</p>
-  </div>
-</div>
-
-<h3>Settings &amp; Polish (v2.1)</h3>
-
-<div class="done-card">
-  <div class="done-icon">🌋</div>
-  <div class="done-body">
-    <h4>Floor is Lava — configurable</h4>
-    <p>Outlier badge glows with customizable lava color (CSS variable). Countdown duration configurable 5–120s. 🧪 Test button added (injects a fake badge if none present).</p>
-  </div>
-</div>
-<div class="done-card">
-  <div class="done-icon">🎨</div>
-  <div class="done-body">
-    <h4>Event Colors in Theme System</h4>
-    <p><code>--lava-color-primary</code>, <code>--lava-color-secondary</code>, <code>--shame-color</code> added to all 11 base themes and the custom theme builder. Controllable from both Theme tab and Events tab.</p>
-  </div>
-</div>
-<div class="done-card">
-  <div class="done-icon">🧪</div>
-  <div class="done-body">
-    <h4>Individual Test Buttons for All Effects</h4>
-    <p>Every section in the Events tab now has a 🧪 Test button: Confetti, Fireworks, Balloons, Streak Bonus, Floor is Lava, Shame Spotlight, Avatar Battle, Seasonal Animation. Global button renamed to "🎉 Test All".</p>
-  </div>
-</div>
-
-<hr>
-
-<!-- ══════════════════════════════════════════════════════════ -->
-<h2 id="ranking">Master Priority Table</h2>
-
-<div class="table-wrap"><table class="ranking-table">
-  <tr><th>#</th><th>Feature</th><th>Tier</th><th>Effort</th><th>Status</th><th>Notes</th></tr>
-  <tr><td class="rank">1</td><td><b>Shame (Lone Wolf)</b></td><td><span class="badge badge-pink">TOP</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v1.0</td></tr>
-  <tr><td class="rank">2</td><td><b>User Avatars</b></td><td><span class="badge badge-pink">TOP</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v1.0</td></tr>
-  <tr><td class="rank">3</td><td><b>Avatar Battle</b></td><td><span class="badge badge-pink">TOP</span></td><td class="effort-cell">L</td><td class="status-done">✅ Done</td><td>v1.0</td></tr>
-  <tr><td class="rank">4</td><td>Anonymous Vibe Check</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">S</td><td class="status-done">✅ Done</td><td>v2.0</td></tr>
-  <tr><td class="rank">5</td><td>Ghost Mode</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">S</td><td class="status-done">✅ Done</td><td>v3.0</td></tr>
-  <tr><td class="rank">6</td><td>Discussion Timer (Coffee / Lava)</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">S</td><td class="status-done">✅ Done</td><td>v3.0</td></tr>
-  <tr><td class="rank">7</td><td>Voice-Activated Reveal</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">S</td><td class="status-done">✅ Done</td><td>v3.0</td></tr>
-  <tr><td class="rank">8</td><td>End-of-Session Awards</td><td><span class="badge badge-green">EASY</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v2.0</td></tr>
-  <tr><td class="rank">9</td><td>Estimate Streaks &amp; Godlike Mode</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v2.0</td></tr>
-  <tr><td class="rank">10</td><td>Lone Wolf Counter-Spell</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v3.0</td></tr>
-  <tr><td class="rank">11</td><td>Hall of Fame (per session)</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td><span class="badge badge-blue">🔵 v3</span></td><td>End-session stats screen</td></tr>
-  <tr><td class="rank">12</td><td>Seasonal Themes</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td class="status-done">✅ Done</td><td>v2.0 · expanding to 39 events</td></tr>
-  <tr><td class="rank">13</td><td>The Finisher (Team Ultimate)</td><td><span class="badge badge-yellow">MED</span></td><td class="effort-cell">M</td><td><span class="badge badge-blue">🔵 v3</span></td><td>Celebration extension</td></tr>
-  <tr><td class="rank">14</td><td>Jira Integration</td><td><span class="badge badge-orange">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-blue">🔵 v3</span></td><td>v3.0 Patch 7</td></tr>
-  <tr><td class="rank">15</td><td>Boss Fight Arena</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-blue">🔵 v3</span></td><td>Ticket-state machine</td></tr>
-  <tr><td class="rank">16</td><td>Oracle Prediction</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-blue">🔵 v3</span></td><td>Pre-reveal wager phase</td></tr>
-  <tr><td class="rank">17</td><td>Duel of Perspective</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-red">❌ Won't Do</span></td><td>Too complex, too niche</td></tr>
-  <tr><td class="rank">18</td><td>Power-Ups</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-red">❌ Won't Do</span></td><td>Too complex, too niche</td></tr>
-  <tr><td class="rank">19</td><td>Scrum Gold Economy</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">XL</td><td><span class="badge badge-red">❌ Won't Do</span></td><td>Needs persistence layer</td></tr>
-  <tr><td class="rank">20</td><td>Loot Boxes</td><td><span class="badge badge-red">HARD</span></td><td class="effort-cell">L</td><td><span class="badge badge-red">❌ Won't Do</span></td><td>Depends on Scrum Gold</td></tr>
+<div class="table-wrap"><table>
+  <tr>
+    <th>Group</th><th>Feature(s)</th><th>Tier</th>
+    <th>Files Touched</th><th>Plan File</th><th>Status</th>
+  </tr>
+  <tr>
+    <td><b>A</b></td>
+    <td>🐇 Spring Rabbit Direction Fix</td>
+    <td><span class="badge badge-cyan">BugFix</span></td>
+    <td><code>seasonal.js</code></td>
+    <td><span class="plan-file">plan-A-spring-rabbit.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>B</b></td>
+    <td>✨ Visual Polish — streak glow, vote burst, vibe float</td>
+    <td><span class="badge badge-green">Easy</span></td>
+    <td><code>room.js</code> · <code>celebration.js</code> · <code>site.css</code></td>
+    <td><span class="plan-file">plan-B-visual-polish.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>C</b></td>
+    <td>🃏 Card Flip Reveal (3D animation)</td>
+    <td><span class="badge badge-green">Easy</span></td>
+    <td><code>room.js</code> · <code>site.css</code></td>
+    <td><span class="plan-file">plan-C-card-flip-reveal.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>D</b></td>
+    <td>📊 Vote Distribution Bar</td>
+    <td><span class="badge badge-green">Easy</span></td>
+    <td><code>room.js</code> · <code>Index.cshtml</code> · <code>site.css</code></td>
+    <td><span class="plan-file">plan-D-vote-distribution.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>E</b></td>
+    <td>⚡ Speed Badge + 🌡️ Hot/Cold Meter</td>
+    <td><span class="badge badge-green">Easy</span></td>
+    <td><code>room.js</code> · <code>Index.cshtml</code> · <code>site.css</code></td>
+    <td><span class="plan-file">plan-E-speed-badge-hotcold.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>F</b></td>
+    <td>🎡 Decider Wheel + 🃏 Poker Hand Reveal</td>
+    <td><span class="badge badge-yellow">Medium</span></td>
+    <td><code>room.js</code> · <code>_Layout.cshtml</code> · <code>site.css</code></td>
+    <td><span class="plan-file">plan-F-party-tools.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>G</b></td>
+    <td>💾 Retro CRT Theme (13th theme)</td>
+    <td><span class="badge badge-yellow">Medium</span></td>
+    <td><code>site.js</code> · new <code>crt.css</code> · <code>_Layout.cshtml</code></td>
+    <td><span class="plan-file">plan-G-crt-theme.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>H</b></td>
+    <td>🎵 Ambient Audio (lo-fi, rain, café)</td>
+    <td><span class="badge badge-yellow">Medium</span></td>
+    <td>new <code>audio.js</code> · <code>_Layout.cshtml</code></td>
+    <td><span class="plan-file">plan-H-ambient-audio.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>I</b></td>
+    <td>📈 Analytics — session stats, velocity, bingo</td>
+    <td><span class="badge badge-yellow">Medium</span></td>
+    <td>new <code>analytics.js</code> · <code>_Layout.cshtml</code> · <code>room.js</code></td>
+    <td><span class="plan-file">plan-I-analytics.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>J</b></td>
+    <td>🎯 Voting Enhancements — confidence, anon mode, soundboard</td>
+    <td><span class="badge badge-orange">Hard</span></td>
+    <td><code>PokerHub.cs</code> · <code>PokerModels.cs</code> · <code>room.js</code> · <code>_Layout.cshtml</code></td>
+    <td><span class="plan-file">investigation-voting-backend.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>K</b></td>
+    <td>🐉 Boss Fight Arena (#15)</td>
+    <td><span class="badge badge-red">Hard</span></td>
+    <td>new <code>boss.js</code> · <code>PokerHub.cs</code> · <code>PokerModels.cs</code> · <code>_Layout.cshtml</code></td>
+    <td><span class="plan-file">investigation-boss-fight.md</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+  </tr>
+  <tr>
+    <td><b>L</b></td>
+    <td>🔮 Oracle Prediction (#16)</td>
+    <td><span class="badge badge-red">Hard</span></td>
+    <td><code>PokerHub.cs</code> · <code>PokerModels.cs</code> · <code>room.js</code> · <code>_Layout.cshtml</code></td>
+    <td><span class="plan-file">investigation-oracle.md</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+  </tr>
+  <tr>
+    <td><b>M</b></td>
+    <td>🔗 Jira Integration (#14 / Patch 7)</td>
+    <td><span class="badge badge-red">Hard</span></td>
+    <td>new <code>JiraService.cs</code> · <code>PokerHub.cs</code> · <code>Program.cs</code> · <code>_Layout.cshtml</code></td>
+    <td><span class="plan-file">investigation-jira.md</span></td>
+    <td class="status-done">✅ M1 Done — v3.1</td>
+  </tr>
+  <tr>
+    <td><b>N</b></td>
+    <td>🎮 Game Modes — vote prediction, Devil's Advocate, range voting</td>
+    <td><span class="badge badge-red">Hard</span></td>
+    <td><code>PokerHub.cs</code> · <code>PokerModels.cs</code> · <code>room.js</code></td>
+    <td><span class="plan-file">investigation-game-modes.md</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+  </tr>
+  <tr>
+    <td><b>O</b></td>
+    <td>⚙️ Settings &amp; Quality Polish — toggles, test buttons, voice polish, seasonal per-animation config, card reveal particles, audio broadcast improvements</td>
+    <td><span class="badge badge-green">Easy</span></td>
+    <td><code>_Layout.cshtml</code> · <code>room.js</code> · <code>celebration.js</code> · <code>seasonal.js</code> · <code>voice.js</code> · <code>site.css</code> · <code>PokerHub.cs</code></td>
+    <td><span class="plan-file">plan-O-settings-polish.md</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+  </tr>
 </table></div>
 
 <hr>
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<h2 id="carried">v3 Pipeline — Carried from v2.0</h2>
+<h2 id="groups-easy">Groups A–E — Easy / Client-Only</h2>
 
 <div class="callout info">
-  <strong>Moved from v2.0 backlog</strong>
-  These features were originally ranked in v2.0 but not yet built. All are now part of the v3 pipeline. Each must ship with a <code>testX()</code> function and an in-tab test button.
+  <strong>One plan file per group</strong>
+  Each plan file contains exact code snippets, function locations, and verification steps.
+  These groups were sized to fit in a single context window. Implement in order A → E, or skip to any group independently — they don't depend on each other.
 </div>
 
-<div class="feature-card" id="ghost-mode" style="border-color:var(--green);">
-  <h4>#5 — 👻 Ghost Mode <span class="badge badge-green">EASY · S</span> <span class="status-done">✅ Done — v3.0</span></h4>
-  <p>Global room toggle — any participant can enable/disable ghost mode, all participants see a Teams-style info bar. When on, latecomers who join mid-vote are marked ghosts (watch only). Ghost status clears on reset.</p>
-  <ul>
-    <li><code>GhostModeEnabled</code> on <code>Room</code>; <code>IsGhost</code> on <code>Participant</code></li>
-    <li>New <code>ToggleGhostMode(bool)</code> hub method broadcasts <code>GhostModeToggled</code> event</li>
-    <li>Toggle button in room controls; 👻 badge on ghost participant; vote cards disabled for ghosts</li>
+<div class="group-card" id="group-a">
+  <h3>Group A — 🐇 Spring Rabbit Direction Fix <span class="plan-file">plan-A-spring-rabbit.md</span></h3>
+  <span class="tag">BugFix</span><span class="tag">1 change</span>
+  <ul style="margin-top:10px;">
+    <li>In <code>seasonal.js</code>, find <code>_seaBunnyHop</code>. Change <code>_seaLR(</code> → <code>_seaRL(</code>.</li>
+    <li>The 🐇 emoji faces left; the fix makes it hop from right to left so it no longer appears to hop backwards.</li>
   </ul>
 </div>
 
-<div class="feature-card" id="discussion-timer" style="border-color:var(--green);">
-  <h4>#6 — ☕ Discussion Timer <span class="badge badge-green">EASY · S</span> <span class="status-done">✅ Done — v3.0</span></h4>
-  <p>After a non-consensus reveal, an optional countdown banner gives the team discussion time before 🌋 Floor is Lava kicks in. Both phases optional and independently configurable.</p>
-  <ul>
-    <li>Pure client-side (<code>discussion.js</code>); triggered in <code>VotesRevealed</code> handler</li>
-    <li>Configurable duration (default 120s); enable toggle in Events settings tab</li>
-    <li>On expiry: calls <code>triggerFloorIsLava()</code> automatically (if lava enabled)</li>
-    <li>Clears on vote reset</li>
+<div class="group-card" id="group-b">
+  <h3>Group B — ✨ Visual Polish <span class="plan-file">plan-B-visual-polish.md</span></h3>
+  <span class="tag">Easy</span><span class="tag">room.js · celebration.js · site.css</span>
+  <ul style="margin-top:10px;">
+    <li><b>Streak glow</b> — during an active streak (≥3 consensus), all participant badges glow gold with pulsing animation</li>
+    <li><b>Vote card burst</b> — small confetti burst from badge position when a participant first casts their vote</li>
+    <li><b>Vibe float</b> — clicking a vibe emoji (🚀😱😴 etc.) causes it to float upward from the button</li>
   </ul>
 </div>
 
-<div class="feature-card" id="voice-reveal" style="border-color:var(--green);">
-  <h4>#7 — 🎤 Voice-Activated Reveal <span class="badge badge-green">EASY · S</span> <span class="status-done">✅ Done — v3.0</span></h4>
-  <p>Say a configurable trigger phrase to reveal votes hands-free. Works for whoever enables it locally — no host gating.</p>
-  <ul>
-    <li>Uses <code>window.SpeechRecognition</code> / <code>webkitSpeechRecognition</code> — no server changes</li>
-    <li>Settings: trigger phrase (default "reveal"), language, enable toggle in Events tab</li>
-    <li>🎤 Listening badge in navbar while active; auto-restarts after silence</li>
-    <li>Works in Chrome/Edge; graceful no-op on unsupported browsers</li>
+<div class="group-card" id="group-c">
+  <h3>Group C — 🃏 Card Flip Reveal <span class="plan-file">plan-C-card-flip-reveal.md</span></h3>
+  <span class="tag">Easy</span><span class="tag">room.js · site.css</span>
+  <ul style="margin-top:10px;">
+    <li>On <code>VotesRevealed</code>, add <code>.revealing</code> class to <code>#participantsContainer</code></li>
+    <li>CSS: <code>.revealing .participant-badge</code> plays a 450ms Y-axis flip animation</li>
+    <li>Class removed after 600ms; no impact on subsequent renders</li>
   </ul>
 </div>
 
-<div class="feature-card" id="counter-spell" style="border-color:var(--green);">
-  <h4>#10 — 🪄 Lone Wolf Counter-Spell <span class="badge badge-yellow">MED · M</span> <span class="status-done">✅ Done — v3.0</span></h4>
-  <p>The outlier voter gets a once-per-session button to cast a Counter-Spell, overlaying all other voters with a 🐔 bouncing chicken for a configurable duration.</p>
-  <ul>
-    <li><code>CastCounterSpell()</code> hub method validates caller is current shame participant and <code>CounterUsed == false</code></li>
-    <li><code>CounterUsed: bool</code> on <code>Participant</code>; <code>ShameParticipantId</code> stored on <code>Room</code> at reveal for server-side validation</li>
-    <li>🐔 chicken overlay CSS animation on all non-outlier badges; bouncing keyframe animation</li>
-    <li>Settings: enable toggle, duration (default 4s) in Events tab; 🧪 Test button</li>
+<div class="group-card" id="group-d">
+  <h3>Group D — 📊 Vote Distribution Bar <span class="plan-file">plan-D-vote-distribution.md</span></h3>
+  <span class="tag">Easy</span><span class="tag">room.js · Index.cshtml</span>
+  <ul style="margin-top:10px;">
+    <li>Add <code>#voteDistBar</code> div below stats in <code>Index.cshtml</code></li>
+    <li>New <code>_renderVoteDistribution(votes)</code> function draws proportional coloured segments</li>
+    <li>Called from <code>showStats</code>; cleared on reset</li>
   </ul>
 </div>
 
-<div class="feature-card" id="hall-of-fame">
-  <h4>#11 — 🏆 Hall of Fame <span class="badge badge-yellow">MED · M</span></h4>
-  <p>End-of-session leaderboard showing who was most accurate, fastest voter, most consensus hits, etc.</p>
-  <ul>
-    <li>Persists <code>ConsensusHits</code>, <code>FlipCount</code>, <code>LastVoteMs</code> per participant in backend <code>Room</code></li>
-    <li>Triggered by "End Session" button (host only); shows modal with ranked table</li>
-    <li>Extends existing End-of-Session Awards with more categories</li>
-  </ul>
-</div>
-
-<div class="feature-card" id="finisher">
-  <h4>#13 — 💥 The Finisher <span class="badge badge-yellow">MED · M</span></h4>
-  <p>When the team achieves 3+ consecutive consensus votes, the next consensus triggers a team "Ultimate Move" screen.</p>
-  <ul>
-    <li>Extension of existing streak system — fires after streak ≥ 3 AND consensus</li>
-    <li>Full-screen animated overlay with team name + dramatic title ("SYNCHRONIZED ANNIHILATION")</li>
-    <li>Settings: streak threshold, animation style, enable toggle</li>
-  </ul>
-</div>
-
-<div class="feature-card" id="boss-fight">
-  <h4>#15 — 🐉 Boss Fight Arena <span class="badge badge-red">HARD · L</span></h4>
-  <p>Each story is framed as a boss monster to defeat. Disagreement = the boss attacks; consensus = damage dealt.</p>
-  <ul>
-    <li>New ticket state machine on <code>Room</code>: boss HP, phase, attack log</li>
-    <li>Arena overlay replaces the normal vote reveal</li>
-    <li>Boss art is generated procedurally from story title hash</li>
-  </ul>
-</div>
-
-<div class="feature-card" id="oracle">
-  <h4>#16 — 🔮 Oracle Prediction <span class="badge badge-red">HARD · L</span></h4>
-  <p>Before revealing, each voter secretly wagers whether the group will reach consensus. Correct predictions earn points.</p>
-  <ul>
-    <li>New pre-reveal phase; hidden wagers broadcast on reveal</li>
-    <li>Per-user currency state (<code>es_oraclePoints</code> in localStorage)</li>
-    <li>Settings: wager window (seconds), streak multiplier, enable toggle</li>
+<div class="group-card" id="group-e">
+  <h3>Group E — ⚡ Speed Badge + 🌡️ Hot/Cold Meter <span class="plan-file">plan-E-speed-badge-hotcold.md</span></h3>
+  <span class="tag">Easy</span><span class="tag">room.js · Index.cshtml · site.css</span>
+  <ul style="margin-top:10px;">
+    <li><b>Speed badges</b> — first voter gets ⚡, last voter (if 2+) gets 🐢 on their participant badge post-reveal (uses existing <code>_roundVoteOrder</code>)</li>
+    <li><b>Hot/cold meter</b> — after 2+ rounds, shows 🔥 ON FIRE / 🌡️ WARMING UP / ❄️ ICY based on last 3 rounds' consensus rate</li>
   </ul>
 </div>
 
 <hr>
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<h2>New v3.0 Features</h2>
+<h2 id="groups-med">Groups F–I — Medium Complexity</h2>
 
-<div class="callout info">
-  <strong>Delivery format</strong>
-  v3.0 features ship in 7 patches. Each patch is self-contained and independently reviewable. All new JS modules follow the established pattern including <code>testX()</code>.
-</div>
-
-<div class="patch-card" id="patch1">
-  <h3>Patch 1 — 🃏 Visual Polish</h3>
-  <span class="tag">Easy</span><span class="tag">Client-only</span>
+<div class="group-card" id="group-f">
+  <h3>Group F — 🎉 Party Tools <span class="plan-file">plan-F-party-tools.md</span></h3>
+  <span class="tag">Medium</span><span class="tag">room.js · _Layout.cshtml · site.css</span>
   <ul style="margin-top:10px;">
-    <li><b>Card particle burst</b> — confetti burst from the voted card position on each vote cast</li>
-    <li><b>Card flip reveal</b> — cards animate with a 3D flip when votes are revealed instead of just appearing</li>
-    <li><b>Streak name glow</b> — participant badges glow gold during an active streak</li>
-    <li><b>Reaction burst</b> — when you cast a vibe reaction, a brief emoji floats up from the button</li>
+    <li><b>The Decider Wheel</b> — canvas spin-the-wheel overlay that lands on a random participant; picks who speaks first. New modal + JS in <code>room.js</code>.</li>
+    <li><b>Poker Hand Reveal</b> — sequential vote reveal (one card per 380ms), toggled via Events settings. Adds <code>_sequentialReveal()</code> to <code>room.js</code> and a checkbox to celebration settings.</li>
   </ul>
 </div>
 
-<div class="patch-card" id="patch2">
-  <h3>Patch 2 — 📊 Voting Enhancements</h3>
-  <span class="tag">Easy–Med</span><span class="tag">Some backend</span>
+<div class="group-card" id="group-g">
+  <h3>Group G — 💾 Retro CRT Theme <span class="plan-file">plan-G-crt-theme.md</span></h3>
+  <span class="tag">Medium</span><span class="tag">site.js · new crt.css · _Layout.cshtml</span>
   <ul style="margin-top:10px;">
-    <li><b>Confidence indicator</b> — optional slider (1–5 stars) alongside your vote card; broadcast and shown post-reveal</li>
-    <li><b>Speed badge</b> — first voter gets a ⚡ badge; last voter (before reveal) gets a 🐢 badge</li>
-    <li><b>Hot/cold meter</b> — after several rounds, a "temperature" gauge tracks whether the team is converging or diverging</li>
-    <li><b>Anonymous mode</b> — room-level setting (host toggle) that hides voter names until reveal</li>
+    <li>13th base theme: dark green phosphor, <code>Courier New</code> font, scanline overlay via CSS <code>::after</code></li>
+    <li>Add <code>'crt'</code> to <code>BASE_THEMES</code> and <code>BASE_THEME_LABELS</code> in <code>site.js</code></li>
+    <li>New <code>wwwroot/css/crt.css</code> always loaded; only activates when <code>data-theme="crt"</code></li>
   </ul>
 </div>
 
-<div class="patch-card" id="patch3">
-  <h3>Patch 3 — 🎰 Party Tools</h3>
-  <span class="tag">Medium</span><span class="tag">Client-only</span>
+<div class="group-card" id="group-h">
+  <h3>Group H — 🎵 Ambient Audio <span class="plan-file">plan-H-ambient-audio.md</span></h3>
+  <span class="tag">Medium</span><span class="tag">new audio.js · _Layout.cshtml</span>
   <ul style="margin-top:10px;">
-    <li><b>Poker hand reveal</b> — instead of cards flipping simultaneously, they flip one-by-one with a dramatic reveal drum-roll</li>
-    <li><b>Soundboard</b> — host can trigger crowd sounds (👏 applause, 😂 laugh track, 🔔 ding) from a panel; broadcast to all</li>
-    <li><b>The Decider wheel</b> — spin-the-wheel overlay that lands on a random participant; used to pick who speaks next</li>
-    <li><b>Vote distribution bar</b> — animated horizontal bar chart showing vote spread, shown post-reveal alongside the results</li>
+    <li>New <code>audio.js</code> module: <code>startAmbient()</code>, <code>stopAmbient()</code>, localStorage settings persistence</li>
+    <li>Sound options: Lo-Fi, Rain, Café (Off default)</li>
+    <li>Settings panel in Events tab with source selector + volume slider</li>
+    <li><b>Note:</b> Audio URLs are placeholders — source royalty-free files to <code>wwwroot/audio/</code> before shipping</li>
   </ul>
 </div>
 
-<div class="patch-card" id="patch4">
-  <h3>Patch 4 — 📈 Analytics</h3>
-  <span class="tag">Medium</span><span class="tag">localStorage</span>
+<div class="group-card" id="group-i">
+  <h3>Group I — 📈 Session Analytics <span class="plan-file">plan-I-analytics.md</span></h3>
+  <span class="tag">Medium</span><span class="tag">new analytics.js · _Layout.cshtml · room.js</span>
   <ul style="margin-top:10px;">
-    <li><b>Room lifetime stats panel</b> — sidebar widget showing total rounds, consensus rate, average estimation time, longest streak</li>
-    <li><b>Velocity tracker</b> — tracks story points per session over time (localStorage); shown as a sparkline in the stats panel</li>
-    <li><b>Planning poker bingo</b> — auto-generated bingo card (e.g. "someone votes ∞", "first-try consensus", "longest debate"); marks off automatically</li>
-  </ul>
-</div>
-
-<div class="patch-card" id="patch5">
-  <h3>Patch 5 — 🎮 Game Modes</h3>
-  <span class="tag">Hard</span><span class="tag">Backend changes</span>
-  <ul style="margin-top:10px;">
-    <li><b>Vote prediction</b> — before reveal, each player secretly predicts the majority vote; correct = bonus points toward Oracle currency</li>
-    <li><b>Devil's Advocate role</b> — one randomly assigned player must argue against the consensus, even if they agree (shown post-reveal)</li>
-    <li><b>Range voting mode</b> — instead of single-point cards, players pick a min/max range; displayed as confidence intervals</li>
-  </ul>
-</div>
-
-<div class="patch-card" id="patch6">
-  <h3>Patch 6 — 🌆 Atmosphere</h3>
-  <span class="tag">Medium</span><span class="tag">Client-only</span>
-  <ul style="margin-top:10px;">
-    <li><b>Background ambience audio</b> — optional lo-fi music or office/café background sounds; volume control in settings; plays via Web Audio API</li>
-    <li><b>Retro CRT theme</b> — 13th CSS theme: scanline overlay, green phosphor text, CRT bloom effect, old-school beep sounds on votes</li>
-  </ul>
-</div>
-
-<div class="patch-card" id="patch7">
-  <h3>Patch 7 — 🔗 Jira Integration</h3>
-  <span class="tag">Hard</span><span class="tag">Full backend</span>
-  <ul style="margin-top:10px;">
-    <li>Import Jira backlog items via JQL query into the story list</li>
-    <li>C# backend: <code>JiraService.cs</code> calls Jira REST API; secrets stored in <code>appsettings.json</code> (not committed)</li>
-    <li>Frontend: Jira import wizard in the Room settings panel</li>
-    <li>ADF description parsing → plain text for story display</li>
-    <li>Portal animation (spinning cards) during import</li>
-    <li>Write estimated points back to Jira story point field on session end (optional)</li>
+    <li><b>Session stats</b> — rounds, consensus %, best streak, estimated points (from consensus votes)</li>
+    <li><b>Velocity sparkline</b> — cross-session bar chart from localStorage; auto-saved after each round</li>
+    <li><b>Planning Bingo</b> — 9-square auto-bingo card (∞ vote, first-try consensus, flip 3+ times, etc.)</li>
+    <li>📊 Analytics button appears beside 🏆 Awards after 2+ rounds</li>
   </ul>
 </div>
 
 <hr>
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<h2 id="polish">🔧 v3.0 Polish &amp; Fixes</h2>
+<h2 id="groups-hard">Groups J–N — Investigation Required</h2>
 
-<div class="callout good">
-  <strong>Small targeted improvements</strong>
-  These don't need a full patch — they're focused quality-of-life fixes and UX enhancements that ship alongside any other work.
+<div class="callout warn">
+  <strong>Read investigation files before starting</strong>
+  These groups require backend changes, have cross-cutting concerns, or need design decisions before implementation. Each investigation doc lists effort estimates, options, and recommended sequencing.
 </div>
 
-<div class="patch-card">
-  <h3>🎯 Shame Settings Inline Preview</h3>
-  <span class="tag">Easy</span><span class="tag">Client-only</span>
+<div class="group-card hard" id="group-j">
+  <h3>Group J — 🎯 Voting Enhancements (Backend) <span class="plan-file">investigation-voting-backend.md</span></h3>
+  <span class="tag">Hard</span><span class="tag">PokerHub.cs · PokerModels.cs · room.js · _Layout.cshtml</span>
   <ul style="margin-top:10px;">
-    <li>Add a live preview inside the Shame Spotlight settings panel — a mini participant badge with the glow shadow and a mock toast — both update in real-time as you change the color picker or message text</li>
-    <li>Similar in concept to the Theme tab's Live Preview pane</li>
-    <li>No new settings keys; purely cosmetic feedback in <code>_Layout.cshtml</code> + <code>shame.js</code></li>
+    <li><b>Confidence Indicator</b> — 1–5 star rating alongside vote; new hub method <code>CastConfidence(int)</code></li>
+    <li><b>Anonymous Mode</b> — hide participant names until reveal; server-side alias assignment</li>
+    <li><b>Soundboard</b> — start local-only; upgrade to broadcast later via <code>TriggerSound(string)</code></li>
   </ul>
 </div>
 
-<div class="patch-card">
-  <h3>▶ Per-Season Test Buttons</h3>
-  <span class="tag">Easy</span><span class="tag">Client-only</span>
+<div class="group-card hard" id="group-k">
+  <h3>Group K — 🐉 Boss Fight Arena (#15) <span class="plan-file">investigation-boss-fight.md</span></h3>
+  <span class="tag">Hard</span><span class="tag">new boss.js · PokerHub.cs · PokerModels.cs · _Layout.cshtml</span>
   <ul style="margin-top:10px;">
-    <li>Each of the 39 seasonal event checkboxes gets a small <code>▶</code> icon that fires that season's animation immediately</li>
-    <li>New <code>testSpecificSeason(key)</code> function in <code>seasonal.js</code> — picks a random animation from <code>SEA_ANIMS[key]</code></li>
-    <li>No need to wait for a real date match; every season is now individually testable from settings</li>
+    <li>State machine on Room: boss HP, phase, attack log</li>
+    <li>Procedural boss art from story title hash — deterministic emoji + color</li>
+    <li>Consensus = damage; disagreement = boss attacks back</li>
+    <li><b>Complexity HIGH</b> — not recommended until Groups A–I complete</li>
   </ul>
 </div>
 
-<div class="patch-card">
-  <h3>🐇 Spring Rabbit Direction Fix</h3>
-  <span class="tag">Trivial</span><span class="tag">Bug fix</span>
+<div class="group-card hard" id="group-l">
+  <h3>Group L — 🔮 Oracle Prediction (#16) <span class="plan-file">investigation-oracle.md</span></h3>
+  <span class="tag">Hard</span><span class="tag">PokerHub.cs · PokerModels.cs · room.js · _Layout.cshtml</span>
   <ul style="margin-top:10px;">
-    <li>The 🐇 emoji faces left but <code>_seaBunnyHop()</code> was using the left-to-right animation — making it appear to hop backwards</li>
-    <li>Fix: change <code>sea-lr</code> → <code>sea-rl</code> so the rabbit moves from right to left, matching its facing direction</li>
+    <li>New pre-reveal wager phase: 15s countdown, predict consensus yes/no</li>
+    <li>Server-side auto-close timer; correct predictors earn Oracle Points (localStorage)</li>
+    <li>Intercepts the reveal flow — needs careful sequencing with other reveal-phase features</li>
   </ul>
 </div>
 
-<hr>
-
-<!-- ══════════════════════════════════════════════════════════ -->
-<h2 id="wont-do">🚫 Will Not Do</h2>
-
-<div class="callout danger">
-  <strong>Removed from roadmap</strong>
-  These four features were originally ranked in v2.0 but are being formally dropped. The complexity-to-fun ratio doesn't justify the build cost, and #19 and #20 require a persistence layer that would be an architectural shift for what is intentionally a stateless, in-memory app.
+<div class="group-card hard" id="group-m">
+  <h3>Group M — 🔗 Jira Integration (#14) <span class="plan-file">investigation-jira.md</span></h3>
+  <span class="tag">Hard</span><span class="tag">new JiraService.cs · PokerHub.cs · Program.cs · _Layout.cshtml</span>
+  <ul style="margin-top:10px;">
+    <li>Import Jira backlog via JQL; C# <code>JiraService</code> calls Jira REST API</li>
+    <li>Credentials passed client → server per request; never stored server-side</li>
+    <li>ADF description parsing → plain text</li>
+    <li>Optional write-back of story points after estimation</li>
+  </ul>
 </div>
 
-<div class="feature-card" style="border-color:var(--red);opacity:0.7;" id="duel">
-  <h4 style="color:var(--red);">#17 — ⚡ Duel of Perspective <span class="badge badge-red">HARD · L</span></h4>
-  <p>Post-reveal 1v1 debate duel with hotkey attack spells. Interactive but too niche — most teams just want to discuss, not fight.</p>
-</div>
-
-<div class="feature-card" style="border-color:var(--red);opacity:0.7;" id="power-ups">
-  <h4 style="color:var(--red);">#18 — ⚡ Power-Ups <span class="badge badge-red">HARD · L</span></h4>
-  <p>Per-session special abilities (Mirror, Smoke, Double-Down, Bomb). Adds server-side inventory validation complexity with limited payoff.</p>
-</div>
-
-<div class="feature-card" style="border-color:var(--red);opacity:0.7;" id="scrum-gold">
-  <h4 style="color:var(--red);">#19 — 💰 Scrum Gold Economy <span class="badge badge-red">HARD · XL</span></h4>
-  <p>Persistent in-game currency requiring a storage layer. The app is intentionally stateless and in-memory; this would be a fundamental architectural change.</p>
-</div>
-
-<div class="feature-card" style="border-color:var(--red);opacity:0.7;" id="loot-boxes">
-  <h4 style="color:var(--red);">#20 — 🎁 Loot Boxes <span class="badge badge-red">HARD · L</span></h4>
-  <p>Random cosmetic drops dependent on Scrum Gold (#19). Dropped with its prerequisite.</p>
+<div class="group-card hard" id="group-n">
+  <h3>Group N — 🎮 Game Modes (Patch 5) <span class="plan-file">investigation-game-modes.md</span></h3>
+  <span class="tag">Hard</span><span class="tag">PokerHub.cs · PokerModels.cs · room.js</span>
+  <ul style="margin-top:10px;">
+    <li><b>Vote Prediction (local)</b> — predict majority value before reveal; easy, no backend ✅ do this first</li>
+    <li><b>Devil's Advocate</b> — secret role assigned to one player; 1 hub method</li>
+    <li><b>Range Voting</b> — min/max instead of single point; breaking API change — defer</li>
+  </ul>
 </div>
 
 <hr>
@@ -652,6 +586,183 @@ const SEA_EVENT_TABLE = [
   Mar 14: Pi Day (P1) beats Spring (P4) and Holi (P3). ·
   Unchecking Halloween in settings → Oct 21 falls through to Autumn.
 </div>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2 id="archive">📦 Archive — Done &amp; Won't Do</h2>
+
+<div class="callout good">
+  <strong>Completed or formally dropped</strong>
+  All items below are either shipped or have been deliberately removed from the roadmap. Won't Do items cite the reason.
+</div>
+
+<div class="table-wrap"><table>
+  <tr><th>#</th><th>Feature</th><th>Tier</th><th>Status</th><th>Notes</th></tr>
+
+  <tr>
+    <td>1</td><td><b>Shame (Lone Wolf)</b></td>
+    <td><span class="badge badge-pink">TOP</span></td>
+    <td class="status-done">✅ Done — v1.0</td>
+    <td>Outlier badge spotlight, configurable color, shame toast. <code>--shame-color</code> CSS variable.</td>
+  </tr>
+  <tr>
+    <td>2</td><td><b>User Avatars</b></td>
+    <td><span class="badge badge-pink">TOP</span></td>
+    <td class="status-done">✅ Done — v1.0</td>
+    <td>Initials, DiceBear (20+ styles), RoboHash, social photo upload. Real-time SignalR sync.</td>
+  </tr>
+  <tr>
+    <td>3</td><td><b>Avatar Battle Arena</b></td>
+    <td><span class="badge badge-pink">TOP</span></td>
+    <td class="status-done">✅ Done — v1.0</td>
+    <td>Animated duel, vote-scaled weapons, 3 speed modes, 3 round lengths, 5 outcome modes.</td>
+  </tr>
+  <tr>
+    <td>4</td><td>Anonymous Vibe Check</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v2.0</td>
+    <td>Pre-vote emoji reactions (🚀😱😴🤔💪🤷). Live counts, no names, resets with votes.</td>
+  </tr>
+  <tr>
+    <td>5</td><td>Ghost Mode</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v3.0</td>
+    <td>Latecomers watch-only. <code>GhostModeEnabled</code> on Room; <code>IsGhost</code> on Participant.</td>
+  </tr>
+  <tr>
+    <td>6</td><td>Discussion Timer (Coffee / Lava)</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v3.0</td>
+    <td>Post-reveal countdown before Floor is Lava triggers. Configurable duration, pure client-side.</td>
+  </tr>
+  <tr>
+    <td>7</td><td>Voice-Activated Reveal</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v3.0</td>
+    <td>SpeechRecognition API, configurable phrase, 🎤 badge in navbar. Chrome/Edge only.</td>
+  </tr>
+  <tr>
+    <td>8</td><td>End-of-Session Awards (Hall of Fame)</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v2.0 / v3.0</td>
+    <td>Trophy button after 2+ rounds. Leaderboard + crown awards (Consensus King, Lone Wolf, etc.).</td>
+  </tr>
+  <tr>
+    <td>9</td><td>Estimate Streaks &amp; Godlike Mode</td>
+    <td><span class="badge badge-yellow">MED</span></td>
+    <td class="status-done">✅ Done — v2.0</td>
+    <td>Consecutive consensus → Triple / Godlike toasts + golden overlay + boosted fireworks.</td>
+  </tr>
+  <tr>
+    <td>10</td><td>Lone Wolf Counter-Spell</td>
+    <td><span class="badge badge-yellow">MED</span></td>
+    <td class="status-done">✅ Done — v3.0</td>
+    <td>Outlier casts 🐔 bouncing chicken over other voters. Once-per-session, server-validated.</td>
+  </tr>
+  <tr>
+    <td>11</td><td>Hall of Fame (session leaderboard)</td>
+    <td><span class="badge badge-yellow">MED</span></td>
+    <td class="status-done">✅ Done — v3.0</td>
+    <td>Part of End-of-Session Awards. <code>awards.js</code> computes stats from <code>roomState.history</code>.</td>
+  </tr>
+  <tr>
+    <td>12</td><td>Seasonal Themes</td>
+    <td><span class="badge badge-yellow">MED</span></td>
+    <td class="status-done">✅ Done — v2.0</td>
+    <td>45+ animations across 8 original seasons. Expanded to 39 events in v3.0 design.</td>
+  </tr>
+  <tr>
+    <td>13</td><td>The Finisher (Team Ultimate)</td>
+    <td><span class="badge badge-yellow">MED</span></td>
+    <td class="status-done">✅ Done — v3.0</td>
+    <td>Full-screen overlay on streak ≥ N consecutive consensus. Tiered dramatic titles. Configurable threshold.</td>
+  </tr>
+  <tr>
+    <td>—</td><td>Floor is Lava — configurable</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v2.1</td>
+    <td>Lava glow color + countdown duration configurable. 🧪 test button. CSS variable <code>--lava-color-primary</code>.</td>
+  </tr>
+  <tr>
+    <td>—</td><td>Event Colors in Theme System</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v2.1</td>
+    <td><code>--lava-color-*</code> and <code>--shame-color</code> across all 12 themes + custom builder.</td>
+  </tr>
+  <tr>
+    <td>—</td><td>Individual Test Buttons for All Effects</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v2.1</td>
+    <td>Every Events tab section has a 🧪 test button. Global "🎉 Test All" preserved.</td>
+  </tr>
+  <tr>
+    <td>—</td><td>Shame Settings Inline Preview</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v3.0</td>
+    <td>Live preview badge + toast in shame settings. <code>_updateShamePreview()</code> in <code>shame.js</code>.</td>
+  </tr>
+  <tr>
+    <td>—</td><td>Per-Season Test Buttons</td>
+    <td><span class="badge badge-green">EASY</span></td>
+    <td class="status-done">✅ Done — v3.0</td>
+    <td>▶ and ⚙️ buttons on every season row in seasonal settings.</td>
+  </tr>
+  <tr>
+    <td>—</td><td>Flag Emoji → flagcdn.com</td>
+    <td><span class="badge badge-cyan">BugFix</span></td>
+    <td class="status-done">✅ Done — 2026-05-15</td>
+    <td>Windows 11 doesn't render Unicode regional indicator flags. Replaced with <code>&lt;img&gt;</code> tags from flagcdn.com in seasonal.js + _Layout.cshtml.</td>
+  </tr>
+  <tr>
+    <td>17</td><td>Duel of Perspective</td>
+    <td><span class="badge badge-red">HARD</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+    <td>Post-reveal 1v1 debate duel with hotkey attack spells. Too niche — most teams just want to discuss.</td>
+  </tr>
+  <tr>
+    <td>18</td><td>Power-Ups</td>
+    <td><span class="badge badge-red">HARD</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+    <td>Per-session special abilities (Mirror, Smoke, Double-Down, Bomb). Server-side inventory complexity with limited payoff.</td>
+  </tr>
+  <tr>
+    <td>19</td><td>Scrum Gold Economy</td>
+    <td><span class="badge badge-red">HARD</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+    <td>Persistent in-game currency requiring a storage layer. The app is intentionally stateless and in-memory.</td>
+  </tr>
+  <tr>
+    <td>20</td><td>Loot Boxes</td>
+    <td><span class="badge badge-red">HARD</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+    <td>Depends on Scrum Gold (#19). Dropped with its prerequisite.</td>
+  </tr>
+  <tr>
+    <td>K</td><td>🐉 Boss Fight Arena (#15)</td>
+    <td><span class="badge badge-red">HARD</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+    <td>Procedural boss sprites, HP bars, damage/attack broadcast — touches 6+ files with complex server state. High effort, low poker planning value.</td>
+  </tr>
+  <tr>
+    <td>L</td><td>🔮 Oracle Prediction (#16)</td>
+    <td><span class="badge badge-red">HARD</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+    <td>Adds a new wager phase that intercepts the reveal flow + server-side timer. Significant hub refactor for a niche game mechanic.</td>
+  </tr>
+  <tr>
+    <td>N</td><td>🎮 Game Modes — vote prediction, Devil's Advocate, range voting</td>
+    <td><span class="badge badge-red">HARD</span></td>
+    <td class="status-wontdo">❌ Won't Do</td>
+    <td>Devil's Advocate requires secret per-player hub messages; Range voting is a breaking API change to CastVote. Complexity outweighs benefit.</td>
+  </tr>
+  <tr>
+    <td>O</td><td>⚙️ Settings &amp; Quality Polish (Patches A–F)</td>
+    <td><span class="badge badge-green">Easy</span></td>
+    <td class="status-done">✅ Done — v3.1</td>
+    <td>Full settings pass: counter-spell bar fix, voice modal indicator, runTest() wrapper, poker reveal test, speed/hot-cold/vote-dist toggles, per-animation seasonal config, card reveal particles, sound receive toggle + subtitle, custom audio broadcast, decider wheel test.</td>
+  </tr>
+</table></div>
 
 </main>
 </div>

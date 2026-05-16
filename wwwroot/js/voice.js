@@ -42,6 +42,8 @@ function saveVoiceFromForm() {
 
 function startVoiceRecognition() {
     stopVoiceRecognition();
+    // Only activate in a room context (revealVotes is defined there)
+    if (typeof revealVotes !== 'function') return;
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { console.warn('Speech recognition not supported'); return; }
     var s = getVoiceSettings();
@@ -84,15 +86,19 @@ function stopVoiceRecognition() {
 }
 
 function _setMicIndicator(on) {
-    var el = document.getElementById('voice-mic-indicator');
-    if (el) el.style.display = on ? '' : 'none';
+    ['voice-mic-indicator', 'voice-mic-indicator-modal'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = on ? '' : 'none';
+    });
 }
 
 function _voiceFlash() {
-    var el = document.getElementById('voice-mic-indicator');
-    if (!el) return;
-    el.classList.add('voice-flash');
-    setTimeout(function() { el.classList.remove('voice-flash'); }, 600);
+    ['voice-mic-indicator', 'voice-mic-indicator-modal'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('voice-flash');
+        setTimeout(function() { el.classList.remove('voice-flash'); }, 600);
+    });
 }
 
 function testVoiceRecognition() {

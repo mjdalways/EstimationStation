@@ -7,6 +7,12 @@ public class RoomService
 {
     private readonly ConcurrentDictionary<string, Room> _rooms = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _connectionToRoom = new();
+    private readonly IRoomRepository _repo;
+
+    public RoomService(IRoomRepository repo)
+    {
+        _repo = repo;
+    }
 
     public static readonly Dictionary<string, EstimateSetInfo> EstimateSets = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -44,7 +50,25 @@ public class RoomService
 
     public Room GetOrCreateRoom(string roomName)
     {
-        return _rooms.GetOrAdd(roomName, name => new Room { Name = name });
+        if (_rooms.TryGetValue(roomName, out var existing)) return existing;
+
+        var persisted = _repo.GetRoom(roomName);
+        if (persisted != null)
+        {
+            _rooms[roomName] = persisted;
+            return persisted;
+        }
+
+        var room = new Room { Name = roomName };
+        _rooms[roomName] = room;
+        _repo.SaveRoom(room);
+        return room;
+    }
+
+    public void SaveRoom(Room room)
+    {
+        room.LastActivity = DateTime.UtcNow;
+        _repo.SaveRoom(room);
     }
 
     public Room? GetRoom(string roomName)
@@ -66,6 +90,10 @@ public class RoomService
 
     public void RemoveConnection(string connectionId)
     {
-        _connectionToRoom.TryRemove(connectionId, out _);
+        if (_connectionToRoom.TryRemove(connectionId, out var roomName))
+        {
+            if (_rooms.TryGetValue(roomName, out var room))
+                _repo.SaveRoom(room);
+        }
     }
 }
