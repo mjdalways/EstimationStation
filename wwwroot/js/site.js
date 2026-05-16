@@ -293,6 +293,205 @@ function installApp() {
 }
 
 // ============================================================
+// Settings Test Previews
+// All test functions render floating overlays above the modal.
+// No room DOM elements are touched — works from any page.
+// ============================================================
+function _testOverlay(html, ms) {
+    var existing = document.getElementById('_es_test_preview');
+    if (existing) existing.remove();
+    var el = document.createElement('div');
+    el.id = '_es_test_preview';
+    el.style.cssText = 'position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:2100;'
+        + 'background:var(--card-bg,#fff);border:1px solid var(--panel-border,#dee2e6);'
+        + 'border-radius:10px;padding:12px 20px;box-shadow:0 4px 20px rgba(0,0,0,0.25);'
+        + 'min-width:260px;max-width:440px;text-align:center;pointer-events:none;font-size:0.92rem;';
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    setTimeout(function() { if (el.parentNode) el.remove(); }, ms || 3500);
+    return el;
+}
+
+function testHotCold() {
+    _testOverlay(
+        '🔥 <span style="font-weight:700;color:#ff6b35;">ON FIRE</span>'
+        + ' <span style="font-size:0.75rem;opacity:0.6;">(last 3 rounds consistent)</span>',
+        3000
+    );
+}
+
+function testVoteDist() {
+    var fakeCounts = { '1': 2, '3': 1, '8': 3 };
+    var total = 6;
+    var bars = Object.keys(fakeCounts).map(function(v) {
+        return '<div style="flex:' + fakeCounts[v] + ';display:flex;align-items:center;justify-content:center;'
+            + 'font-size:0.75rem;font-weight:700;color:#fff;background:hsl('
+            + (parseInt(v) * 22) + ',65%,45%);min-width:28px;padding:4px 0;" title="' + v + ': ' + fakeCounts[v] + ' votes">' + v + '</div>';
+    });
+    _testOverlay(
+        '<div style="font-size:0.8rem;color:var(--text-secondary,#6c757d);margin-bottom:6px;">Vote spread preview</div>'
+        + '<div style="display:flex;gap:3px;height:32px;border-radius:5px;overflow:hidden;">' + bars.join('') + '</div>',
+        3500
+    );
+}
+
+function testSpeedBadges() {
+    _testOverlay(
+        '<div style="font-size:0.75rem;color:var(--text-secondary,#6c757d);margin-bottom:8px;">Speed badges preview</div>'
+        + '<div style="display:flex;gap:10px;justify-content:center;">'
+        + '<div style="padding:8px 12px;border:1px solid #dee2e6;border-radius:8px;position:relative;font-size:0.85rem;">'
+        + '👤 Alice<span style="position:absolute;top:-7px;right:-7px;font-size:0.8rem;background:#fff176;border-radius:50%;padding:1px 4px;box-shadow:0 1px 3px rgba(0,0,0,0.2);">⚡</span></div>'
+        + '<div style="padding:8px 12px;border:1px solid #dee2e6;border-radius:8px;font-size:0.85rem;">👤 Bob</div>'
+        + '<div style="padding:8px 12px;border:1px solid #dee2e6;border-radius:8px;position:relative;font-size:0.85rem;">'
+        + '👤 Carol<span style="position:absolute;top:-7px;right:-7px;font-size:0.8rem;background:#e0e0e0;border-radius:50%;padding:1px 4px;box-shadow:0 1px 3px rgba(0,0,0,0.2);">🐢</span></div>'
+        + '</div>',
+        3000
+    );
+}
+
+function testSlotMachine() {
+    var cs = typeof getCelebrationSettings === 'function' ? getCelebrationSettings() : {};
+    var speeds = { fast: 500, normal: 800, dramatic: 1300 };
+    var slotMs = speeds[cs.suspenseSpeed || 'normal'] || 800;
+    var vals = ['3', '5', '8'];
+    var overlay = _testOverlay(
+        '<div style="font-size:0.75rem;color:var(--text-secondary,#6c757d);margin-bottom:8px;">Slot machine preview</div>'
+        + '<div style="display:flex;gap:12px;justify-content:center;">'
+        + vals.map(function(v) {
+            return '<div class="participant-badge voted" data-testbadge="1" '
+                + 'style="padding:12px 16px;font-size:1.1rem;border:2px solid #dee2e6;border-radius:8px;background:var(--card-bg,#fff);">'
+                + '<span class="vote-hidden" style="font-weight:700;">' + v + '</span></div>';
+        }).join('') + '</div>',
+        vals.length * 380 + slotMs + 1500
+    );
+    overlay.style.pointerEvents = 'none';
+    var badges = Array.from(overlay.querySelectorAll('[data-testbadge]'));
+    badges.forEach(function(badge, i) {
+        var val = vals[i];
+        setTimeout(function() {
+            badge.classList.add('poker-flip');
+            if (typeof _slotMachineReveal === 'function') {
+                _slotMachineReveal(badge, val, slotMs, function() { badge.classList.remove('poker-flip'); });
+            } else {
+                var span = badge.querySelector('.vote-hidden, .participant-vote');
+                var pool = ['1','2','3','5','8','13','21'];
+                var idx = 0;
+                var t = setInterval(function() { if (span) span.textContent = pool[idx++ % pool.length]; }, 80);
+                setTimeout(function() {
+                    clearInterval(t);
+                    if (span) { span.textContent = val; span.className = 'participant-vote'; }
+                    badge.classList.remove('poker-flip');
+                }, slotMs);
+            }
+        }, i * 380);
+    });
+}
+
+// ============================================================
+// Decider Wheel (global — modal is in _Layout, works from any page)
+// ============================================================
+var _deciderSpinning = false;
+var _deciderParticipants = null; // set by testDecider() to inject fake participants
+
+function _deciderNames() {
+    var participants = _deciderParticipants
+        || (window.roomState && window.roomState.participants)
+        || [];
+    return participants.filter(function(p) { return !p.isObserver && !p.isGhost; })
+                       .map(function(p) { return p.name; });
+}
+
+function openDecider() {
+    _drawDeciderWheel();
+    document.getElementById('deciderResult').textContent = '';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deciderModal')).show();
+}
+
+function _drawDeciderWheel(highlightIdx) {
+    var canvas = document.getElementById('deciderCanvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var names = _deciderNames();
+    if (names.length === 0) {
+        ctx.clearRect(0, 0, 280, 280);
+        ctx.fillStyle = '#888';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No participants', 140, 145);
+        return;
+    }
+    var arc = (2 * Math.PI) / names.length;
+    var colors = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#0dcaf0','#fd7e14','#20c997'];
+    var cx = 140, cy = 140, r = 130;
+    ctx.clearRect(0, 0, 280, 280);
+    names.forEach(function(name, i) {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, i * arc - Math.PI / 2, (i + 1) * arc - Math.PI / 2);
+        ctx.fillStyle = i === highlightIdx ? '#ffd700' : colors[i % colors.length];
+        ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(i * arc + arc / 2 - Math.PI / 2);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold ' + Math.min(14, Math.floor(110 / names.length) + 6) + 'px sans-serif';
+        ctx.fillText(name.substring(0, 12), r - 8, 5);
+        ctx.restore();
+    });
+    ctx.beginPath(); ctx.arc(cx, cy, 18, 0, 2 * Math.PI); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx, cy - r + 4); ctx.lineTo(cx - 8, cy - r + 18); ctx.lineTo(cx + 8, cy - r + 18);
+    ctx.fillStyle = '#333'; ctx.fill();
+}
+
+function spinDecider() {
+    if (_deciderSpinning) return;
+    var names = _deciderNames();
+    if (names.length === 0) return;
+    _deciderSpinning = true;
+    document.getElementById('deciderResult').textContent = '...';
+    var winner = Math.floor(Math.random() * names.length);
+    var totalFrames = 60;
+    var frame = 0;
+    function _escHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function tick() {
+        var progress = frame / totalFrames;
+        _drawDeciderWheel(frame < totalFrames ? undefined : winner);
+        frame++;
+        if (frame <= totalFrames) {
+            setTimeout(tick, 16 + progress * 24);
+        } else {
+            _deciderSpinning = false;
+            document.getElementById('deciderResult').innerHTML =
+                '🎯 <strong>' + _escHtml(names[winner]) + '</strong> goes first!';
+        }
+    }
+    tick();
+}
+
+function testDecider() {
+    _deciderParticipants = [
+        { name: 'Alice',   isObserver: false, isGhost: false },
+        { name: 'Bob',     isObserver: false, isGhost: false },
+        { name: 'Charlie', isObserver: false, isGhost: false },
+        { name: 'Diana',   isObserver: false, isGhost: false },
+        { name: 'Evan',    isObserver: false, isGhost: false }
+    ];
+    openDecider();
+    var modal = document.getElementById('deciderModal');
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', function cleanup() {
+            _deciderParticipants = null;
+            modal.removeEventListener('hidden.bs.modal', cleanup);
+        });
+    }
+}
+
+// ============================================================
 // Custom Theme Builder
 // ============================================================
 const CUSTOM_COLOR_FIELDS = [

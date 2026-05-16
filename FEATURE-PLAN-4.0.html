@@ -143,6 +143,7 @@
     <p>Feature Plan v4.0</p>
   </div>
   <div class="nav-section">Easy</div>
+  <a href="#group-s">S — Test Polish</a>
   <a href="#group-e">E — Timer Audio</a>
   <div class="nav-section">Medium</div>
   <a href="#group-n">N — Settings Reorg</a>
@@ -167,7 +168,7 @@
   <p>Continuation of v3.0. All v3.0 groups A–O are complete. This plan covers the next wave: reveal drama, sprint intelligence, game mechanics, Jira write-back, mobile, and persistence.</p>
   <div class="meta">
     <span>📅 <b>Created 2026-05-16</b></span>
-    <span>✅ <b>v3.0 + 8 v4.0 groups shipped</b></span>
+    <span>✅ <b>v3.0 + 9 v4.0 groups shipped</b></span>
     <span>📋 <b>10 groups pending</b></span>
     <span>🔧 Stack: <b>ASP.NET Core 10 / C# / SignalR / Bootstrap 5 / Vanilla JS</b></span>
   </div>
@@ -189,6 +190,13 @@
   </thead>
   <tbody>
     <tr>
+    <tr>
+      <td><b>S</b></td>
+      <td>🧪 Test Polish — floor is lava stop button; decider wheel test with random data</td>
+      <td><span class="badge badge-green">Easy</span></td>
+      <td><code>room.js</code> · <code>site.js</code> · <code>_Layout.cshtml</code></td>
+      <td class="status-done">✅ Done</td>
+    </tr>
     <tr>
       <td><b>E</b></td>
       <td>🎵 Timer Audio Customization — Jeopardy theme, Jaws theme, custom upload, configurable trigger point</td>
@@ -549,6 +557,30 @@
     <li>Popup / Corner params: emoji, size, hold duration</li>
     <li>Store in localStorage <code>es_customSeasons = [...]</code>; on startup inject into <code>SEA_ANIMS</code> and <code>SEA_ANIM_META</code></li>
     <li>Test: the existing <code>testSpecificSeason(key)</code> function works for custom seasons too</li>
+  </ul>
+</div>
+
+<!-- GROUP S -->
+<div class="group-card" id="group-s">
+  <h3>Group S — 🧪 Test Polish</h3>
+  <span class="tag">Easy</span><span class="tag">room.js · site.js · _Layout.cshtml</span>
+
+  <h4>S1 — Floor Is Lava: Stop Test Button</h4>
+  <ul>
+    <li>The 🧪 Test button for Floor Is Lava triggers the animation but provides no way to stop it early</li>
+    <li>While the test is running, the button label should change to "⏹ Stop" (with distinct styling)</li>
+    <li>Clicking Stop clears the floor-is-lava interval/timeout and restores the room to normal</li>
+    <li>Implementation: track a running flag + interval ID in <code>room.js</code>; toggle button text/style; on stop call cleanup logic</li>
+    <li>Files: <code>wwwroot/js/room.js</code>, <code>Views/Shared/_Layout.cshtml</code></li>
+  </ul>
+
+  <h4>S2 — Decider Wheel: Standalone Test with Random Data</h4>
+  <ul>
+    <li>Currently <code>testDecider()</code> in <code>site.js</code> shows "open a room to use this" when no room is active</li>
+    <li>Instead, generate fake participant data (3–5 random names) and open the decider wheel with that data</li>
+    <li>This allows the wheel to be fully tested from the settings modal on the home page</li>
+    <li>Implementation: inject <code>window.roomState = { participants: { ... } }</code> temporarily or call <code>openDecider()</code> with mock data parameter</li>
+    <li>Files: <code>wwwroot/js/site.js</code>, <code>wwwroot/js/room.js</code> (openDecider signature)</li>
   </ul>
 </div>
 

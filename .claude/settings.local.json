@@ -19,7 +19,9 @@
       "Bash(curl -L --max-time 30 -o \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/vendor/fireworks.umd.js\" \"https://cdn.jsdelivr.net/npm/fireworks-js@2/dist/index.umd.js\" -w \"fireworks: %{http_code} %{size_download} bytes\\\\n\")",
       "Bash(Select-String -Path \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\\\\js\\\\room.js\" -Pattern \"^function \")",
       "Bash(Select-Object -Last 20)",
-      "Bash(grep -n \"^function \" /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/room.js | tail -20)"
+      "Bash(grep -n \"^function \" /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/room.js | tail -20)",
+      "Bash(powershell.exe -Command 'Select-String -Path '\\\\''C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\\\\js\\\\vendor\\\\confetti.min.js'\\\\'' -Pattern '\\\\''zIndex'\\\\'' | Select-Object -First 1 | ForEach-Object { $_.Line.Substring\\([Math]::Max\\(0,$_.Matches[0].Index-30\\), 80\\) }')",
+      "PowerShell($content = Get-Content 'C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\\\\js\\\\vendor\\\\confetti.min.js' -Raw; $m = [regex]::Match\\($content, 'zIndex.{0,40}'\\); $m.Value)"
     ]
   }
 }

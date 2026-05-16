@@ -1442,19 +1442,6 @@ h1, h2, h3, h4, h5, h6 {
 /* Test-mode: lift DOM elements above modal so tests are visible while settings is open */
 body.test-mode .participant-badge { position:relative; z-index:1200; }
 body.test-mode #counterSpellBar   { z-index:2000; }
-body.test-mode #hotColdMeter,
-body.test-mode #voteDistBar {
-    position: fixed !important;
-    top: 68px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    z-index: 1200 !important;
-    min-width: 220px;
-    background: var(--card-bg, #fff);
-    padding: 8px 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
-}
 
 /* Confidence stars on participant badges */
 .confidence-stars { display:block; font-size:0.65rem; color:#ffc107; line-height:1.2; margin-top:1px; }
@@ -1644,15 +1631,4 @@ body.presentation-mode #currentStoryDisplay {
     #currentStoryDisplay { font-size:1rem; }
 }
 
-.card-flash {
-    outline: 3px solid var(--bs-primary, #0d6efd);
-    outline-offset: 4px;
-    border-radius: 6px;
-    animation: cardFlashPulse 0.7s ease-out;
-}
-@keyframes cardFlashPulse {
-    0%   { outline-color: var(--bs-primary, #0d6efd); }
-    60%  { outline-color: var(--bs-primary, #0d6efd); }
-    100% { outline-color: transparent; }
-}
 

@@ -301,6 +301,18 @@ function triggerCardBurst(originX, originY) {
 // Floor is Lava — called from room.js on non-consensus reveal
 // ============================================================
 var _lavaInterval = null;
+var _lavaTestActive = false;
+
+function _toggleLavaTest() {
+    var btn = document.getElementById('lava-test-btn');
+    if (_lavaTestActive) {
+        stopFloorIsLava();
+    } else {
+        _lavaTestActive = true;
+        if (btn) { btn.textContent = '⏹ Stop'; btn.style.outline = '2px solid #dc3545'; btn.style.color = '#dc3545'; }
+        testFloorIsLava();
+    }
+}
 
 function triggerFloorIsLava(connectionId, seconds) {
     var s = getCelebrationSettings();
@@ -348,6 +360,11 @@ function stopFloorIsLava() {
     var banner = document.getElementById('lava-banner');
     if (banner) banner.remove();
     document.querySelectorAll('.lava-outlier').forEach(function(el) { el.classList.remove('lava-outlier'); });
+    if (_lavaTestActive) {
+        _lavaTestActive = false;
+        var btn = document.getElementById('lava-test-btn');
+        if (btn) { btn.textContent = '🧪 Test'; btn.style.outline = ''; btn.style.color = ''; }
+    }
 }
 
 function _showStreakToast(streak) {
@@ -873,31 +890,40 @@ function testFireworks() { stopFireworks(); triggerFireworks(getCelebrationSetti
 function testBalloons()  { stopBalloons();  triggerBalloons(getCelebrationSettings()); }
 function testStreak()    { triggerStreakCelebration(5); }
 
+function _liveParticleShape() {
+    var sel = document.getElementById('cel-reveal-particle-type');
+    return (sel && sel.value) || 'star';
+}
+function _liveParticleCount() {
+    var inp = document.getElementById('cel-reveal-particle-count');
+    return Math.min(Math.max(parseInt((inp && inp.value) || 8), 1), 99);
+}
+
 function previewParticlesAt(el) {
     if (typeof confetti === 'undefined') return;
-    var s = typeof getCelebrationSettings === 'function' ? getCelebrationSettings() : {};
     var r = el.getBoundingClientRect();
     confetti({
-        particleCount: s.revealParticleCount || 8,
-        spread: 50,
-        startVelocity: 18,
+        particleCount: _liveParticleCount(),
+        spread: 60,
+        startVelocity: 22,
         decay: 0.88,
+        zIndex: 2100,
         origin: { x: (r.left + r.width / 2) / window.innerWidth, y: (r.top + r.height / 2) / window.innerHeight },
-        shapes: [s.revealParticleType || 'star'],
+        shapes: [_liveParticleShape()],
         colors: ['#ffd700', '#ff6b6b', '#00ff88', '#ffffff', '#00cfff']
     });
 }
 
 function testRevealParticles() {
-    var s = getCelebrationSettings();
     if (typeof confetti === 'undefined') return;
     confetti({
-        particleCount: s.revealParticleCount || 8,
-        spread: 50,
-        startVelocity: 18,
+        particleCount: _liveParticleCount(),
+        spread: 60,
+        startVelocity: 22,
         decay: 0.88,
+        zIndex: 2100,
         origin: { x: 0.5, y: 0.5 },
-        shapes: [s.revealParticleType || 'star'],
+        shapes: [_liveParticleShape()],
         colors: ['#ffd700', '#ff6b6b', '#00ff88', '#ffffff', '#00cfff']
     });
 }

@@ -32,6 +32,7 @@ let roomState = {
     estimateSet: 'fibonacci',
     history: []   // full session: { story, votes, stats, voteOrder, flipCounts }
 };
+window.roomState = roomState;
 
 // ============================================================
 // SignalR Connection
@@ -1455,87 +1456,6 @@ function _emitRevealParticles(badge, cs) {
 }
 
 // ============================================================
-// Decider Wheel
-// ============================================================
-var _deciderSpinning = false;
-
-function openDecider() {
-    _drawDeciderWheel();
-    document.getElementById('deciderResult').textContent = '';
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('deciderModal')).show();
-}
-
-function _drawDeciderWheel(highlightIdx) {
-    const canvas = document.getElementById('deciderCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const names = roomState.participants
-        .filter(p => !p.isObserver && !p.isGhost)
-        .map(p => p.name);
-    if (names.length === 0) {
-        ctx.clearRect(0, 0, 280, 280);
-        ctx.fillStyle = '#888';
-        ctx.font = '14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('No participants', 140, 145);
-        return;
-    }
-    const arc = (2 * Math.PI) / names.length;
-    const colors = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#0dcaf0','#fd7e14','#20c997'];
-    const cx = 140, cy = 140, r = 130;
-    ctx.clearRect(0, 0, 280, 280);
-    names.forEach((name, i) => {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, r, i * arc - Math.PI / 2, (i + 1) * arc - Math.PI / 2);
-        ctx.fillStyle = i === highlightIdx ? '#ffd700' : colors[i % colors.length];
-        ctx.fill();
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(i * arc + arc / 2 - Math.PI / 2);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold ' + Math.min(14, Math.floor(110 / names.length) + 6) + 'px sans-serif';
-        ctx.fillText(name.substring(0, 12), r - 8, 5);
-        ctx.restore();
-    });
-    ctx.beginPath(); ctx.arc(cx, cy, 18, 0, 2 * Math.PI); ctx.fillStyle = '#fff'; ctx.fill();
-    ctx.beginPath(); ctx.moveTo(cx, cy - r + 4); ctx.lineTo(cx - 8, cy - r + 18); ctx.lineTo(cx + 8, cy - r + 18);
-    ctx.fillStyle = '#333'; ctx.fill();
-}
-
-function spinDecider() {
-    if (_deciderSpinning) return;
-    const names = roomState.participants
-        .filter(p => !p.isObserver && !p.isGhost)
-        .map(p => p.name);
-    if (names.length === 0) return;
-    _deciderSpinning = true;
-    document.getElementById('deciderResult').textContent = '...';
-    const winner = Math.floor(Math.random() * names.length);
-    const totalFrames = 60;
-    let frame = 0;
-    function tick() {
-        const progress = frame / totalFrames;
-        const eased = 1 - Math.pow(1 - progress, 3);
-        const spins = 4 + (winner / names.length);
-        const currentAngle = eased * spins * 2 * Math.PI;
-        const segArc = 2 * Math.PI / names.length;
-        _drawDeciderWheel(frame < totalFrames ? undefined : winner);
-        frame++;
-        if (frame <= totalFrames) {
-            setTimeout(tick, 16 + progress * 24);
-        } else {
-            _deciderSpinning = false;
-            document.getElementById('deciderResult').innerHTML =
-                '🎯 <strong>' + escHtml(names[winner]) + '</strong> goes first!';
-        }
-    }
-    tick();
-}
-
-// ============================================================
 // Confidence Indicator
 // ============================================================
 function castConfidence(level) {
@@ -1786,12 +1706,9 @@ function _soundAirhorn(ctx) {
 }
 
 // ============================================================
-// Test helpers (settings modal)
+// Test helpers (settings modal) — room-specific only
+// Generic test functions (testHotCold, testVoteDist, etc.) live in site.js
 // ============================================================
-function testDecider() {
-    if (typeof openDecider === 'function') openDecider();
-}
-
 function testConfidenceIndicator() {
     var sel = document.getElementById('confidenceSelector');
     if (!sel) return;
@@ -1805,98 +1722,6 @@ function testSoundboard() {
     setTimeout(function() { _playSoundLocal('fanfare'); }, 800);
     setTimeout(function() { _playSoundLocal('drumroll'); }, 1600);
 }
-
-function testSpeedBadges() {
-    var badges = document.querySelectorAll('.participant-badge[data-connection-id]');
-    if (!badges.length) return;
-    var first = badges[0], last = badges[badges.length - 1];
-    function _addTemp(el, cls, text, title) {
-        var s = document.createElement('span');
-        s.className = 'speed-badge ' + cls; s.textContent = text; s.title = title;
-        el.appendChild(s);
-        setTimeout(function() { if (s.parentNode) s.parentNode.removeChild(s); }, 3000);
-    }
-    _addTemp(first, 'speed-first', '⚡', 'First to vote');
-    if (badges.length > 1) _addTemp(last, 'speed-last', '🐢', 'Last to vote');
-}
-
-function testHotCold() {
-    var el = document.getElementById('hotColdMeter');
-    if (!el) return;
-    var orig = el.style.cssText, origHtml = el.innerHTML;
-    el.innerHTML = '🔥 <span style="font-weight:700;color:#ff6b35;">ON FIRE</span>'
-        + ' <span style="font-size:0.7rem;opacity:0.55;">(last 3 rounds) (TEST)</span>';
-    el.style.display = '';
-    setTimeout(function() { el.innerHTML = origHtml; el.style.cssText = orig; }, 3000);
-}
-
-function testVoteDist() {
-    var el = document.getElementById('voteDistBar');
-    if (!el) return;
-    var origHtml = el.innerHTML, origDisplay = el.style.display;
-    var fakeCounts = { '1': 2, '3': 1, '8': 3 };
-    var total = 6;
-    var bars = Object.keys(fakeCounts).map(function(v) {
-        var pct = Math.round(fakeCounts[v] / total * 100);
-        return '<div style="flex:' + fakeCounts[v] + ';display:flex;align-items:center;justify-content:center;'
-            + 'font-size:0.65rem;font-weight:700;color:#fff;background:hsl('
-            + (parseInt(v) * 22) + ',65%,45%);min-width:24px;" title="' + v + ': ' + fakeCounts[v] + ' votes">'
-            + v + '</div>';
-    });
-    el.innerHTML = '<div style="font-size:0.7rem;color:var(--text-secondary,#6c757d);margin-bottom:3px;">Vote spread (TEST)</div>'
-        + '<div style="display:flex;gap:3px;height:26px;border-radius:5px;overflow:hidden;">' + bars.join('') + '</div>';
-    el.style.display = '';
-    setTimeout(function() { el.innerHTML = origHtml; el.style.display = origDisplay; }, 3500);
-}
-
-function testSlotMachine() {
-    var cs = typeof getCelebrationSettings === 'function' ? getCelebrationSettings() : {};
-    var speeds = { fast: 500, normal: 800, dramatic: 1300 };
-    var slotMs = speeds[cs.suspenseSpeed || 'normal'] || 800;
-    var fakeVotes = ['3', '5', '8', '13', '21'];
-    var badges = Array.from(document.querySelectorAll('.participant-badge[data-connection-id]'));
-    var cleanup = null;
-
-    if (!badges.length) {
-        var demo = document.createElement('div');
-        demo.style.cssText = 'position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);z-index:2000;display:flex;gap:12px;';
-        ['3', '5', '8'].forEach(function(v) {
-            var b = document.createElement('div');
-            b.className = 'participant-badge voted';
-            b.style.cssText = 'padding:14px 20px;font-size:1.2rem;';
-            b.innerHTML = '<span class="vote-hidden">' + v + '</span>';
-            demo.appendChild(b);
-            badges.push(b);
-        });
-        document.body.appendChild(demo);
-        var totalTime = badges.length * 380 + slotMs + 800;
-        cleanup = setTimeout(function() { demo.remove(); }, totalTime);
-    }
-
-    badges.forEach(function(badge, i) {
-        var val = fakeVotes[i % fakeVotes.length];
-        var span = badge.querySelector('.vote-hidden, .vote-waiting, .participant-vote');
-        if (!span) {
-            span = document.createElement('span');
-            span.className = 'vote-hidden';
-            span.textContent = val;
-            badge.appendChild(span);
-        }
-        setTimeout(function() {
-            badge.classList.add('poker-flip');
-            _slotMachineReveal(badge, val, slotMs, function() {
-                badge.classList.remove('poker-flip');
-            });
-        }, i * 380);
-    });
-}
-
-// Expose test helpers globally (onclick attributes reference by name)
-window.testSpeedBadges = testSpeedBadges;
-window.testHotCold = testHotCold;
-window.testVoteDist = testVoteDist;
-window.testDecider = testDecider;
-window.testSlotMachine = testSlotMachine;
 
 // ============================================================
 // Init

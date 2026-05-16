@@ -459,7 +459,7 @@
                             <div class="form-check d-flex align-items-center gap-2">
                                 <input class="form-check-input flex-shrink-0" type="checkbox" id="cel-lava-enabled" onchange="document.getElementById('cel-lava-sub').style.display=this.checked?'':'none'" />
                                 <label class="form-check-label fw-semibold" for="cel-lava-enabled">🌋 Floor is Lava</label>
-                                <button type="button" class="btn btn-outline-secondary ms-auto" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testFloorIsLava)">🧪 Test</button>
+                                <button type="button" id="lava-test-btn" class="btn btn-outline-secondary ms-auto" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="_toggleLavaTest()">🧪 Test</button>
                             </div>
                             <div class="form-check d-flex align-items-center gap-2">
                                 <input class="form-check-input flex-shrink-0" type="checkbox" id="cel-poker-reveal" />
@@ -519,7 +519,7 @@
                                     <option value="square">■ Square</option>
                                 </select>
                                 <label for="cel-reveal-particle-count" class="mb-0">Count</label>
-                                <input type="number" class="form-control form-control-sm d-inline-block" id="cel-reveal-particle-count" min="1" max="30" value="8" style="width:60px;" />
+                                <input type="number" class="form-control form-control-sm d-inline-block" id="cel-reveal-particle-count" min="1" max="99" value="8" style="width:60px;" />
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <span class="fw-semibold">🗓️ Seasonal Theme</span>
@@ -1132,6 +1132,14 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/16/2026 (44)</strong></p>
+                        <ul class="mb-2">
+                            <li>🌋 Floor is Lava test button now toggles to "⏹ Stop" while the animation is running — click it again to end the test early. 🎡 Decider Wheel now works from settings on any page — the test opens the wheel with 5 random demo participants so you can spin without needing a live room.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/16/2026 (43)</strong></p>
+                        <ul class="mb-2">
+                            <li>🧪 Test buttons now work from any page — all setting tests show a self-contained floating preview above the modal instead of touching the room screen. Card Reveal Particles confetti now renders above the modal (z-index fix).</li>
+                        </ul>
                         <p class="mb-2"><strong>5/16/2026 (42)</strong></p>
                         <ul class="mb-2">
                             <li>🧪 Test improvements — slot machine reveal now has a 🧪 Test button that runs the cycling animation on real badges (or demo badges if alone); team temperature and vote distribution meters now float above the settings modal in test mode; card reveal particles settings show a hoverable 🃏 preview card; analytics test modal now shows 5 varied rounds with bingo triggers and a 2-round streak.</li>
