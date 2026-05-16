@@ -168,8 +168,8 @@
   <p>Continuation of v3.0. All v3.0 groups A–O are complete. This plan covers the next wave: reveal drama, sprint intelligence, game mechanics, Jira write-back, mobile, and persistence.</p>
   <div class="meta">
     <span>📅 <b>Created 2026-05-16</b></span>
-    <span>✅ <b>v3.0 + 9 v4.0 groups shipped</b></span>
-    <span>📋 <b>10 groups pending</b></span>
+    <span>✅ <b>v3.0 + 11 v4.0 groups shipped</b></span>
+    <span>📋 <b>8 groups pending</b></span>
     <span>🔧 Stack: <b>ASP.NET Core 10 / C# / SignalR / Bootstrap 5 / Vanilla JS</b></span>
   </div>
 </div>
@@ -202,14 +202,14 @@
       <td>🎵 Timer Audio Customization — Jeopardy theme, Jaws theme, custom upload, configurable trigger point</td>
       <td><span class="badge badge-green">Easy</span></td>
       <td><code>room.js</code> · <code>_Layout.cshtml</code></td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>N</b></td>
       <td>🗂️ Settings Reorganization — Audio tab, Other tab, Global section, collapsible groups, sound join dialog</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td><code>_Layout.cshtml</code> · <code>PokerHub.cs</code> · <code>room.js</code> · <code>site.css</code></td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>O</b></td>
@@ -413,7 +413,9 @@
     <li>"Other" tab is also a natural home for future developer/advanced settings</li>
   </ul>
 
-  <h4>N3 — Move "Reveal Majority First" to Room-Level Global Setting</h4>
+  <div class="callout warn"><strong>Deferred — not Won't Do</strong>N3 and N4 require backend changes (PokerHub.cs, Room model) and significant HTML restructuring. Both are deferred to a future sprint; they remain on the backlog.</div>
+
+  <h4>N3 — Move "Reveal Majority First" to Room-Level Global Setting <em style="color:var(--muted);font-size:0.8rem;">(Deferred)</em></h4>
   <p>This toggle is currently localStorage-only but affects reveal ordering for all participants — it should be a room-wide broadcast setting, not a personal preference.</p>
   <ul>
     <li>Add <code>ToggleRevealOrdering(bool enabled)</code> hub method in <code>PokerHub.cs</code>; store on <code>Room</code> model; broadcast <code>RevealOrderingChanged(bool)</code> to room</li>
@@ -422,7 +424,7 @@
     <li>Respect in <code>_sequentialReveal()</code> using the server-authoritative value</li>
   </ul>
 
-  <h4>N4 — Collapsible Sections Within Settings Tabs</h4>
+  <h4>N4 — Collapsible Sections Within Settings Tabs <em style="color:var(--muted);font-size:0.8rem;">(Deferred)</em></h4>
   <p>The Events/Celebrations tab is very long and hard to scan. Group controls into labelled collapsible sections.</p>
   <ul>
     <li>Celebrations tab groups: Confetti, Fireworks, Balloons, Lava Lamp, Card Reveal, Shame &amp; Counter-Spell, Miscellaneous</li>
@@ -453,34 +455,44 @@
     <li>"Clear" button reverts to the active preset back</li>
   </ul>
 
-  <h4>O2 — Flip Speed Slider (from X1)</h4>
+  <h4>✅ O2 — Flip Speed Slider</h4>
   <ul>
-    <li><code>flipGap = 380</code> is hardcoded in <code>_sequentialReveal()</code>; add <code>revealFlipGap: 380</code> to <code>DEFAULT_CELEBRATION</code></li>
-    <li>Slider in Events tab (100–1000 ms, step 10) labelled "Card flip gap"; test button calls <code>testPokerReveal()</code></li>
+    <li><code>revealFlipGap: 380</code> added to <code>DEFAULT_CELEBRATION</code>; used in <code>_sequentialReveal()</code> and <code>testPokerReveal()</code></li>
+    <li>Slider in Events tab (100–1000 ms, step 10) under Poker Hand Reveal</li>
   </ul>
 
-  <h4>O3 — Card Font Size Slider (from X4)</h4>
+  <h4>✅ O3 — Card Font Size Slider</h4>
   <ul>
-    <li>Add <code>--card-font-size: 1.1rem</code> to <code>:root</code>; apply to <code>.poker-card { font-size: var(--card-font-size); }</code></li>
-    <li>Slider in Settings → Appearance: 0.7–2 rem, step 0.1; labels "Small / Normal / Large"</li>
-    <li>Live preview: slider change updates the CSS var immediately so visible cards resize in real time</li>
-    <li>Stored in localStorage; applied on load via inline style on <code>:root</code></li>
+    <li><code>.poker-card</code> uses <code>var(--card-font-size, 1.25rem)</code>; slider in Theme → Cards (0.7–2.0 rem, step 0.1)</li>
+    <li>Live: updates CSS var on drag; persisted to <code>localStorage</code>; applied on page load and modal open via <code>applyCardFontSize()</code></li>
   </ul>
 
-  <h4>O4 — Compact Participant Mode (from X2)</h4>
+  <h4>✅ O4 — Compact Participant Mode</h4>
   <ul>
-    <li>Toggle in Settings → Appearance: "Compact participant cards" (default off)</li>
-    <li>Applies <code>compact</code> class to <code>#participantsContainer</code></li>
-    <li>CSS: <code>.compact .participant-badge { min-width:56px; padding:0.3rem 0.5rem; font-size:0.75rem; }</code>; avatar shrinks 32px → 22px</li>
-    <li>Inline mockup preview in settings showing 2 badges side-by-side at compact size</li>
+    <li>Toggle in Theme → Cards: "Compact participant cards"</li>
+    <li>Toggles <code>.compact</code> on <code>#participantsContainer</code>; CSS shrinks badge to 56px, avatar to 22px, name to 0.7rem</li>
+    <li>Mockup preview (2 demo badges) shown inline in settings; persisted via <code>es_compactMode</code></li>
   </ul>
 
-  <h4>O5 — More Card Reveal Particle Shapes (10–20)</h4>
-  <p>confetti.js supports custom SVG path shapes. Currently only star, circle, and square are offered. Expand to at least 12 options:</p>
+  <h4>O5 — Card Reveal Particle Shapes + Custom Emoji</h4>
+  <p>Expand confetti burst options beyond the current 3-option select. Allow both preset shapes and free-form emoji/text input (similar to the confetti emoji particle field).</p>
   <ul>
-    <li>Card suits: ♠ ♥ ♦ ♣, Crown 👑, Star ★, Triangle, Lightning bolt ⚡, Heart, Diamond, Sparkle ✨, Cross</li>
-    <li>Update shape selector from a 3-option <code>&lt;select&gt;</code> to a grid of emoji checkbox buttons with a live mini preview burst on hover/click</li>
-    <li>Multiple shapes can be selected and are randomly mixed during the burst</li>
+    <li>Preset shapes: card suits ♠ ♥ ♦ ♣, Crown 👑, Star ★, Triangle △, Lightning ⚡, Sparkle ✨, Cross ✚ — rendered as SVG paths by confetti.js</li>
+    <li>Custom emoji input: a text box where the user types or pastes any emoji/unicode character(s); these are used as confetti shapes alongside (or instead of) presets</li>
+    <li>UI: grid of toggle-buttons for preset shapes + a small text input for custom characters (same visual pattern as the confetti emoji particle field)</li>
+    <li>Multiple selections mixed randomly during the burst; live mini preview burst on change</li>
+    <li><em>Future:</em> a "🔍 Pick" button opens the reusable emoji/shape/unicode picker modal (see O6)</li>
+  </ul>
+
+  <h4>O6 — Reusable Emoji / Shape / Unicode Picker <em style="color:var(--muted);font-size:0.8rem;">(Plan only — not yet implemented)</em></h4>
+  <p>A small "🔍" button adjacent to any emoji/text input (particle shapes, confetti emojis, reaction palette, seasonal runners) that opens a scrollable, searchable, filterable picker modal.</p>
+  <ul>
+    <li>Content: emoji categories (smileys, symbols, objects, flags, card suits, math, arrows, etc.) + common unicode shapes</li>
+    <li>Search box filters by name/keyword (e.g. "heart", "star", "arrow")</li>
+    <li>Category tabs for fast browsing; recently used section at top</li>
+    <li>Clicking an item appends it to the triggering text input and fires its <code>oninput</code></li>
+    <li>Single reusable component — attach via <code>data-picker-target="input-id"</code> on the button</li>
+    <li>Apply to: card reveal particle shapes (O5), confetti emoji particles, seasonal runner emoji, reaction palette (P2)</li>
   </ul>
 </div>
 

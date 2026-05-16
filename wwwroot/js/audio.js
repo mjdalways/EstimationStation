@@ -1,4 +1,34 @@
 // ============================================================
+// Master Sound Toggle
+// ============================================================
+var ES_ALL_SOUNDS_OFF_KEY = 'es_allSoundsOff';
+
+function getAllSoundsOff() {
+    return localStorage.getItem(ES_ALL_SOUNDS_OFF_KEY) === '1';
+}
+
+function saveAllSoundsOff(off) {
+    localStorage.setItem(ES_ALL_SOUNDS_OFF_KEY, off ? '1' : '0');
+    var el = document.getElementById('audio-all-off');
+    if (el) el.checked = !!off;
+    if (off) {
+        stopTimerAudio();
+        stopAmbient();
+    } else {
+        applyAmbientFromSettings();
+    }
+}
+
+function populateAudioTab() {
+    var el = document.getElementById('audio-all-off');
+    if (el) el.checked = getAllSoundsOff();
+    if (typeof populateAmbientTab === 'function') populateAmbientTab();
+    if (typeof populateTimerAudioSection === 'function') populateTimerAudioSection();
+    if (typeof populateSoundReceiveSection === 'function') populateSoundReceiveSection();
+    if (typeof renderCustomSoundSlots === 'function') renderCustomSoundSlots();
+}
+
+// ============================================================
 // EstimationStation — Ambient Audio
 // ============================================================
 var AMBIENT_SETTINGS_KEY = 'es_ambientAudio';
@@ -21,6 +51,7 @@ function saveAmbientSettings(s) {
 
 function startAmbient(source, volume) {
     stopAmbient();
+    if (getAllSoundsOff()) return;
     if (!source || source === 'none') return;
     var info = AMBIENT_SOURCES[source];
     if (!info || !info.url) return;
@@ -119,6 +150,7 @@ function handleTimerAudioUpload(input) {
 
 function startTimerAudio(secondsRemaining) {
     stopTimerAudio();
+    if (getAllSoundsOff()) return;
     var s = getTimerAudioSettings();
     if (s.theme === 'silent') return;
     if (s.theme === 'custom' && s.customBase64) {

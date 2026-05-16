@@ -88,6 +88,9 @@
                         <button class="nav-link settings-tab-btn" id="tab-celebration-btn" data-bs-toggle="tab" data-bs-target="#tab-celebration" type="button" role="tab">🎉 <span class="tab-label">Events</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <button class="nav-link settings-tab-btn" id="tab-audio-btn" data-bs-toggle="tab" data-bs-target="#tab-audio" type="button" role="tab">🔊 <span class="tab-label">Audio</span></button>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-seasons-btn" data-bs-toggle="tab" data-bs-target="#tab-seasons" type="button" role="tab">🗓️ <span class="tab-label">Seasons</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -95,6 +98,9 @@
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-jira-btn" data-bs-toggle="tab" data-bs-target="#tab-jira" type="button" role="tab">🔗 <span class="tab-label">Jira</span></button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link settings-tab-btn" id="tab-other-btn" data-bs-toggle="tab" data-bs-target="#tab-other" type="button" role="tab">⚙️ <span class="tab-label">Other</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-about-btn" data-bs-toggle="tab" data-bs-target="#tab-about" type="button" role="tab">ℹ️ <span class="tab-label">About</span></button>
@@ -315,6 +321,27 @@
                                                 <label class="ct-field-label">Border Width: <strong><span id="ct-border-width-label">1.5</span>px</strong></label>
                                                 <input type="range" class="form-range" id="ct-card-border-width" min="0" max="8" step="0.5" value="1.5" oninput="document.getElementById('ct-border-width-label').textContent=this.value; updateThemePreview()" />
                                             </div>
+                                            <div class="col-12">
+                                                <label class="ct-field-label">Card font size: <strong><span id="card-font-size-label">1.25</span>rem</strong> <span class="text-muted" style="font-size:0.72rem;">· Small 0.7 · Normal 1.25 · Large 2.0</span></label>
+                                                <input type="range" class="form-range" id="card-font-size-slider" min="0.7" max="2.0" step="0.1" value="1.25"
+                                                    oninput="var v=parseFloat(this.value).toFixed(1); document.getElementById('card-font-size-label').textContent=v; document.documentElement.style.setProperty('--card-font-size',v+'rem'); localStorage.setItem('es_cardFontSize',v)" />
+                                            </div>
+                                            <div class="col-12 mt-1">
+                                                <div class="form-check d-flex align-items-center gap-2">
+                                                    <input class="form-check-input" type="checkbox" id="compact-mode-toggle"
+                                                        onchange="localStorage.setItem('es_compactMode',this.checked?'1':'0'); var c=document.getElementById('participantsContainer'); if(c) c.classList.toggle('compact',this.checked);" />
+                                                    <label class="form-check-label ct-field-label mb-0" for="compact-mode-toggle">Compact participant cards</label>
+                                                </div>
+                                                <div class="d-flex gap-1 mt-1 p-2" style="background:rgba(128,128,128,0.08);border-radius:6px;">
+                                                    <div style="padding:0.3rem 0.5rem;border:1px solid var(--panel-border,#ccc);border-radius:6px;font-size:0.75rem;min-width:56px;text-align:center;">
+                                                        <div style="font-size:0.7rem;font-weight:600;">Alice</div><div>?</div>
+                                                    </div>
+                                                    <div style="padding:0.3rem 0.5rem;border:1px solid var(--card-voted,#198754);border-radius:6px;font-size:0.75rem;min-width:56px;text-align:center;">
+                                                        <div style="font-size:0.7rem;font-weight:600;">Bob</div><div>5</div>
+                                                    </div>
+                                                    <span class="text-muted ms-1" style="font-size:0.7rem;align-self:center;">compact preview</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -467,6 +494,11 @@
                                 <button type="button" class="btn btn-outline-secondary ms-auto" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testPokerReveal)">🧪 Test</button>
                             </div>
                             <div class="ms-3 ps-1 border-start border-secondary" style="border-width:2px!important;">
+                                <div class="d-flex align-items-center gap-2 mb-2 ms-1">
+                                    <label class="small text-muted" style="min-width:70px;">Flip gap</label>
+                                    <input type="range" id="cel-flip-gap" class="form-range" min="100" max="1000" step="10" style="max-width:130px;" oninput="document.getElementById('cel-flip-gap-val').textContent=this.value+'ms'" />
+                                    <span id="cel-flip-gap-val" class="small text-muted" style="min-width:36px;">380ms</span>
+                                </div>
                                 <div class="form-check d-flex align-items-center gap-2 mb-1">
                                     <input class="form-check-input flex-shrink-0" type="checkbox" id="cel-suspense-reveal" />
                                     <label class="form-check-label" for="cel-suspense-reveal">🎰 Slot machine effect (numbers cycle before landing)</label>
@@ -544,26 +576,6 @@
                             </div>
                         </div>
 
-
-                        <!-- Ambient Audio -->
-                        <div class="border-top pt-2 mt-2 mb-3">
-                            <h6 class="text-muted small fw-semibold mb-2">🎵 Ambient Audio</h6>
-                            <div class="d-flex align-items-center gap-2 mb-2 small">
-                                <label for="ambient-source" class="text-nowrap">Sound</label>
-                                <select id="ambient-source" class="form-select form-select-sm" onchange="saveAmbientFromForm()">
-                                    <option value="none">🔇 Off</option>
-                                    <option value="lofi">🎵 Lo-Fi</option>
-                                    <option value="rain">🌧️ Rain</option>
-                                    <option value="cafe">☕ Café</option>
-                                </select>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 small">
-                                <label for="ambient-volume" class="text-nowrap">Volume</label>
-                                <input type="range" id="ambient-volume" min="0" max="1" step="0.05" style="width:90px;"
-                                       oninput="document.getElementById('ambient-vol-label').textContent=Math.round(this.value*100)+'%';saveAmbientFromForm()">
-                                <span id="ambient-vol-label">30%</span>
-                            </div>
-                        </div>
 
                         <!-- Confetti -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2">
@@ -690,86 +702,6 @@
                             <p class="small text-muted mb-0">When the timer expires, 🌋 Floor is Lava starts automatically (if enabled).</p>
                         </div>
 
-                        <!-- Timer Audio -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
-                            <h6 class="text-muted mb-0 me-auto">🎵 Timer Audio</h6>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testTimerAudio)">🧪 Test</button>
-                        </div>
-                        <div class="row g-1 align-items-center mb-1">
-                            <div class="col-auto"><label class="col-form-label col-form-label-sm" for="timer-audio-theme">Theme</label></div>
-                            <div class="col">
-                                <select id="timer-audio-theme" class="form-select form-select-sm"
-                                        onchange="saveTimerAudioFromForm(); _timerAudioToggleCustom(this.value)">
-                                    <option value="jeopardy">🎵 Jeopardy</option>
-                                    <option value="jaws">🦈 Jaws</option>
-                                    <option value="ticking">⏰ Ticking Clock</option>
-                                    <option value="silent">🔇 Silent</option>
-                                    <option value="custom">📁 Custom Upload</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row g-1 align-items-center mb-1">
-                            <div class="col-auto"><label class="col-form-label col-form-label-sm" for="timer-audio-trigger">Start at</label></div>
-                            <div class="col">
-                                <input type="range" id="timer-audio-trigger" class="form-range" min="5" max="30" step="1" value="10"
-                                       oninput="document.getElementById('timer-audio-trigger-val').textContent=this.value+'s'; saveTimerAudioFromForm();">
-                            </div>
-                            <div class="col-auto"><span id="timer-audio-trigger-val" class="badge bg-secondary">10s</span></div>
-                        </div>
-                        <div id="timer-audio-custom-wrap" class="mb-2" style="display:none;">
-                            <label class="form-label form-label-sm mb-1">Audio file (max 10s / 800 KB)</label>
-                            <input type="file" id="timer-audio-file" class="form-control form-control-sm" accept="audio/*"
-                                   onchange="handleTimerAudioUpload(this)">
-                            <div id="timer-audio-custom-label" class="text-muted" style="font-size:0.7rem;">No file chosen</div>
-                        </div>
-
-                        <!-- Voice-Activated Reveal -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
-                            <h6 class="text-muted mb-0 me-auto">🎤 Voice-Activated Reveal</h6>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testVoiceRecognition)">🧪 Test</button>
-                        </div>
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="voice-enabled" onchange="saveVoiceFromForm()">
-                            <label class="form-check-label small" for="voice-enabled">Reveal votes by voice command</label>
-                        </div>
-                        <div id="voice-options-wrap">
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <label class="form-label mb-0 small" for="voice-phrase">Trigger phrase</label>
-                                <input type="text" class="form-control form-control-sm" id="voice-phrase" maxlength="40" placeholder="reveal" style="max-width:160px;" oninput="saveVoiceFromForm()">
-                            </div>
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <label class="form-label mb-0 small" for="voice-lang">Language</label>
-                                <select class="form-select form-select-sm" id="voice-lang" style="max-width:160px;" onchange="saveVoiceFromForm()">
-                                    <option value="en-US">English (US)</option>
-                                    <option value="en-GB">English (UK)</option>
-                                    <option value="fr-FR">French</option>
-                                    <option value="de-DE">German</option>
-                                    <option value="es-ES">Spanish</option>
-                                    <option value="ja-JP">Japanese</option>
-                                </select>
-                            </div>
-                            <p class="small text-muted mb-0">Requires microphone permission. Works in Chrome/Edge.</p>
-                            <div class="mt-2">
-                                <span id="voice-mic-indicator-modal" style="display:none;" class="badge bg-danger">
-                                    🎤
-                                    <span class="voice-bars" aria-hidden="true"><span></span><span></span><span></span></span>
-                                    Listening
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Mobile -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
-                            <h6 class="text-muted mb-0 me-auto">📱 Mobile</h6>
-                        </div>
-                        <div class="form-check form-check-sm mb-2">
-                            <input class="form-check-input" type="checkbox" id="cel-mobile-animations"
-                                   onchange="saveCelebrationSettingsFromForm()">
-                            <label class="form-check-label small" for="cel-mobile-animations">
-                                Enable animations on mobile (may affect performance)
-                            </label>
-                        </div>
-
                         <!-- Shame Spotlight -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
                             <h6 class="text-muted mb-0 me-auto">🎯 Shame Spotlight</h6>
@@ -815,27 +747,6 @@
                             <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testConfidenceIndicator)">🧪 Test</button>
                         </div>
                         <p class="small text-muted mb-2">After casting a vote, a 1–5 star selector appears. Stars are revealed alongside votes.</p>
-
-                        <!-- Soundboard -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
-                            <h6 class="text-muted mb-0 me-auto">🔊 Soundboard</h6>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testSoundboard)">🧪 Test</button>
-                        </div>
-                        <div class="form-check form-switch mb-1">
-                            <input class="form-check-input" type="checkbox" id="sound-receive-enabled" checked onchange="saveSoundReceiveSettings()">
-                            <label class="form-check-label small" for="sound-receive-enabled">Receive broadcast sounds from other players</label>
-                        </div>
-                        <div id="sound-subtitle-wrap" style="display:none;">
-                            <div class="form-check form-switch mb-2 ms-3">
-                                <input class="form-check-input" type="checkbox" id="sound-show-subtitle" checked onchange="saveSoundReceiveSettings()">
-                                <label class="form-check-label small" for="sound-show-subtitle">Show subtitle banner instead (muted)</label>
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <p class="small fw-semibold mb-1">🎵 Custom sounds <span class="text-muted fw-normal">(max 5s / ~600KB each, up to 3)</span></p>
-                            <div id="custom-sounds-list"></div>
-                            <button type="button" id="custom-sound-add-btn" class="btn btn-outline-secondary btn-sm mt-2" style="font-size:0.75rem;" onclick="addCustomSoundSlot()">+ Add custom sound</button>
-                        </div>
 
                         <!-- Session Analytics (test only — always on) -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
@@ -1005,6 +916,96 @@
                     </div><!-- end tab-seasons -->
 
                     <!-- ══════════════════════════════════════════
+                         TAB: 🔊 Audio
+                         ══════════════════════════════════════════ -->
+                    <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-audio" role="tabpanel">
+
+                        <!-- Master mute -->
+                        <div class="d-flex align-items-center gap-3 p-2 border rounded mb-3 bg-body-secondary">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="audio-all-off" onchange="saveAllSoundsOff(this.checked)">
+                                <label class="form-check-label fw-semibold small" for="audio-all-off">🔇 Mute all sounds</label>
+                            </div>
+                            <span class="text-muted small ms-auto">Overrides all settings below</span>
+                        </div>
+
+                        <!-- Ambient Audio -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
+                            <h6 class="text-muted mb-0 me-auto">🎵 Ambient Audio</h6>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-2 small">
+                            <label for="ambient-source" class="text-nowrap">Sound</label>
+                            <select id="ambient-source" class="form-select form-select-sm" onchange="saveAmbientFromForm()">
+                                <option value="none">🔇 Off</option>
+                                <option value="lofi">🎵 Lo-Fi</option>
+                                <option value="rain">🌧️ Rain</option>
+                                <option value="cafe">☕ Café</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-3 small">
+                            <label for="ambient-volume" class="text-nowrap">Volume</label>
+                            <input type="range" id="ambient-volume" min="0" max="1" step="0.05" style="width:90px;"
+                                   oninput="document.getElementById('ambient-vol-label').textContent=Math.round(this.value*100)+'%';saveAmbientFromForm()">
+                            <span id="ambient-vol-label">30%</span>
+                        </div>
+
+                        <!-- Timer Audio -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-2">
+                            <h6 class="text-muted mb-0 me-auto">🎵 Timer Audio</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testTimerAudio)">🧪 Test</button>
+                        </div>
+                        <div class="row g-1 align-items-center mb-1">
+                            <div class="col-auto"><label class="col-form-label col-form-label-sm" for="timer-audio-theme">Theme</label></div>
+                            <div class="col">
+                                <select id="timer-audio-theme" class="form-select form-select-sm"
+                                        onchange="saveTimerAudioFromForm(); _timerAudioToggleCustom(this.value)">
+                                    <option value="jeopardy">🎵 Jeopardy</option>
+                                    <option value="jaws">🦈 Jaws</option>
+                                    <option value="ticking">⏰ Ticking Clock</option>
+                                    <option value="silent">🔇 Silent</option>
+                                    <option value="custom">📁 Custom Upload</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-1 align-items-center mb-1">
+                            <div class="col-auto"><label class="col-form-label col-form-label-sm" for="timer-audio-trigger">Start at</label></div>
+                            <div class="col">
+                                <input type="range" id="timer-audio-trigger" class="form-range" min="5" max="30" step="1" value="10"
+                                       oninput="document.getElementById('timer-audio-trigger-val').textContent=this.value+'s'; saveTimerAudioFromForm();">
+                            </div>
+                            <div class="col-auto"><span id="timer-audio-trigger-val" class="badge bg-secondary">10s</span></div>
+                        </div>
+                        <div id="timer-audio-custom-wrap" class="mb-3" style="display:none;">
+                            <label class="form-label form-label-sm mb-1">Audio file (max 10s / 800 KB)</label>
+                            <input type="file" id="timer-audio-file" class="form-control form-control-sm" accept="audio/*"
+                                   onchange="handleTimerAudioUpload(this)">
+                            <div id="timer-audio-custom-label" class="text-muted" style="font-size:0.7rem;">No file chosen</div>
+                        </div>
+
+                        <!-- Soundboard -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-2">
+                            <h6 class="text-muted mb-0 me-auto">🔊 Soundboard</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testSoundboard)">🧪 Test</button>
+                        </div>
+                        <div class="form-check form-switch mb-1">
+                            <input class="form-check-input" type="checkbox" id="sound-receive-enabled" checked onchange="saveSoundReceiveSettings()">
+                            <label class="form-check-label small" for="sound-receive-enabled">Receive broadcast sounds from other players</label>
+                        </div>
+                        <div id="sound-subtitle-wrap" style="display:none;">
+                            <div class="form-check form-switch mb-2 ms-3">
+                                <input class="form-check-input" type="checkbox" id="sound-show-subtitle" checked onchange="saveSoundReceiveSettings()">
+                                <label class="form-check-label small" for="sound-show-subtitle">Show subtitle banner instead (muted)</label>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <p class="small fw-semibold mb-1">🎵 Custom sounds <span class="text-muted fw-normal">(max 5s / ~600KB each, up to 3)</span></p>
+                            <div id="custom-sounds-list"></div>
+                            <button type="button" id="custom-sound-add-btn" class="btn btn-outline-secondary btn-sm mt-2" style="font-size:0.75rem;" onclick="addCustomSoundSlot()">+ Add custom sound</button>
+                        </div>
+
+                    </div><!-- end tab-audio -->
+
+                    <!-- ══════════════════════════════════════════
                          TAB: 👤 Profile
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-profile" role="tabpanel">
@@ -1132,6 +1133,22 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/16/2026 (48)</strong></p>
+                        <ul class="mb-2">
+                            <li>🗜️ Compact participant cards — toggle in Theme → Cards shrinks badges to minimal size (56px wide, 22px avatars). Good for large teams on smaller screens.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/16/2026 (47)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔡 Card font size slider — resize the number shown on voting cards (0.7–2.0 rem). Find it in Theme → Cards. Changes are live and persisted.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/16/2026 (46)</strong></p>
+                        <ul class="mb-2">
+                            <li>🃏 Card flip gap slider — control how fast cards flip during the Poker Hand Reveal (100–1000 ms, default 380 ms). Find it in Events under Poker Hand Reveal.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/16/2026 (45)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔊 New Audio tab — Ambient Audio, Timer Audio, and Soundboard are now in their own Audio tab (was: Events). A master "🔇 Mute all sounds" toggle at the top overrides all sound settings at once. ⚙️ New Other tab — Voice-Activated Reveal and Mobile animations moved here, plus an App Install shortcut. On room join, a one-time banner asks your sound preference if sounds are configured.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/16/2026 (44)</strong></p>
                         <ul class="mb-2">
                             <li>🌋 Floor is Lava test button now toggles to "⏹ Stop" while the animation is running — click it again to end the test early. 🎡 Decider Wheel now works from settings on any page — the test opens the wheel with 5 random demo participants so you can spin without needing a live room.</li>
@@ -1432,6 +1449,68 @@
                             <div id="jiraSettingsStatus" class="small mt-2"></div>
                         </div>
                     </div><!-- end tab-jira -->
+
+                    <!-- ══════════════════════════════════════════
+                         TAB: ⚙️ Other
+                         ══════════════════════════════════════════ -->
+                    <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-other" role="tabpanel">
+
+                        <!-- Voice-Activated Reveal -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
+                            <h6 class="text-muted mb-0 me-auto">🎤 Voice-Activated Reveal</h6>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testVoiceRecognition)">🧪 Test</button>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="voice-enabled" onchange="saveVoiceFromForm()">
+                            <label class="form-check-label small" for="voice-enabled">Reveal votes by voice command</label>
+                        </div>
+                        <div id="voice-options-wrap">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <label class="form-label mb-0 small" for="voice-phrase">Trigger phrase</label>
+                                <input type="text" class="form-control form-control-sm" id="voice-phrase" maxlength="40" placeholder="reveal" style="max-width:160px;" oninput="saveVoiceFromForm()">
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <label class="form-label mb-0 small" for="voice-lang">Language</label>
+                                <select class="form-select form-select-sm" id="voice-lang" style="max-width:160px;" onchange="saveVoiceFromForm()">
+                                    <option value="en-US">English (US)</option>
+                                    <option value="en-GB">English (UK)</option>
+                                    <option value="fr-FR">French</option>
+                                    <option value="de-DE">German</option>
+                                    <option value="es-ES">Spanish</option>
+                                    <option value="ja-JP">Japanese</option>
+                                </select>
+                            </div>
+                            <p class="small text-muted mb-0">Requires microphone permission. Works in Chrome/Edge.</p>
+                            <div class="mt-2">
+                                <span id="voice-mic-indicator-modal" style="display:none;" class="badge bg-danger">
+                                    🎤
+                                    <span class="voice-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+                                    Listening
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Mobile Animations -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
+                            <h6 class="text-muted mb-0 me-auto">📱 Mobile</h6>
+                        </div>
+                        <div class="form-check form-check-sm mb-2">
+                            <input class="form-check-input" type="checkbox" id="cel-mobile-animations"
+                                   onchange="saveCelebrationSettingsFromForm()">
+                            <label class="form-check-label small" for="cel-mobile-animations">
+                                Enable animations on mobile (may affect performance)
+                            </label>
+                        </div>
+
+                        <!-- PWA / App Install -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
+                            <h6 class="text-muted mb-0 me-auto">📲 App Install</h6>
+                        </div>
+                        <p class="small text-muted mb-2">Add Estimation Station to your home screen for a full-screen, offline-capable experience.</p>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="installApp()">📲 Add to Home Screen</button>
+                        <p class="small text-muted mt-2 mb-0">Button only appears when your browser supports installation.</p>
+
+                    </div><!-- end tab-other -->
 
                 </div><!-- end tab-content -->
             </div>

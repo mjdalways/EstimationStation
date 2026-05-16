@@ -601,7 +601,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: var(--card-font-size, 1.25rem);
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.15s, background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
@@ -671,6 +671,18 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.25rem;
   min-width: 80px;
   transition: border-color 0.2s;
+}
+
+/* Compact participant mode */
+#participantsContainer.compact .participant-badge {
+    min-width: 56px;
+    padding: 0.3rem 0.5rem;
+}
+#participantsContainer.compact .participant-name {
+    font-size: 0.7rem;
+}
+#participantsContainer.compact .avatar-wrapper {
+    --av-size: 22px !important;
 }
 
 .participant-badge.voted { border-color: var(--card-voted); }

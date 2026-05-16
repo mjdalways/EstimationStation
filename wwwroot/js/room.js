@@ -51,6 +51,7 @@ async function initSignalR() {
         const _savedPin = sessionStorage.getItem('es_roomPin_' + ROOM_CONFIG.roomName) || null;
         await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver, _savedPin);
         if (typeof initVoiceRecognition === 'function') initVoiceRecognition();
+        _promptSoundPreferenceOnce();
     } catch (err) {
         console.error('SignalR connection failed:', err);
         setTimeout(initSignalR, 3000);
@@ -1273,6 +1274,43 @@ initVibePanel();
 if (typeof startSeasonalAmbience === 'function') startSeasonalAmbience();
 
 // ============================================================
+// Sound Preference Prompt (N5) — shown once per page load on room join
+// ============================================================
+function _promptSoundPreferenceOnce() {
+    if (sessionStorage.getItem('es_soundAsked')) return;
+    var anyOn = false;
+    if (typeof getTimerAudioSettings === 'function') {
+        var ta = getTimerAudioSettings();
+        if (ta.theme && ta.theme !== 'silent') anyOn = true;
+    }
+    if (typeof getAmbientSettings === 'function') {
+        var am = getAmbientSettings();
+        if (am.source && am.source !== 'none') anyOn = true;
+    }
+    if (!anyOn) return;
+    sessionStorage.setItem('es_soundAsked', '1');
+
+    var banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;bottom:72px;left:50%;transform:translateX(-50%);'
+        + 'background:var(--card-bg,#fff);border:1px solid var(--panel-border,#dee2e6);'
+        + 'border-radius:12px;padding:10px 14px;box-shadow:0 4px 18px rgba(0,0,0,0.18);'
+        + 'z-index:2050;font-size:0.82rem;max-width:360px;text-align:center;';
+    banner.innerHTML = '<div style="font-weight:600;margin-bottom:6px;">🔊 Sounds are configured — how would you like them?</div>'
+        + '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm btn-outline-secondary" onclick="_setSoundMode(\'all\',this.closest(\'div\').parentElement)">All sounds</button>'
+        + '<button class="btn btn-sm btn-outline-secondary" onclick="_setSoundMode(\'none\',this.closest(\'div\').parentElement)">🔇 No sounds</button>'
+        + '<button class="btn btn-sm btn-link btn-sm" onclick="this.closest(\'div\').remove()" style="font-size:0.75rem;">Dismiss</button>'
+        + '</div>';
+    document.body.appendChild(banner);
+    setTimeout(function() { if (banner.parentNode) banner.remove(); }, 12000);
+}
+
+function _setSoundMode(mode, bannerEl) {
+    if (typeof saveAllSoundsOff === 'function') saveAllSoundsOff(mode === 'none');
+    if (bannerEl) bannerEl.remove();
+}
+
+// ============================================================
 // Helpers
 // ============================================================
 function escHtml(str) {
@@ -1367,7 +1405,7 @@ function _sequentialReveal(votes, stats) {
     // Timing config
     const speeds   = { fast: 500, normal: 800, dramatic: 1300 };
     const slotMs   = useSuspense ? (speeds[cs.suspenseSpeed || 'normal'] || 800) : 0;
-    const flipGap  = 380;
+    const flipGap  = cs.revealFlipGap || 380;
     const outlierPause = outlierId ? 700 : 0;
 
     revealOrder.forEach((cid, i) => {

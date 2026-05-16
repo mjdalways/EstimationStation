@@ -106,6 +106,7 @@ const DEFAULT_CELEBRATION = {
     revealParticles:         true,
     revealParticleType:      'star',
     revealParticleCount:     8,
+    revealFlipGap:           380,
     suspenseReveal:          true,
     suspenseSpeed:           'normal',
     suspenseOrdering:        true,
@@ -694,6 +695,9 @@ function populateCelebrationTab() {
     var lavaSub = document.getElementById('cel-lava-sub');
     if (lavaSub) lavaSub.style.display = s.lavaEnabled !== false ? '' : 'none';
     _celSet('cel-poker-reveal',        'checked', s.pokerReveal        !== false);
+    _celSet('cel-flip-gap',            'value',   s.revealFlipGap      || 380);
+    var fgLbl = document.getElementById('cel-flip-gap-val');
+    if (fgLbl) fgLbl.textContent = (s.revealFlipGap || 380) + 'ms';
     _celSet('cel-suspense-reveal',     'checked', s.suspenseReveal     !== false);
     _celSet('cel-suspense-speed',      'value',   s.suspenseSpeed      || 'normal');
     _celSet('cel-suspense-ordering',   'checked', s.suspenseOrdering   !== false);
@@ -794,6 +798,7 @@ function saveCelebrationSettingsFromForm() {
         lavaEnabled:            _celGet('cel-lava-enabled',         'checked') !== false,
         lavaDuration:           _celGetInt('cel-lava-duration', DEFAULT_CELEBRATION.lavaDuration),
         pokerReveal:            _celGet('cel-poker-reveal',        'checked') !== false,
+        revealFlipGap:          _celGetInt('cel-flip-gap', 380),
         suspenseReveal:         _celGet('cel-suspense-reveal',     'checked') !== false,
         suspenseSpeed:          _celGet('cel-suspense-speed',      'value')   || 'normal',
         suspenseOrdering:       _celGet('cel-suspense-ordering',   'checked') !== false,
@@ -941,11 +946,12 @@ function testPokerReveal() {
         setTimeout(function() { demo.remove(); }, 1500);
         return;
     }
+    var flipGap = (typeof getCelebrationSettings === 'function') ? (getCelebrationSettings().revealFlipGap || 380) : 380;
     badges.forEach(function(badge, i) {
         setTimeout(function() {
             badge.classList.add('poker-flip');
             setTimeout(function() { badge.classList.remove('poker-flip'); }, 450);
-        }, i * 380);
+        }, i * flipGap);
     });
 }
 

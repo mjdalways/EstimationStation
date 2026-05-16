@@ -94,9 +94,11 @@ function openSettingsModal(tab) {
 
     // Pre-populate theme tab from current theme
     populateThemeTab();
+    applyCardFontSize();
+    applyCompactMode();
 
     if (typeof populateCelebrationTab === 'function') populateCelebrationTab();
-    if (typeof populateAmbientTab === 'function') populateAmbientTab();
+    if (typeof populateAudioTab === 'function') populateAudioTab();
     if (typeof populateAvatarTab === 'function') populateAvatarTab();
     if (typeof populateShameSection === 'function') populateShameSection();
     if (typeof populateBattleSection === 'function') populateBattleSection();
@@ -104,11 +106,8 @@ function openSettingsModal(tab) {
     if (typeof populateVoiceSection === 'function') populateVoiceSection();
     if (typeof populateCounterSpellSection === 'function') populateCounterSpellSection();
     if (typeof _seaAddConfigButtons === 'function') _seaAddConfigButtons();
-    if (typeof populateSoundReceiveSection === 'function') populateSoundReceiveSection();
-    if (typeof renderCustomSoundSlots === 'function') renderCustomSoundSlots();
     populateJiraTab();
     applyCardBackDesign();
-    if (typeof populateTimerAudioSection === 'function') populateTimerAudioSection();
 
     _settingsSaved = false; // reset the save flag for this session
 
@@ -261,7 +260,22 @@ function loadTheme() {
     applyTheme(saved);
 }
 
-document.addEventListener('DOMContentLoaded', loadTheme);
+document.addEventListener('DOMContentLoaded', function() { loadTheme(); applyCardFontSize(); applyCompactMode(); });
+
+function applyCompactMode() {
+    var compact = localStorage.getItem('es_compactMode') === '1';
+    var container = document.getElementById('participantsContainer');
+    if (container) container.classList.toggle('compact', compact);
+    var cb = document.getElementById('compact-mode-toggle');
+    if (cb) cb.checked = compact;
+}
+
+function applyCardFontSize() {
+    var v = parseFloat(localStorage.getItem('es_cardFontSize') || '1.25');
+    document.documentElement.style.setProperty('--card-font-size', v + 'rem');
+    var slider = document.getElementById('card-font-size-slider');
+    if (slider) { slider.value = v; document.getElementById('card-font-size-label').textContent = v.toFixed(1); }
+}
 
 // ============================================================
 // PWA Install
