@@ -79,10 +79,24 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
+                <!-- Z3: Global controls bar -->
+                <div class="d-flex align-items-center flex-wrap gap-2 px-3 py-1 border-bottom bg-body-secondary" id="settings-global-bar" style="font-size:0.72rem;">
+                    <button class="btn btn-outline-danger btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="settingsAllOff()">🔇 All Off</button>
+                    <button class="btn btn-outline-success btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="settingsAllOn()">✨ All On</button>
+                    <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="settingsResetAll()">↩ Reset All</button>
+                    <div class="ms-auto d-flex gap-1">
+                        <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="exportAllSettings()">📤 Export</button>
+                        <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="importAllSettings()">📥 Import</button>
+                    </div>
+                </div>
+
                 <!-- Tab nav -->
                 <ul class="nav nav-tabs settings-tabs px-3 pt-2 border-bottom-0" id="settingsTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active settings-tab-btn" id="tab-theme-btn" data-bs-toggle="tab" data-bs-target="#tab-theme" type="button" role="tab">🎨 <span class="tab-label">Theme</span></button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link settings-tab-btn" id="tab-visual-btn" data-bs-toggle="tab" data-bs-target="#tab-visual" type="button" role="tab">👁️ <span class="tab-label">Visual</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-celebration-btn" data-bs-toggle="tab" data-bs-target="#tab-celebration" type="button" role="tab">🎉 <span class="tab-label">Events</span></button>
@@ -106,6 +120,17 @@
                         <button class="nav-link settings-tab-btn" id="tab-about-btn" data-bs-toggle="tab" data-bs-target="#tab-about" type="button" role="tab">ℹ️ <span class="tab-label">About</span></button>
                     </li>
                 </ul>
+
+                <!-- Z1: Settings search -->
+                <div class="px-3 pt-2 pb-1 border-bottom" id="settings-search-wrap">
+                    <div class="d-flex align-items-center gap-2" style="max-width:400px;">
+                        <div class="input-group input-group-sm flex-fill">
+                            <span class="input-group-text">🔍</span>
+                            <input type="search" id="settings-search" class="form-control" placeholder="Search settings…" oninput="filterSettings(this.value)">
+                        </div>
+                        <span id="settings-search-results" class="small"></span>
+                    </div>
+                </div>
 
                 <!-- Tab content -->
                 <div class="tab-content flex-fill overflow-hidden" id="settingsTabContent">
@@ -321,27 +346,6 @@
                                                 <label class="ct-field-label">Border Width: <strong><span id="ct-border-width-label">1.5</span>px</strong></label>
                                                 <input type="range" class="form-range" id="ct-card-border-width" min="0" max="8" step="0.5" value="1.5" oninput="document.getElementById('ct-border-width-label').textContent=this.value; updateThemePreview()" />
                                             </div>
-                                            <div class="col-12">
-                                                <label class="ct-field-label">Card font size: <strong><span id="card-font-size-label">1.25</span>rem</strong> <span class="text-muted" style="font-size:0.72rem;">· Small 0.7 · Normal 1.25 · Large 2.0</span></label>
-                                                <input type="range" class="form-range" id="card-font-size-slider" min="0.7" max="2.0" step="0.1" value="1.25"
-                                                    oninput="var v=parseFloat(this.value).toFixed(1); document.getElementById('card-font-size-label').textContent=v; document.documentElement.style.setProperty('--card-font-size',v+'rem'); localStorage.setItem('es_cardFontSize',v)" />
-                                            </div>
-                                            <div class="col-12 mt-1">
-                                                <div class="form-check d-flex align-items-center gap-2">
-                                                    <input class="form-check-input" type="checkbox" id="compact-mode-toggle"
-                                                        onchange="localStorage.setItem('es_compactMode',this.checked?'1':'0'); var c=document.getElementById('participantsContainer'); if(c) c.classList.toggle('compact',this.checked);" />
-                                                    <label class="form-check-label ct-field-label mb-0" for="compact-mode-toggle">Compact participant cards</label>
-                                                </div>
-                                                <div class="d-flex gap-1 mt-1 p-2" style="background:rgba(128,128,128,0.08);border-radius:6px;">
-                                                    <div style="padding:0.3rem 0.5rem;border:1px solid var(--panel-border,#ccc);border-radius:6px;font-size:0.75rem;min-width:56px;text-align:center;">
-                                                        <div style="font-size:0.7rem;font-weight:600;">Alice</div><div>?</div>
-                                                    </div>
-                                                    <div style="padding:0.3rem 0.5rem;border:1px solid var(--card-voted,#198754);border-radius:6px;font-size:0.75rem;min-width:56px;text-align:center;">
-                                                        <div style="font-size:0.7rem;font-weight:600;">Bob</div><div>5</div>
-                                                    </div>
-                                                    <span class="text-muted ms-1" style="font-size:0.7rem;align-self:center;">compact preview</span>
-                                                </div>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -398,7 +402,7 @@
                                 <!-- Card Back Design section -->
                                 <div class="ct-section mb-2">
                                     <button class="ct-section-toggle w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#sec-card-back">
-                                        🃏 Card Backs
+                                        🃏 Participant Card Backs
                                     </button>
                                     <div id="sec-card-back" class="ct-section-body">
                                         <label class="ct-field-label" for="cardBackSelect">Style when voted (face-down)</label>
@@ -461,9 +465,94 @@
                     </div><!-- end tab-theme -->
 
                     <!-- ══════════════════════════════════════════
+                         TAB: 👁️ Visual
+                         ══════════════════════════════════════════ -->
+                    <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-visual" role="tabpanel">
+                        <!-- Z2: Bulk controls -->
+                        <div class="d-flex gap-1 mb-3">
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabAllOn('tab-visual')">✓ All</button>
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabAllOff('tab-visual')">✗ None</button>
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabResetDefaults('tab-visual')">↩ Reset</button>
+                        </div>
+
+                        <!-- W3: Live Preview -->
+                        <div class="p-3 mb-3" style="background:var(--bg3,#f8f9fa);border-radius:10px;border:1px solid var(--border,#dee2e6);">
+                            <div class="text-muted small mb-2 fw-bold">Live Preview</div>
+                            <div class="d-flex gap-3 align-items-flex-start flex-wrap">
+                                <div>
+                                    <div class="text-muted small mb-1">Participant</div>
+                                    <div class="participant-badge" id="live-preview-badge" style="pointer-events:none;display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--panel-border,#dee2e6);">
+                                        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent,#5b8dee);display:flex;align-items:center;justify-content:center;font-size:0.8rem;color:#fff;">A</div>
+                                        <span style="font-size:var(--card-font-size,0.8rem);">Alex</span>
+                                        <span style="opacity:0.5;">✓</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small mb-1">Vote Card</div>
+                                    <div class="poker-card" id="live-preview-vote-card" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;width:42px;height:56px;border-radius:6px;border:2px solid var(--card-border,#dee2e6);font-size:var(--card-font-size,1.25rem);font-weight:700;">5</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small mb-1">Revealed</div>
+                                    <div class="participant-badge" id="live-preview-revealed" style="pointer-events:none;display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--card-voted,#198754);">
+                                        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent,#5b8dee);display:flex;align-items:center;justify-content:center;font-size:0.8rem;color:#fff;">A</div>
+                                        <span style="font-size:var(--card-font-size,0.8rem);">Alex</span>
+                                        <span style="font-weight:700;font-size:var(--card-font-size,0.8rem);">5</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- W1/W2: Card Font Size -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold mb-1">Card font size: <strong><span id="card-font-size-label">1.25</span>rem</strong> <span class="text-muted" style="font-size:0.72rem;">· Small 0.7 · Normal 1.25 · Large 2.0</span></label>
+                            <input type="range" class="form-range" id="card-font-size-slider" min="0.7" max="2.0" step="0.1" value="1.25"
+                                oninput="var v=parseFloat(this.value).toFixed(1); document.getElementById('card-font-size-label').textContent=v; document.documentElement.style.setProperty('--card-font-size',v+'rem'); localStorage.setItem('es_cardFontSize',v)" />
+                        </div>
+
+                        <!-- W1/W2: Compact mode -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="compact-mode-toggle"
+                                    onchange="localStorage.setItem('es_compactMode',this.checked?'1':'0'); var c=document.getElementById('participantsContainer'); if(c) { c.classList.toggle('compact',this.checked); c.classList.add('just-changed'); setTimeout(function(){c.classList.remove('just-changed');},600); }" />
+                                <label class="form-check-label" for="compact-mode-toggle">Compact participant cards</label>
+                            </div>
+                            <div class="d-flex gap-2 p-2" style="background:rgba(128,128,128,0.08);border-radius:6px;max-width:260px;">
+                                <div>
+                                    <div class="text-muted small mb-1">Normal</div>
+                                    <div style="padding:0.4rem 0.6rem;border:1px solid var(--panel-border,#ccc);border-radius:6px;font-size:0.8rem;min-width:60px;text-align:center;">
+                                        <div style="font-size:0.75rem;font-weight:600;">Alice</div><div>?</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small mb-1">Compact</div>
+                                    <div style="padding:0.25rem 0.4rem;border:1px solid var(--panel-border,#ccc);border-radius:6px;font-size:0.7rem;min-width:48px;text-align:center;">
+                                        <div style="font-size:0.65rem;font-weight:600;">Alice</div><div>?</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- W4: Confidence Indicator toggle -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="show-confidence-toggle" checked
+                                    onchange="localStorage.setItem('es_showConfidence', this.checked ? '1' : '0')" />
+                                <label class="form-check-label" for="show-confidence-toggle">Show "How confident are you?" prompt after voting</label>
+                            </div>
+                        </div>
+
+                    </div><!-- end tab-visual -->
+
+                    <!-- ══════════════════════════════════════════
                          TAB: 🎉 Celebration
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-celebration" role="tabpanel">
+                        <!-- Z2: Bulk controls -->
+                        <div class="d-flex gap-1 mb-2">
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabAllOn('tab-celebration')">✓ All</button>
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabAllOff('tab-celebration')">✗ None</button>
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabResetDefaults('tab-celebration')">↩ Reset</button>
+                        </div>
                         <!-- Enable / Disable toggles -->
                         <div class="d-flex gap-4 mb-3 flex-wrap">
                             <div class="form-check">
@@ -578,10 +667,11 @@
 
 
                         <!-- Confetti -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
-                            <h6 class="text-muted mb-0 me-auto">🎊 Confetti</h6>
+                        <div class="settings-section-header">
+                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-confetti" role="button">🎊 Confetti ▾</span>
                             <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testConfetti)">🧪 Test</button>
                         </div>
+                        <div class="collapse show" id="sec-confetti">
                         <div class="row g-2 mb-3">
                             <div class="col-md-4 col-6">
                                 <label class="form-label small mb-1" for="cel-confetti-type">Particle type</label>
@@ -623,15 +713,18 @@
                             </div>
                             <div id="cel-emoji-group" class="col-12" style="display:none;">
                                 <label class="form-label small mb-1" for="cel-confetti-emojis">Custom emojis (comma-separated)</label>
-                                <input type="text" id="cel-confetti-emojis" class="form-control form-control-sm" placeholder="🎉,🎊,✨,🎈" />
+                                <input type="text" id="cel-confetti-emojis" class="form-control form-control-sm" placeholder="🎉,🎊,✨,🎈" data-picker-target />
                             </div>
                         </div>
 
+                        </div><!-- end sec-confetti -->
+
                         <!-- Fireworks -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
-                            <h6 class="text-muted mb-0 me-auto">🎆 Fireworks</h6>
+                        <div class="settings-section-header">
+                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-fireworks" role="button">🎆 Fireworks ▾</span>
                             <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testFireworks)">🧪 Test</button>
                         </div>
+                        <div class="collapse" id="sec-fireworks">
                         <div class="row g-2 mb-3">
                             <div class="col-md-4 col-6">
                                 <label class="form-label small mb-1" for="cel-fireworks-duration">Duration</label>
@@ -666,11 +759,14 @@
                             </div>
                         </div>
 
+                        </div><!-- end sec-fireworks -->
+
                         <!-- Balloons -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
-                            <h6 class="text-muted mb-0 me-auto">🎈 Balloons</h6>
+                        <div class="settings-section-header">
+                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-balloons" role="button">🎈 Balloons ▾</span>
                             <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testBalloons)">🧪 Test</button>
                         </div>
+                        <div class="collapse" id="sec-balloons">
                         <div class="row g-2 mb-3">
                             <div class="col-md-4 col-6">
                                 <label class="form-label small mb-1">Count: <span id="cel-balloon-count-val">10</span></label>
@@ -685,11 +781,14 @@
                             </div>
                         </div>
 
+                        </div><!-- end sec-balloons -->
+
                         <!-- Discussion Timer -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
-                            <h6 class="text-muted mb-0 me-auto">☕ Discussion Timer</h6>
+                        <div class="settings-section-header">
+                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-discussion" role="button">☕ Discussion Timer ▾</span>
                             <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testDiscussionTimer)">🧪 Test</button>
                         </div>
+                        <div class="collapse" id="sec-discussion">
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="disc-enabled" onchange="saveDiscussionFromForm()">
                             <label class="form-check-label small" for="disc-enabled">Show discussion countdown on non-consensus reveal</label>
@@ -702,11 +801,14 @@
                             <p class="small text-muted mb-0">When the timer expires, 🌋 Floor is Lava starts automatically (if enabled).</p>
                         </div>
 
+                        </div><!-- end sec-discussion -->
+
                         <!-- Shame Spotlight -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
-                            <h6 class="text-muted mb-0 me-auto">🎯 Shame Spotlight</h6>
+                        <div class="settings-section-header">
+                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-shame" role="button">🎯 Shame Spotlight ▾</span>
                             <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testShame)">🧪 Test</button>
                         </div>
+                        <div class="collapse" id="sec-shame">
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="shame-enabled" onchange="saveShameFromForm()">
                             <label class="form-check-label small" for="shame-enabled">Spotlight the outlier voter on reveal</label>
@@ -726,11 +828,14 @@
                             </div>
                         </div>
 
+                        </div><!-- end sec-shame -->
+
                         <!-- Lone Wolf Counter-Spell -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
-                            <h6 class="text-muted mb-0 me-auto">🪄 Lone Wolf Counter-Spell</h6>
+                        <div class="settings-section-header">
+                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-counterspell" role="button">🪄 Lone Wolf Counter-Spell ▾</span>
                             <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testCounterSpell)">🧪 Test</button>
                         </div>
+                        <div class="collapse" id="sec-counterspell">
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="cs-enabled" onchange="saveCounterSpellFromForm()">
                             <label class="form-check-label small" for="cs-enabled">Allow the outlier to cast a 🐔 Counter-Spell (once per session)</label>
@@ -740,6 +845,7 @@
                             <input type="number" class="form-control form-control-sm" id="cs-duration" min="1" max="30" value="4" style="width:70px;" oninput="saveCounterSpellFromForm()">
                         </div>
                         <p class="small text-muted mb-0">After a non-consensus reveal the lone wolf sees a <strong>🐔 Cast Spell</strong> button. All other voters get a 🐔 overlay for the configured duration.</p>
+                        </div><!-- end sec-counterspell -->
 
                         <!-- Confidence Indicator (test only — always on) -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
@@ -763,10 +869,11 @@
                         <p class="small text-muted mb-2">Canvas spinner that randomly picks a participant. Button in the Controls panel in-room.</p>
 
                         <!-- Avatar Battle -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
-                            <h6 class="text-muted mb-0 me-auto">⚔️ Avatar Battle</h6>
+                        <div class="settings-section-header">
+                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-battle" role="button">⚔️ Avatar Battle ▾</span>
                             <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testBattle)">🧪 Test</button>
                         </div>
+                        <div class="collapse" id="sec-battle">
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="battle-enabled" onchange="saveBattleFromForm()">
                             <label class="form-check-label small" for="battle-enabled">Play a battle animation when votes are revealed</label>
@@ -813,6 +920,7 @@
                                 </div>
                             </div>
                         </div>
+                        </div><!-- end sec-battle -->
 
                         <div class="d-flex gap-2 flex-wrap border-top pt-3">
                             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetCelebrationSettings()">↩ Reset defaults</button>
@@ -825,6 +933,8 @@
                          TAB: 🗓️ Seasons
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-seasons" role="tabpanel">
+                        <!-- AA1: Active season status bar -->
+                        <div id="sea-status-bar" class="d-none mb-2 px-3 py-1 rounded small fw-semibold text-center" style="background:var(--accent,#5b8dee);color:#fff;"></div>
                         <!-- Master toggle + bulk actions -->
                         <div class="d-flex align-items-center flex-wrap gap-2 mb-3 p-2 border rounded bg-body-secondary">
                             <div class="form-check mb-0">
@@ -834,6 +944,7 @@
                             <div class="ms-auto d-flex gap-2 flex-wrap">
                                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_seaSelectAll(true)" style="font-size:0.75rem;">✓ All</button>
                                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="_seaSelectAll(false)" style="font-size:0.75rem;">✗ None</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="tabResetDefaults('tab-seasons')" style="font-size:0.75rem;">↩ Reset</button>
                                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="runTest(testSeasonalAmbience)" style="font-size:0.75rem;">🧪 Cycle Test</button>
                             </div>
                         </div>
@@ -844,7 +955,7 @@
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-deepwinter"><label for="cel-seasonal-deepwinter">🧊 Deep Winter</label><span>Jan 11–31</span><button onclick="runTest(testSpecificSeason.bind(null, 'deepwinter'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-spring"><label for="cel-seasonal-spring">🌸 Spring</label><span>Mar–May</span><button onclick="runTest(testSpecificSeason.bind(null, 'spring'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-summer"><label for="cel-seasonal-summer">☀️ Summer</label><span>Jun–Aug</span><button onclick="runTest(testSpecificSeason.bind(null, 'summer'))">▶</button></div>
-                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-autumn"><label for="cel-seasonal-autumn">🍂 Autumn</label><span>Sep–Nov</span><button onclick="runTest(testSpecificSeason.bind(null, 'autumn'))">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-autumn"><label for="cel-seasonal-autumn">🍂 Fall/Autumn</label><span>Sep–Nov</span><button onclick="runTest(testSpecificSeason.bind(null, 'autumn'))">▶</button></div>
                         </div>
                         <p class="small fw-semibold text-muted mb-1">🎉 Major Holidays</p>
                         <div class="mb-3">
@@ -910,6 +1021,27 @@
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-endofyear"><label for="cel-seasonal-endofyear">⏰ End of Year</label><span>Dec 27–30</span><button onclick="runTest(testSpecificSeason.bind(null, 'endofyear'))">▶</button></div>
                         </div>
 
+                        <!-- AA8: Frequency sliders -->
+                        <div class="border-top pt-3 mb-3">
+                            <p class="small fw-semibold text-muted mb-2">⏱️ Animation Frequency</p>
+                            <div class="d-flex flex-wrap gap-3 align-items-center" style="font-size:0.82rem;">
+                                <label class="d-flex align-items-center gap-2">Min interval
+                                    <input type="number" id="seaFreqMin" class="form-control form-control-sm" min="5" max="300" step="1" style="width:65px;" value="22">s
+                                </label>
+                                <label class="d-flex align-items-center gap-2">Max interval
+                                    <input type="number" id="seaFreqMax" class="form-control form-control-sm" min="5" max="600" step="1" style="width:65px;" value="55">s
+                                </label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="saveSeaFreq()">Apply</button>
+                            </div>
+                        </div>
+
+                        <!-- AA10: Export / Import -->
+                        <div class="border-top pt-2 mb-3 d-flex gap-2 flex-wrap align-items-center">
+                            <span class="small text-muted me-1">Config:</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportSeasonalConfig()">⬇️ Export</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="importSeasonalConfig()">⬆️ Import</button>
+                        </div>
+
                         <div class="border-top pt-2 d-flex gap-2 justify-content-end">
                             <button type="button" class="btn btn-sm btn-primary" onclick="saveCelebrationSettingsFromForm()">💾 Save</button>
                         </div>
@@ -920,6 +1052,13 @@
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-audio" role="tabpanel">
 
+                        <!-- Z2: Bulk controls -->
+                        <div class="d-flex gap-1 mb-2">
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabAllOn('tab-audio')">✓ All</button>
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabAllOff('tab-audio')">✗ None</button>
+                            <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="tabResetDefaults('tab-audio')">↩ Reset</button>
+                        </div>
+
                         <!-- Master mute -->
                         <div class="d-flex align-items-center gap-3 p-2 border rounded mb-3 bg-body-secondary">
                             <div class="form-check form-switch mb-0">
@@ -929,78 +1068,129 @@
                             <span class="text-muted small ms-auto">Overrides all settings below</span>
                         </div>
 
-                        <!-- Ambient Audio -->
+                        <!-- N4: Ambient Audio (collapsible) -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2">
-                            <h6 class="text-muted mb-0 me-auto">🎵 Ambient Audio</h6>
+                            <span class="flex-grow-1 d-flex align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#sec-audio-ambient">
+                                <h6 class="text-muted mb-0 me-auto">🎵 Ambient Audio</h6>
+                            </span>
                         </div>
-                        <div class="d-flex align-items-center gap-2 mb-2 small">
-                            <label for="ambient-source" class="text-nowrap">Sound</label>
-                            <select id="ambient-source" class="form-select form-select-sm" onchange="saveAmbientFromForm()">
-                                <option value="none">🔇 Off</option>
-                                <option value="lofi">🎵 Lo-Fi</option>
-                                <option value="rain">🌧️ Rain</option>
-                                <option value="cafe">☕ Café</option>
-                            </select>
-                        </div>
-                        <div class="d-flex align-items-center gap-2 mb-3 small">
-                            <label for="ambient-volume" class="text-nowrap">Volume</label>
-                            <input type="range" id="ambient-volume" min="0" max="1" step="0.05" style="width:90px;"
-                                   oninput="document.getElementById('ambient-vol-label').textContent=Math.round(this.value*100)+'%';saveAmbientFromForm()">
-                            <span id="ambient-vol-label">30%</span>
-                        </div>
-
-                        <!-- Timer Audio -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-2">
-                            <h6 class="text-muted mb-0 me-auto">🎵 Timer Audio</h6>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testTimerAudio)">🧪 Test</button>
-                        </div>
-                        <div class="row g-1 align-items-center mb-1">
-                            <div class="col-auto"><label class="col-form-label col-form-label-sm" for="timer-audio-theme">Theme</label></div>
-                            <div class="col">
-                                <select id="timer-audio-theme" class="form-select form-select-sm"
-                                        onchange="saveTimerAudioFromForm(); _timerAudioToggleCustom(this.value)">
-                                    <option value="jeopardy">🎵 Jeopardy</option>
-                                    <option value="jaws">🦈 Jaws</option>
-                                    <option value="ticking">⏰ Ticking Clock</option>
-                                    <option value="silent">🔇 Silent</option>
-                                    <option value="custom">📁 Custom Upload</option>
+                        <div class="collapse show" id="sec-audio-ambient">
+                            <div class="d-flex align-items-center gap-2 mb-2 small">
+                                <label for="ambient-source" class="text-nowrap">Sound</label>
+                                <select id="ambient-source" class="form-select form-select-sm" onchange="saveAmbientFromForm()">
+                                    <option value="none">🔇 Off</option>
+                                    <option value="lofi">🎵 Lo-Fi</option>
+                                    <option value="rain">🌧️ Rain</option>
+                                    <option value="cafe">☕ Café</option>
                                 </select>
                             </div>
-                        </div>
-                        <div class="row g-1 align-items-center mb-1">
-                            <div class="col-auto"><label class="col-form-label col-form-label-sm" for="timer-audio-trigger">Start at</label></div>
-                            <div class="col">
-                                <input type="range" id="timer-audio-trigger" class="form-range" min="5" max="30" step="1" value="10"
-                                       oninput="document.getElementById('timer-audio-trigger-val').textContent=this.value+'s'; saveTimerAudioFromForm();">
+                            <div class="d-flex align-items-center gap-2 mb-3 small">
+                                <label for="ambient-volume" class="text-nowrap">Volume</label>
+                                <input type="range" id="ambient-volume" min="0" max="1" step="0.05" style="width:90px;"
+                                       oninput="document.getElementById('ambient-vol-label').textContent=Math.round(this.value*100)+'%';saveAmbientFromForm()">
+                                <span id="ambient-vol-label">30%</span>
                             </div>
-                            <div class="col-auto"><span id="timer-audio-trigger-val" class="badge bg-secondary">10s</span></div>
-                        </div>
-                        <div id="timer-audio-custom-wrap" class="mb-3" style="display:none;">
-                            <label class="form-label form-label-sm mb-1">Audio file (max 10s / 800 KB)</label>
-                            <input type="file" id="timer-audio-file" class="form-control form-control-sm" accept="audio/*"
-                                   onchange="handleTimerAudioUpload(this)">
-                            <div id="timer-audio-custom-label" class="text-muted" style="font-size:0.7rem;">No file chosen</div>
                         </div>
 
-                        <!-- Soundboard -->
+                        <!-- N4: Timer Audio (collapsible) -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-2">
-                            <h6 class="text-muted mb-0 me-auto">🔊 Soundboard</h6>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testSoundboard)">🧪 Test</button>
+                            <span class="flex-grow-1 d-flex align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#sec-audio-timer">
+                                <h6 class="text-muted mb-0 me-auto">🎵 Timer Audio</h6>
+                            </span>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testTimerAudio)">🧪 Test</button>
                         </div>
-                        <div class="form-check form-switch mb-1">
-                            <input class="form-check-input" type="checkbox" id="sound-receive-enabled" checked onchange="saveSoundReceiveSettings()">
-                            <label class="form-check-label small" for="sound-receive-enabled">Receive broadcast sounds from other players</label>
-                        </div>
-                        <div id="sound-subtitle-wrap" style="display:none;">
-                            <div class="form-check form-switch mb-2 ms-3">
-                                <input class="form-check-input" type="checkbox" id="sound-show-subtitle" checked onchange="saveSoundReceiveSettings()">
-                                <label class="form-check-label small" for="sound-show-subtitle">Show subtitle banner instead (muted)</label>
+                        <div class="collapse show" id="sec-audio-timer">
+                            <div class="row g-1 align-items-center mb-1">
+                                <div class="col-auto"><label class="col-form-label col-form-label-sm" for="timer-audio-theme">Theme</label></div>
+                                <div class="col">
+                                    <select id="timer-audio-theme" class="form-select form-select-sm"
+                                            onchange="saveTimerAudioFromForm(); _timerAudioToggleCustom(this.value)">
+                                        <option value="jeopardy">🎵 Jeopardy</option>
+                                        <option value="jaws">🦈 Jaws</option>
+                                        <option value="ticking">⏰ Ticking Clock</option>
+                                        <option value="silent">🔇 Silent</option>
+                                        <option value="custom">📁 Custom Upload</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-1 align-items-center mb-1">
+                                <div class="col-auto"><label class="col-form-label col-form-label-sm" for="timer-audio-trigger">Start at</label></div>
+                                <div class="col">
+                                    <input type="range" id="timer-audio-trigger" class="form-range" min="5" max="30" step="1" value="10"
+                                           oninput="document.getElementById('timer-audio-trigger-val').textContent=this.value+'s'; saveTimerAudioFromForm();">
+                                </div>
+                                <div class="col-auto"><span id="timer-audio-trigger-val" class="badge bg-secondary">10s</span></div>
+                            </div>
+                            <div id="timer-audio-custom-wrap" class="mb-3" style="display:none;">
+                                <label class="form-label form-label-sm mb-1">Audio file (max 10s / 800 KB)</label>
+                                <input type="file" id="timer-audio-file" class="form-control form-control-sm" accept="audio/*"
+                                       onchange="handleTimerAudioUpload(this)">
+                                <div id="timer-audio-custom-label" class="text-muted" style="font-size:0.7rem;">No file chosen</div>
                             </div>
                         </div>
-                        <div class="mt-2">
-                            <p class="small fw-semibold mb-1">🎵 Custom sounds <span class="text-muted fw-normal">(max 5s / ~600KB each, up to 3)</span></p>
-                            <div id="custom-sounds-list"></div>
-                            <button type="button" id="custom-sound-add-btn" class="btn btn-outline-secondary btn-sm mt-2" style="font-size:0.75rem;" onclick="addCustomSoundSlot()">+ Add custom sound</button>
+
+                        <!-- N4: Soundboard (collapsible) -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-2">
+                            <span class="flex-grow-1 d-flex align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#sec-audio-soundboard">
+                                <h6 class="text-muted mb-0 me-auto">🔊 Soundboard</h6>
+                            </span>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testSoundboard)">🧪 Test</button>
+                        </div>
+                        <div class="collapse show" id="sec-audio-soundboard">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="sound-receive-enabled" checked onchange="saveSoundReceiveSettings()">
+                                <label class="form-check-label small" for="sound-receive-enabled">Receive broadcast sounds from other players</label>
+                            </div>
+                            <div id="sound-subtitle-wrap" style="display:none;">
+                                <div class="form-check form-switch mb-2 ms-3">
+                                    <input class="form-check-input" type="checkbox" id="sound-show-subtitle" checked onchange="saveSoundReceiveSettings()">
+                                    <label class="form-check-label small" for="sound-show-subtitle">Show subtitle banner instead (muted)</label>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <p class="small fw-semibold mb-1">🎵 Custom sounds <span class="text-muted fw-normal">(max 5s / ~600KB each, up to 3)</span></p>
+                                <div id="custom-sounds-list"></div>
+                                <button type="button" id="custom-sound-add-btn" class="btn btn-outline-secondary btn-sm mt-2" style="font-size:0.75rem;" onclick="addCustomSoundSlot()">+ Add custom sound</button>
+                            </div>
+                        </div>
+
+                        <!-- N4: Voice-Activated Reveal (collapsible) -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-2">
+                            <span class="flex-grow-1 d-flex align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#sec-audio-voice">
+                                <h6 class="text-muted mb-0 me-auto">🎤 Voice-Activated Reveal</h6>
+                            </span>
+                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testVoiceRecognition)">🧪 Test</button>
+                        </div>
+                        <div class="collapse show" id="sec-audio-voice">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="voice-enabled" onchange="saveVoiceFromForm()">
+                                <label class="form-check-label small" for="voice-enabled">Reveal votes by voice command</label>
+                            </div>
+                            <div id="voice-options-wrap">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <label class="form-label mb-0 small" for="voice-phrase">Trigger phrase</label>
+                                    <input type="text" class="form-control form-control-sm" id="voice-phrase" maxlength="40" placeholder="reveal" style="max-width:160px;" oninput="saveVoiceFromForm()">
+                                </div>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <label class="form-label mb-0 small" for="voice-lang">Language</label>
+                                    <select class="form-select form-select-sm" id="voice-lang" style="max-width:160px;" onchange="saveVoiceFromForm()">
+                                        <option value="en-US">English (US)</option>
+                                        <option value="en-GB">English (UK)</option>
+                                        <option value="fr-FR">French</option>
+                                        <option value="de-DE">German</option>
+                                        <option value="es-ES">Spanish</option>
+                                        <option value="ja-JP">Japanese</option>
+                                    </select>
+                                </div>
+                                <p class="small text-muted mb-0">Requires microphone permission. Works in Chrome/Edge.</p>
+                                <div class="mt-2">
+                                    <span id="voice-mic-indicator-modal" style="display:none;" class="badge bg-danger">
+                                        🎤
+                                        <span class="voice-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+                                        Listening
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
                     </div><!-- end tab-audio -->
@@ -1133,6 +1323,55 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/17/2026 (60)</strong></p>
+                        <ul class="mb-2">
+                            <li>⚙️ Settings quality: global controls bar (All Off/On, Reset All, Export/Import); per-tab bulk toggles (✓ All / ✗ None / ↩ Reset) on Events, Audio, Seasons, Visual tabs; real-time settings search with tab-match badges; collapsible sections in Audio tab (Ambient, Timer, Soundboard, Voice); sound preference confirmation modal on room join.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (59)</strong></p>
+                        <ul class="mb-2">
+                            <li>🗓️ Seasons polish: 20+ animations promoted to fully configurable runners (direction, size, duration, motion style). Motion Style dropdown replaces Wave toggle — choose from none/wave/bounce/hop/spin/run/wobble/zigzag. Per-animation 🧪 test buttons. Star Wars Day crawl animation added. Active season status bar. Next-occurrence dates on each season row. Frequency sliders for animation timing. Export/Import config as JSON.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (58)</strong></p>
+                        <ul class="mb-2">
+                            <li>👁️ New Visual settings tab — card font size and compact mode moved here from Theme; live preview of participant badge and vote card; "How confident are you?" prompt can now be toggled off.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (57)</strong></p>
+                        <ul class="mb-2">
+                            <li>😊 Emoji picker — click the picker button (😊) next to any emoji input to browse by category, search, and insert. Opens on confetti emoji field; reusable for all emoji inputs.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (56)</strong></p>
+                        <ul class="mb-2">
+                            <li>↔️ Sidebar resize — drag the right edge of the Stories panel to set a custom width (min 180 px, max 40% viewport). Width is saved and restored across sessions.</li>
+                            <li>📋 Story titles now show a tooltip with the full text when the sidebar is too narrow to display them completely.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (55)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎛️ Events sections now collapse — Confetti, Fireworks, Balloons, Discussion Timer, Shame Spotlight, Counter-Spell, and Avatar Battle each have a collapsible header in the Events settings tab.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (54)</strong></p>
+                        <ul class="mb-2">
+                            <li>✨ UI Polish — story notes now appear below the story title instead of far right; Accept button shows "Override to X" when you type a custom value; Card Backs renamed to Participant Card Backs; Fall/Autumn label updated; Voice recognition moved to the Audio tab; hover tooltips added to story action buttons and navbar controls.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (53)</strong></p>
+                        <ul class="mb-2">
+                            <li>🌋 Floor is Lava test — now previews the current color and countdown duration from the settings form, even before saving.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (52)</strong></p>
+                        <ul class="mb-2">
+                            <li>🌋 Floor is Lava test fix — the Stop button now works correctly; previously every click restarted lava instead of stopping it because the internal cleanup ran before the active flag was set.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (51)</strong></p>
+                        <ul class="mb-2">
+                            <li>🦈 Ocean Week fix — shark now swims left-to-right facing the correct direction, and is fully configurable (direction, size, speed) like other runner animations.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (50)</strong></p>
+                        <ul class="mb-2">
+                            <li>🏆 Session awards fix — your name no longer shows as "Unknown" in the Hall of Fame. Falls back to your stored display name when the participant record has an empty name field.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (49)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎤 Voice recognition fix — prevents InvalidStateError when the phrase changes mid-session; restart loop is now guarded against double-start. Click the 🎤 badge in the navbar to stop voice recognition at any time.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/16/2026 (48)</strong></p>
                         <ul class="mb-2">
                             <li>🗜️ Compact participant cards — toggle in Theme → Cards shrinks badges to minimal size (56px wide, 22px avatars). Good for large teams on smaller screens.</li>
@@ -1455,41 +1694,6 @@
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-other" role="tabpanel">
 
-                        <!-- Voice-Activated Reveal -->
-                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
-                            <h6 class="text-muted mb-0 me-auto">🎤 Voice-Activated Reveal</h6>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testVoiceRecognition)">🧪 Test</button>
-                        </div>
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="voice-enabled" onchange="saveVoiceFromForm()">
-                            <label class="form-check-label small" for="voice-enabled">Reveal votes by voice command</label>
-                        </div>
-                        <div id="voice-options-wrap">
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <label class="form-label mb-0 small" for="voice-phrase">Trigger phrase</label>
-                                <input type="text" class="form-control form-control-sm" id="voice-phrase" maxlength="40" placeholder="reveal" style="max-width:160px;" oninput="saveVoiceFromForm()">
-                            </div>
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <label class="form-label mb-0 small" for="voice-lang">Language</label>
-                                <select class="form-select form-select-sm" id="voice-lang" style="max-width:160px;" onchange="saveVoiceFromForm()">
-                                    <option value="en-US">English (US)</option>
-                                    <option value="en-GB">English (UK)</option>
-                                    <option value="fr-FR">French</option>
-                                    <option value="de-DE">German</option>
-                                    <option value="es-ES">Spanish</option>
-                                    <option value="ja-JP">Japanese</option>
-                                </select>
-                            </div>
-                            <p class="small text-muted mb-0">Requires microphone permission. Works in Chrome/Edge.</p>
-                            <div class="mt-2">
-                                <span id="voice-mic-indicator-modal" style="display:none;" class="badge bg-danger">
-                                    🎤
-                                    <span class="voice-bars" aria-hidden="true"><span></span><span></span><span></span></span>
-                                    Listening
-                                </span>
-                            </div>
-                        </div>
-
                         <!-- Mobile Animations -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">
                             <h6 class="text-muted mb-0 me-auto">📱 Mobile</h6>
@@ -1635,10 +1839,31 @@
         </div>
     </div>
 
+    <!-- N5: Sound Confirmation Modal -->
+    <div class="modal fade" id="soundConfirmModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-bold">🔊 Sound Preferences</h6>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="small mb-3">Sounds are configured for this room. How would you like to hear them this session?</p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary text-start" onclick="confirmSoundChoice('all')"><b>🔊 All sounds</b> — hear your own and others' sounds</button>
+                        <button class="btn btn-outline-secondary text-start" onclick="confirmSoundChoice('local')"><b>🎵 My sounds only</b> — local triggers, no received broadcasts</button>
+                        <button class="btn btn-outline-secondary text-start" onclick="confirmSoundChoice('broadcast')"><b>📻 Received only</b> — hear others' sounds, not your own</button>
+                        <button class="btn btn-outline-danger text-start" onclick="confirmSoundChoice('none')"><b>🔇 No sounds</b> — mute all for this session</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/lib/signalr/signalr.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/emoji-picker.js" asp-append-version="true"></script>
     <!-- Celebration libraries (canvas-confetti + fireworks-js) loaded from CDN -->
     <script src="~/js/vendor/confetti.min.js" asp-append-version="true"></script>
     <script src="~/js/vendor/fireworks.umd.js" asp-append-version="true"></script>

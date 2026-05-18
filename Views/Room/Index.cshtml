@@ -7,12 +7,12 @@
 <div class="d-flex align-items-center gap-2 flex-wrap">
     <span class="navbar-text" id="navRoomName">🏠 @Model.RoomName</span>
     <span class="navbar-text" id="navPlayerName">👤 <span id="displayName">@Model.PlayerName</span></span>
-    <span id="voice-mic-indicator" style="display:none;" title="Voice recognition active" class="badge bg-danger ms-1">
+    <span id="voice-mic-indicator" style="display:none;cursor:pointer;" title="Voice recognition active — click to stop" class="badge bg-danger ms-1" onclick="toggleVoiceRecognition()">
         🎤
         <span class="voice-bars" aria-hidden="true"><span></span><span></span><span></span></span>
     </span>
     <button class="btn btn-sm btn-outline-info" onclick="copyInviteLink()" title="Copy room invite link">🔗 Invite</button>
-    <button class="btn btn-sm btn-outline-light" onclick="promptRename()">✏️</button>
+    <button class="btn btn-sm btn-outline-light" onclick="promptRename()" title="Change display name">✏️</button>
     <button class="btn btn-sm btn-outline-warning" onclick="leaveRoom()">🚪 Leave</button>
 </div>
 }
@@ -20,9 +20,10 @@
 <div class="room-layout" id="roomLayout">
     <!-- Left Panel: Stories -->
     <div class="stories-panel" id="storiesPanel">
+        <div id="sidebar-resize-handle" aria-hidden="true"></div>
         <div class="panel-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0">📋 Stories</h6>
-            <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="_closeStoriesSheet()">✕</button>
+            <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="_closeStoriesSheet()" title="Close stories panel">✕</button>
         </div>
         <div class="add-story-form">
             <input type="text" id="newStoryInput" class="form-control form-control-sm" placeholder="Add story..." maxlength="200" />
@@ -96,9 +97,11 @@
             <div id="hotColdMeter" style="display:none;flex:0 0 100%;font-size:0.8rem;margin-top:2px;"></div>
             <div style="flex:0 0 100%;margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <button id="acceptEstimateBtn" class="btn btn-sm btn-success py-0 px-2"
-                        onclick="acceptEstimate()" style="font-size:0.8rem;">✅ Accept <span id="acceptEstimateValue"></span></button>
+                        onclick="acceptEstimate()" style="font-size:0.8rem;"
+                        title="Sets the final estimate for this story and marks it complete">✅ Accept &amp; Add to Story <span id="acceptEstimateValue"></span></button>
                 <input id="acceptEstimateInput" type="text" class="form-control form-control-sm"
-                       style="width:70px;font-size:0.8rem;" placeholder="override" />
+                       style="width:70px;font-size:0.8rem;" placeholder="override"
+                       oninput="_updateAcceptBtnLabel(this.value)" />
             </div>
         </div>
 

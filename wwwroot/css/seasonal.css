@@ -109,6 +109,35 @@
   0%,100% { transform: rotate(-20deg); transform-origin: top center; }
   50%     { transform: rotate(20deg);  transform-origin: top center; }
 }
+@keyframes sea-zigzag {
+  0%,100% { transform: translateY(0); }
+  25%     { transform: translateY(-24px); }
+  75%     { transform: translateY(24px); }
+}
+
+/* ── Star Wars crawl ── */
+.sw-crawl-inner {
+  width: 100%;
+  max-width: 500px;
+  padding-bottom: 40px;
+  animation: sw-crawl 8s linear forwards;
+  transform-origin: bottom center;
+}
+.sw-crawl-text {
+  color: #ffe81f;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  text-shadow: 0 0 10px #ffe81f88;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  background: transparent;
+}
+@keyframes sw-crawl {
+  0%   { transform: rotateX(20deg) translateY(0);         opacity: 1; }
+  80%  { transform: rotateX(30deg) translateY(-180%);     opacity: 1; }
+  100% { transform: rotateX(35deg) translateY(-220%);     opacity: 0; }
+}
 
 /* ── Falling particles ── */
 @keyframes sea-snowfall {

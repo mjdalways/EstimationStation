@@ -106,8 +106,16 @@ function openSettingsModal(tab) {
     if (typeof populateVoiceSection === 'function') populateVoiceSection();
     if (typeof populateCounterSpellSection === 'function') populateCounterSpellSection();
     if (typeof _seaAddConfigButtons === 'function') _seaAddConfigButtons();
+    if (typeof _seaUpdateStatusBar === 'function') _seaUpdateStatusBar();
+    if (typeof _seaInjectNextDates === 'function') _seaInjectNextDates();
+    var freqData = JSON.parse(localStorage.getItem('es_seaFreq') || '{}');
+    var freqMin = document.getElementById('seaFreqMin'); if (freqMin) freqMin.value = freqData.min || 22;
+    var freqMax = document.getElementById('seaFreqMax'); if (freqMax) freqMax.value = freqData.max || 55;
     populateJiraTab();
     applyCardBackDesign();
+    if (typeof _epAutoAttach === 'function') _epAutoAttach();
+    var ct = document.getElementById('show-confidence-toggle');
+    if (ct) ct.checked = localStorage.getItem('es_showConfidence') !== '0';
 
     _settingsSaved = false; // reset the save flag for this session
 
@@ -118,6 +126,144 @@ function openSettingsModal(tab) {
         const btn = document.getElementById('tab-' + tab + '-btn');
         if (btn) btn.click();
     }
+}
+
+// ── Z1: Settings Search ─────────────────────────────────────
+function filterSettings(query) {
+    var q = (query || '').trim().toLowerCase();
+    var resultEl = document.getElementById('settings-search-results');
+    if (!resultEl) return;
+    if (!q) { resultEl.innerHTML = ''; return; }
+
+    var tabs = [
+        { id: 'tab-theme',       btn: 'tab-theme-btn',       label: '🎨 Theme' },
+        { id: 'tab-visual',      btn: 'tab-visual-btn',      label: '👁️ Visual' },
+        { id: 'tab-celebration', btn: 'tab-celebration-btn', label: '🎉 Events' },
+        { id: 'tab-audio',       btn: 'tab-audio-btn',       label: '🔊 Audio' },
+        { id: 'tab-seasons',     btn: 'tab-seasons-btn',     label: '🗓️ Seasons' },
+        { id: 'tab-profile',     btn: 'tab-profile-btn',     label: '👤 Profile' },
+        { id: 'tab-jira',        btn: 'tab-jira-btn',        label: '🔗 Jira' },
+        { id: 'tab-other',       btn: 'tab-other-btn',       label: '⚙️ Other' },
+        { id: 'tab-about',       btn: 'tab-about-btn',       label: 'ℹ️ About' },
+    ];
+    var matches = tabs.filter(function(t) {
+        var el = document.getElementById(t.id);
+        return el && el.textContent.toLowerCase().indexOf(q) !== -1;
+    });
+    if (!matches.length) {
+        resultEl.innerHTML = '<span class="text-muted">No matches</span>';
+        return;
+    }
+    resultEl.innerHTML = matches.map(function(t) {
+        return '<a href="#" class="badge bg-secondary text-decoration-none me-1" onclick="event.preventDefault();document.getElementById(\'' + t.btn + '\').click()">' + t.label + '</a>';
+    }).join('');
+    if (matches.length === 1) {
+        var btn = document.getElementById(matches[0].btn);
+        if (btn) btn.click();
+    }
+}
+
+// ── Z2: Per-tab bulk controls ───────────────────────────────
+function tabAllOn(tabId) {
+    var pane = document.getElementById(tabId);
+    if (!pane) return;
+    pane.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = true; cb.dispatchEvent(new Event('change')); });
+}
+function tabAllOff(tabId) {
+    var pane = document.getElementById(tabId);
+    if (!pane) return;
+    pane.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = false; cb.dispatchEvent(new Event('change')); });
+}
+function tabResetDefaults(tabId) {
+    if (!confirm('Reset this tab to defaults?')) return;
+    var keysToRemove = {
+        'tab-visual':      ['es_cardFontSize','es_compactMode','es_showConfidence'],
+        'tab-audio':       ['es_audioAllOff','es_timerAudio','es_ambientAudio','es_soundReceive','es_voiceSettings'],
+        'tab-seasons':     Object.keys(localStorage).filter(function(k) { return k.startsWith('sea_') || k.startsWith('cel-seasonal') || k === 'es_seaFreq'; }),
+        'tab-celebration': Object.keys(localStorage).filter(function(k) { return k.startsWith('es_celebration') || k.startsWith('cel-') && !k.startsWith('cel-seasonal'); }),
+    };
+    var keys = keysToRemove[tabId] || [];
+    keys.forEach(function(k) { localStorage.removeItem(k); });
+    openSettingsModal(tabId.replace('tab-', ''));
+}
+
+// ── Z3: Global settings controls ───────────────────────────
+function settingsAllOff() {
+    var muteEl = document.getElementById('audio-all-off');
+    if (muteEl) { muteEl.checked = true; muteEl.dispatchEvent(new Event('change')); }
+    ['cel-enable-confetti','cel-enable-fireworks','cel-enable-balloons','cel-streak-enabled','cel-lava-enabled','cel-discussion-enabled','cel-shame-enabled','cel-counterspell-enabled','cel-battle-enabled','cel-seasonal-theme'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.checked = false; el.dispatchEvent(new Event('change')); }
+    });
+}
+function settingsAllOn() {
+    var muteEl = document.getElementById('audio-all-off');
+    if (muteEl) { muteEl.checked = false; muteEl.dispatchEvent(new Event('change')); }
+    ['cel-enable-confetti','cel-enable-fireworks','cel-enable-balloons','cel-streak-enabled','cel-lava-enabled','cel-seasonal-theme'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.checked = true; el.dispatchEvent(new Event('change')); }
+    });
+}
+function settingsResetAll() {
+    if (!confirm('Reset ALL settings to factory defaults? This cannot be undone.')) return;
+    var keepKeys = ['es_playerName','es_playerEmoji','es_playerAvatar','es_soundAsked'];
+    var toRemove = [];
+    for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && keepKeys.indexOf(k) === -1) toRemove.push(k);
+    }
+    toRemove.forEach(function(k) { localStorage.removeItem(k); });
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('settingsModal')).hide();
+    setTimeout(function() { openSettingsModal(); }, 300);
+}
+function exportAllSettings() {
+    var data = {};
+    for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k) data[k] = localStorage.getItem(k);
+    }
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'es-settings-export.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+function importAllSettings() {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            try {
+                var data = JSON.parse(ev.target.result);
+                Object.keys(data).forEach(function(k) { localStorage.setItem(k, data[k]); });
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('settingsModal')).hide();
+                setTimeout(function() { openSettingsModal(); }, 300);
+            } catch(ex) { alert('Import failed: invalid JSON file.'); }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+// ── N5: Sound confirmation choice handler ───────────────────
+function confirmSoundChoice(choice) {
+    var modalEl = document.getElementById('soundConfirmModal');
+    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    if (choice === 'none') {
+        localStorage.setItem('audio-all-off','true');
+        var el = document.getElementById('audio-all-off'); if (el) el.checked = true;
+    } else if (choice === 'local') {
+        localStorage.setItem('es_soundReceive', JSON.stringify({ receiveEnabled: false, showSubtitle: false }));
+    } else if (choice === 'broadcast') {
+        localStorage.setItem('es_soundReceive', JSON.stringify({ receiveEnabled: true, showSubtitle: true }));
+        localStorage.setItem('audio-all-off','false');
+    }
+    // 'all' = keep current settings unchanged
 }
 
 function populateThemeTab() {

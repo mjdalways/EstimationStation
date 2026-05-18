@@ -309,19 +309,23 @@ function _toggleLavaTest() {
     if (_lavaTestActive) {
         stopFloorIsLava();
     } else {
+        // Start lava BEFORE setting the flag so triggerFloorIsLava's internal
+        // stopFloorIsLava() call doesn't see _lavaTestActive=true and reset the button.
+        var _testColor    = document.getElementById('cel-lava-color')?.value    || getCelebrationSettings().lavaColor    || '#ff4500';
+        var _testDuration = parseInt(document.getElementById('cel-lava-duration')?.value) || getCelebrationSettings().lavaDuration || 30;
+        testFloorIsLava(_testColor, _testDuration);
         _lavaTestActive = true;
         if (btn) { btn.textContent = '⏹ Stop'; btn.style.outline = '2px solid #dc3545'; btn.style.color = '#dc3545'; }
-        testFloorIsLava();
     }
 }
 
-function triggerFloorIsLava(connectionId, seconds) {
+function triggerFloorIsLava(connectionId, seconds, color) {
     var s = getCelebrationSettings();
     if (!s.lavaEnabled) return;
     stopFloorIsLava();
 
-    var dur = s.lavaDuration || seconds || 30;
-    var col = s.lavaColor || '#ff4500';
+    var dur = seconds || s.lavaDuration || 30;
+    var col = color  || s.lavaColor    || '#ff4500';
     document.documentElement.style.setProperty('--lava-color-primary', col);
     document.documentElement.style.setProperty('--lava-color-secondary', _lightenHex(col, 36));
 
@@ -955,7 +959,7 @@ function testPokerReveal() {
     });
 }
 
-function testFloorIsLava() {
+function testFloorIsLava(color, duration) {
     var badge = document.querySelector('[data-connection-id]');
     var fakeId = badge ? (badge.dataset.connectionId || '__test__') : '__test__';
     if (!badge) {
@@ -968,7 +972,7 @@ function testFloorIsLava() {
         document.body.appendChild(badge);
         setTimeout(function() { badge.remove(); }, 36000);
     }
-    triggerFloorIsLava(fakeId);
+    triggerFloorIsLava(fakeId, duration, color);
 }
 
 // When the settings modal is opened (by user OR re-opened after test), clear the pending flag

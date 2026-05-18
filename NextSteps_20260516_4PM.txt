@@ -1,0 +1,53 @@
+Ensure O6 also applies to season customizations including corner, particles and runner.
+Override/Accept is not clear, it should indicate - add to story and accept (3) should change if override is 1
+Trying to change reveal code causes error:
+
+InvalidStateError: recognition has already started.
+Line 73
+voice.js
+    _voiceRecog.onerror = function(e) {
+        if (e.error !== 'no-speech') console.warn('Voice error:', e.error);
+    };
+    _voiceRecog.onend = function() {
+        var cs = getVoiceSettings();
+        if (cs.enabled && _voiceActive) {
+            setTimeout(function() { if (_voiceActive) _voiceRecog.start(); }, 300);
+        }
+    };
+Need a way to turn off listening mode - likely just click microphone
+All icons and buttons should have hover text (change name/leave do not - check all)
+Voice activate reveal should be in audio
+Allow stories sidebar to be sized, minimum size should be for largest button text + icon width.
+Hover over buttons and drop downs in sidebar should also show full text in case its been made to small to see it all.
+Play and delete buttons on story need hover text
+Notes for stories should be under story name and not on far right causing buttons to move left
+I'm logged in as mark but its showing me as Unknown in session awards?
+Compact particpant cards test needs to show before/after as the checkbox is changed, or show both before/after in preview.  It should be moved to a new setting tab called Visual as it changes immediately and isnt saved with a theme (if it is saved with a theme, leave it where it is, but make it not immediate it will apply when the theme is saved).  Check others for similar
+There needs to be a proper live view of an actual card and actual participant that changes as the settings are changed
+Add a flip animation when a user votes and the card is "turned over"
+Add search for settings
+Is "how confident are you" popup a setting that can be toggled?
+Events and Card Backs are not showing same style as Stories & Chat/Celebration Colors and they aren't collapsible.
+Card Backs should say Particpant Card Backs - when we say cards I assume we ment voting cards.
+When a user has voted the cards should flip over and they should have click change vote to flip them back over and vote - or they can click the back of a card, it will flip over to reveal the number, change the vote and the flip back to the card back.
+Vote card backs should be able to be configured differently from particpant card backs
+Card backs and fronts should be shown in live prevew, along with button to test flip - with flip speeds configurable
+More styles for card backs, including gradients and import image file.
+Make flip gap more obvious what it does, add test and visual confirmation of changes.
+Floor is lava test doesnt toggle to stop, just resets time
+Floor is lava color/countdown time changes dont apply to test and they should
+A button is needed to set all event checkboxes to off/on and reset everything to defaults.  This should be for every tab, maybe even at the top of settings it should allow you to turn everything off, turn everything on, reset everything to defaults, export settings/import settings to a file.
+Seasons tab should show current season that is active, and also season that would apply if all were active (e.g. if Labor Day was unchecked and it was Labor Day it would say Autumn (overriding Labor day)
+Show next season actual date next to date range unles it is a range or defined date)
+Autumn should say Fall/Autumn
+Star Wars day should have scrolling text that was iconic to the move where it scrolls up from the bottom.
+Can we get actual star wars characters to display?  Maybe we need an image import to allow use as emojis/images for seasons
+Ocean Week shark and fish swim wrong way by default
+we should be able to modify shark swim as to the image, the direction, and flip the image - not sure why this is consider complex?
+Add test buttons to each season individual animation settings
+avatar image uploads (and any image upload) should allow user to move the image and choose where it is cropped, and possibly even make it smaller so more fits or make it large so less fits.
+
+
+
+
+

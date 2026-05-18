@@ -139,8 +139,9 @@ function registerHandlers() {
             p.hasVoted = hasVoted;
             renderParticipants();
             if (connectionId === connection.connectionId) {
+                const showConf = localStorage.getItem('es_showConfidence') !== '0';
                 const sel = document.getElementById('confidenceSelector');
-                if (sel) sel.style.display = hasVoted ? 'block' : 'none';
+                if (sel) sel.style.display = (hasVoted && showConf) ? 'block' : 'none';
             }
             if (hasVoted && !wasVoted && typeof triggerCardBurst === 'function') {
                 const badge = document.querySelector('[data-connection-id="' + connectionId + '"]');
@@ -528,14 +529,18 @@ function renderStories() {
         const hasNote = s.notes && s.notes.trim().length > 0;
         const noteBtnClass = hasNote ? 'btn-warning' : 'btn-outline-secondary';
         div.innerHTML = `
-            <span class="story-item-title"${_descTooltip || ` title="${escHtml(s.title)}"`}>${jiraBadge}${displayTitle}</span>
-            ${s.isCompleted ? `<span class="story-item-estimate">${escHtml(s.finalEstimate || '')}</span>` : ''}
-            <div class="story-item-actions">
-                <button class="btn btn-xs btn-sm ${noteBtnClass} story-note-btn py-0 px-1" style="font-size:0.7rem;" onclick="_toggleStoryNote('${s.id}')" title="${hasNote ? 'Edit note' : 'Add note'}">📝</button>
-                ${!s.isCompleted ? `<button class="btn btn-xs btn-sm btn-outline-primary py-0 px-1" style="font-size:0.7rem;" onclick="setCurrentStory('${s.id}')">▶</button>` : ''}
-                <button class="btn btn-xs btn-sm btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteStory('${s.id}')">✕</button>
+            <div class="story-row-main d-flex align-items-start gap-1">
+                <div class="story-text flex-grow-1 min-w-0">
+                    <span class="story-item-title"${_descTooltip || ` title="${escHtml(s.title)}"`}>${jiraBadge}${displayTitle}</span>
+                    ${s.isCompleted ? `<span class="story-item-estimate">${escHtml(s.finalEstimate || '')}</span>` : ''}
+                    ${hasNote ? `<div class="story-notes-preview text-muted small">${escHtml(s.notes.substring(0, 80))}${s.notes.length > 80 ? '…' : ''}</div>` : ''}
+                </div>
+                <div class="story-item-actions flex-shrink-0">
+                    <button class="btn btn-xs btn-sm ${noteBtnClass} story-note-btn py-0 px-1" style="font-size:0.7rem;" onclick="_toggleStoryNote('${s.id}')" title="${hasNote ? 'Edit note' : 'Add note'}">📝</button>
+                    ${!s.isCompleted ? `<button class="btn btn-xs btn-sm btn-outline-primary py-0 px-1" style="font-size:0.7rem;" onclick="setCurrentStory('${s.id}')" title="Set as current story">▶</button>` : ''}
+                    <button class="btn btn-xs btn-sm btn-outline-danger py-0 px-1" style="font-size:0.7rem;" onclick="deleteStory('${s.id}')" title="Delete story">✕</button>
+                </div>
             </div>
-            ${hasNote ? `<div class="story-notes-preview">${escHtml(s.notes.substring(0, 80))}${s.notes.length > 80 ? '…' : ''}</div>` : ''}
             <div class="story-notes-area" id="noteArea_${s.id}" style="display:none;">
                 <textarea class="form-control form-control-sm" rows="3" placeholder="Add notes for this story…" onblur="updateStoryNotes('${s.id}', this.value)">${escHtml(s.notes || '')}</textarea>
             </div>
@@ -543,6 +548,10 @@ function renderStories() {
         list.appendChild(div);
     });
     _updateSprintDashboard();
+    // V2: set title when text overflows (narrow sidebar)
+    list.querySelectorAll('.story-item-title').forEach(function(el) {
+        if (el.scrollWidth > el.offsetWidth && !el.title) el.title = el.textContent.trim();
+    });
 }
 
 function _updateSprintDashboard() {
@@ -647,6 +656,16 @@ function updateStoryNotes(storyId, notes) {
         connection.invoke('UpdateStoryNotes', storyId, notes || null).catch(console.error);
     }
 }
+
+function _updateAcceptBtnLabel(val) {
+    var btn = document.getElementById('acceptEstimateBtn');
+    var valSpan = document.getElementById('acceptEstimateValue');
+    if (!btn) return;
+    var v = (val || '').trim();
+    btn.childNodes[0].textContent = v ? '✅ Override to ' + v + ' & Add to Story ' : '✅ Accept & Add to Story ';
+    if (valSpan) valSpan.textContent = '';
+}
+window._updateAcceptBtnLabel = _updateAcceptBtnLabel;
 
 async function acceptEstimate() {
     if (!roomState.currentStoryId) return;
@@ -1278,6 +1297,8 @@ if (typeof startSeasonalAmbience === 'function') startSeasonalAmbience();
 // ============================================================
 function _promptSoundPreferenceOnce() {
     if (sessionStorage.getItem('es_soundAsked')) return;
+    var muted = localStorage.getItem('audio-all-off') === 'true';
+    if (muted) { sessionStorage.setItem('es_soundAsked','1'); return; }
     var anyOn = false;
     if (typeof getTimerAudioSettings === 'function') {
         var ta = getTimerAudioSettings();
@@ -1289,25 +1310,8 @@ function _promptSoundPreferenceOnce() {
     }
     if (!anyOn) return;
     sessionStorage.setItem('es_soundAsked', '1');
-
-    var banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;bottom:72px;left:50%;transform:translateX(-50%);'
-        + 'background:var(--card-bg,#fff);border:1px solid var(--panel-border,#dee2e6);'
-        + 'border-radius:12px;padding:10px 14px;box-shadow:0 4px 18px rgba(0,0,0,0.18);'
-        + 'z-index:2050;font-size:0.82rem;max-width:360px;text-align:center;';
-    banner.innerHTML = '<div style="font-weight:600;margin-bottom:6px;">🔊 Sounds are configured — how would you like them?</div>'
-        + '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
-        + '<button class="btn btn-sm btn-outline-secondary" onclick="_setSoundMode(\'all\',this.closest(\'div\').parentElement)">All sounds</button>'
-        + '<button class="btn btn-sm btn-outline-secondary" onclick="_setSoundMode(\'none\',this.closest(\'div\').parentElement)">🔇 No sounds</button>'
-        + '<button class="btn btn-sm btn-link btn-sm" onclick="this.closest(\'div\').remove()" style="font-size:0.75rem;">Dismiss</button>'
-        + '</div>';
-    document.body.appendChild(banner);
-    setTimeout(function() { if (banner.parentNode) banner.remove(); }, 12000);
-}
-
-function _setSoundMode(mode, bannerEl) {
-    if (typeof saveAllSoundsOff === 'function') saveAllSoundsOff(mode === 'none');
-    if (bannerEl) bannerEl.remove();
+    var modalEl = document.getElementById('soundConfirmModal');
+    if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
 }
 
 // ============================================================
@@ -1760,6 +1764,37 @@ function testSoundboard() {
     setTimeout(function() { _playSoundLocal('fanfare'); }, 800);
     setTimeout(function() { _playSoundLocal('drumroll'); }, 1600);
 }
+
+// ============================================================
+// V1: Sidebar resize handle
+// ============================================================
+(function() {
+    var handle = document.getElementById('sidebar-resize-handle');
+    if (!handle) return;
+    var dragging = false, startX, startW;
+    var panel = document.getElementById('storiesPanel');
+    var MIN_W = 180;
+    function maxW() { return Math.floor(window.innerWidth * 0.4); }
+    handle.addEventListener('mousedown', function(e) {
+        dragging = true; startX = e.clientX; startW = panel.offsetWidth;
+        document.body.style.cursor = 'ew-resize'; document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        var w = Math.max(MIN_W, Math.min(maxW(), startW + (e.clientX - startX)));
+        document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+    });
+    document.addEventListener('mouseup', function() {
+        if (!dragging) return;
+        dragging = false;
+        document.body.style.cursor = ''; document.body.style.userSelect = '';
+        var w = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'));
+        if (w >= MIN_W) localStorage.setItem('es_sidebarWidth', w);
+    });
+    var saved = parseInt(localStorage.getItem('es_sidebarWidth'));
+    if (saved >= MIN_W) document.documentElement.style.setProperty('--sidebar-width', saved + 'px');
+})();
 
 // ============================================================
 // Init

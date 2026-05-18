@@ -74,11 +74,15 @@ function computeHallOfFame() {
 
         voterIds.forEach(function(cid) {
             var vote = votes[cid];
-            // Look up name from current participants; fall back to previous entry
+            // Look up name from current participants; fall back to previous entry or localStorage for local user
             var participant = (typeof roomState !== 'undefined' && roomState.participants)
                 ? roomState.participants.find(function(px) { return px.connectionId === cid; })
                 : null;
-            var name = participant ? participant.name : (pStats[cid] ? pStats[cid].name : 'Unknown');
+            var name = (participant && participant.name) ? participant.name
+                     : (pStats[cid] && pStats[cid].name && pStats[cid].name !== 'Unknown') ? pStats[cid].name
+                     : (typeof connection !== 'undefined' && cid === connection.connectionId)
+                         ? (localStorage.getItem('es_playerName') || localStorage.getItem('es_displayName') || 'Player')
+                     : 'Unknown';
             var ps = getP(cid, name);
 
             ps.rounds++;

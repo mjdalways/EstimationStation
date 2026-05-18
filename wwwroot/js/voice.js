@@ -2,6 +2,7 @@ var VOICE_KEY = 'es_voiceSettings';
 var DEFAULT_VOICE = { enabled: false, phrase: 'reveal', lang: 'en-US' };
 var _voiceRecog = null;
 var _voiceActive = false;
+var _voiceStarted = false;
 
 function getVoiceSettings() {
     try {
@@ -64,26 +65,38 @@ function startVoiceRecognition() {
             }
         }
     };
+    _voiceRecog.onstart = function() { _voiceStarted = true; };
     _voiceRecog.onerror = function(e) {
         if (e.error !== 'no-speech') console.warn('Voice error:', e.error);
     };
     _voiceRecog.onend = function() {
+        _voiceStarted = false;
         var cs = getVoiceSettings();
         if (cs.enabled && _voiceActive) {
-            setTimeout(function() { if (_voiceActive) _voiceRecog.start(); }, 300);
+            setTimeout(function() {
+                if (_voiceActive && !_voiceStarted) { _voiceStarted = true; _voiceRecog.start(); }
+            }, 300);
         }
     };
 
     _voiceActive = true;
+    _voiceStarted = true;
     _voiceRecog.start();
     _setMicIndicator(true);
 }
 
 function stopVoiceRecognition() {
     _voiceActive = false;
+    _voiceStarted = false;
     if (_voiceRecog) { try { _voiceRecog.stop(); } catch(e) {} _voiceRecog = null; }
     _setMicIndicator(false);
 }
+
+function toggleVoiceRecognition() {
+    if (_voiceActive) stopVoiceRecognition();
+    else startVoiceRecognition();
+}
+window.toggleVoiceRecognition = toggleVoiceRecognition;
 
 function _setMicIndicator(on) {
     ['voice-mic-indicator', 'voice-mic-indicator-modal'].forEach(function(id) {
