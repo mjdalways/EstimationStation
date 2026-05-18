@@ -2117,19 +2117,22 @@ mark.search-highlight { background: #fff176; color: inherit; border-radius: 2px;
 
 /* AE7 — Panel close (×) buttons */
 .panel-close-btn {
-    position: absolute;
-    top: 4px; right: 6px;
+    /* works in both block (float) and flex (margin-left:auto) containers */
+    float: right;
+    order: 999;
+    margin-left: auto;
+    align-self: flex-start;
     background: none;
     border: none;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     line-height: 1;
-    padding: 1px 4px;
+    padding: 1px 3px;
     color: var(--text-muted, #6c757d);
     cursor: pointer;
-    opacity: 0.55;
-    z-index: 10;
+    opacity: 0.5;
     border-radius: 3px;
     transition: opacity 0.15s, background 0.15s;
+    flex-shrink: 0;
 }
 .panel-close-btn:hover {
     opacity: 1;

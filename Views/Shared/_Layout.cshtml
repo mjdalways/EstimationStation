@@ -1461,6 +1461,26 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/18/2026 (77)</strong></p>
+                        <ul class="mb-2">
+                            <li>🐛 Fixes (Group AE) — Season "next date" labels now appear inline after the date in brackets (e.g. <code>1st Mon Sep [7 Sep]</code>) and duplicate dates no longer show for fixed-date seasons. Clock/timer bar hides when disabled and no story is active. Panel × close buttons now use float layout (no stacking-context z-index conflict with vote cards). Clock preview added to the Other tab settings so you can see digital/analog style live before saving.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (76)</strong></p>
+                        <ul class="mb-2">
+                            <li>🌸 Seasonal Animations Fully Configurable (Group AE) — all 22 custom seasonal animations now expose per-field controls in the season config panel: emoji, size, count, duration, color, background color, and text. Alias animations link to their parent configurable animation. Fields are rendered dynamically based on which parameters each animation supports.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (75)</strong></p>
+                        <ul class="mb-2">
+                            <li>⏱️ Clock into Story Bar (Group AE) — clock and count-up timer moved to the same line as "Current Story:", right-aligned with larger text. All dismissable panels (vibe check, keyboard legend, clock/timer) now have × close buttons that save the hidden state.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (74)</strong></p>
+                        <ul class="mb-2">
+                            <li>🃏 Vote Picker Flip Preview (Group AE) — added 🔄 Flip test button to the Vote Picker Card Style section in Visual settings.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (73)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎉 Celebration Defaults Off + Season Status (Group AE) — all celebration/seasonal effects now default to <strong>OFF</strong> for new users (existing settings unaffected). Saving season settings immediately updates the active season display bar without requiring a page refresh.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/18/2026 (72)</strong></p>
                         <ul class="mb-2">
                             <li>💬 Participant Direct Messaging (Group AD) — right-click any participant badge for a context menu: <strong>📨 Private Message</strong> (delivered only to them as a purple toast), <strong>😄 Send Emoji</strong> (private floating reaction with your name), and <strong>🔊 Send Sound</strong> (plays a sound for that person only). Host also sees "👑 Transfer Host" in the menu.</li>
@@ -2000,6 +2020,11 @@
                                 <label>Min <input type="color" id="tc-min-color" value="#495057" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                                 <label>Sec <input type="color" id="tc-sec-color" value="#dc3545" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                             </div>
+                        </div>
+                        <!-- Clock preview -->
+                        <div class="mb-3 small d-flex align-items-center gap-3">
+                            <span class="text-muted">Preview:</span>
+                            <span id="tc-clock-preview" class="border rounded px-2 py-1 d-inline-block" style="min-width:60px;text-align:center;background:var(--bg-secondary,#f8f9fa);">🕐</span>
                         </div>
 
                         <!-- Mobile Animations -->

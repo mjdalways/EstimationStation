@@ -892,9 +892,11 @@
 </div>
 
 <div class="group-card hard" id="group-ae">
-  <h3>Group AE — 🪟 Widget Panel System <span class="new-tag">new</span></h3>
+  <h3>Group AE — 🪟 Widget Panel System + Pending Bugs <span class="new-tag">new</span></h3>
   <span class="tag">Hard</span><span class="tag">room.js · site.css · Index.cshtml</span>
-  <div class="callout warn" style="margin-top:12px;">
+
+  <h4 style="margin-top:14px;">AE10 — Widget Panel System (Deferred)</h4>
+  <div class="callout warn" style="margin-top:8px;">
     <strong>Desktop only</strong> — No drag/reorder on mobile. Mobile layout unchanged.
   </div>
   <ul style="margin-top:10px;">
@@ -904,6 +906,16 @@
     <li><b>AE10d — Close/show toggles:</b> each widget has × close button; restored via settings or right-click on the widget bar</li>
     <li><b>AE10e — Mobile detection:</b> <code>window.innerWidth &lt; 768</code> disables drag entirely; panels revert to stacked layout</li>
     <li>Implement with vanilla JS HTML5 drag API (no library); z-index management for dragged panel bring-to-front</li>
+  </ul>
+
+  <h4 style="margin-top:16px;">AE11 — Pending Bugs &amp; Enhancements (from Group AE review)</h4>
+  <ul>
+    <li><b>AE11a — Memorial flag image support:</b> <code>_SEA_US_FLAG</code> is an <code>&lt;img&gt;</code> HTML string, not an emoji — incompatible with the emoji config text input. Need a "custom image" field type in <code>SEA_ANIM_META</code> (e.g. <code>imageUrl</code>) with a URL input in the UI builder. <em>File: seasonal.js</em></li>
+    <li><b>AE11b — Count-up timer missing:</b> <code>#stc-timer</code> is hidden when no story is active. Users may not know to look in the story bar or when it appears. Consider a "no story" placeholder or tooltip. <em>File: room.js</em></li>
+    <li><b>AE11c — Clock checkbox covered:</b> When the analog clock renders in <code>#stc-clock</code> inside the story bar, the toggle switch in the Other tab settings may be visually obscured. Investigate layout clash. <em>File: _Layout.cshtml / site.css</em></li>
+    <li><b>AE11d — Extended clock settings (AE8):</b> Font family (digital), 12h/24h toggle, number style (analog: digits/roman/ticks/none), clock background color — deferred from Group AE plan. <em>File: room.js, _Layout.cshtml</em></li>
+    <li><b>AE11e — Timer style settings (AE9):</b> <code>es_timerStyle</code> for color, fontSize, fontFamily on count-up timer. <em>File: room.js, _Layout.cshtml</em></li>
+    <li><b>AE11f — Events tab header bug:</b> Awaiting screenshot from user. <em>Blocked</em></li>
   </ul>
 </div>
 

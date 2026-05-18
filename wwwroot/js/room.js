@@ -1491,7 +1491,6 @@ function _addPanelCloseButtons() {
         var panel = document.getElementById(p.id);
         if (!panel) return;
         if (panel.querySelector('.panel-close-btn')) return;
-        if (getComputedStyle(panel).position === 'static') panel.style.position = 'relative';
         var btn = document.createElement('button');
         btn.className = 'panel-close-btn';
         btn.title = 'Hide this panel';
@@ -1502,7 +1501,8 @@ function _addPanelCloseButtons() {
             panel.style.display = 'none';
             p.hide();
         };
-        panel.insertBefore(btn, panel.firstChild);
+        // Append at end; CSS handles positioning (float:right for block, order/margin for flex)
+        panel.appendChild(btn);
     });
     // Respect saved vibe hide state
     if (localStorage.getItem('es_hideVibeCheck') === '1') {
@@ -1546,6 +1546,8 @@ function saveTimerClockSettings() {
     };
     localStorage.setItem('es_clockStyle', JSON.stringify(styleData));
     _acTick();
+    var prev = document.getElementById('tc-clock-preview');
+    if (prev) _acRenderClock(prev);
 }
 window.saveTimerClockSettings = saveTimerClockSettings;
 
@@ -1565,7 +1567,9 @@ function _acTick() {
     var showClock = localStorage.getItem('es_showClock') !== '0';
     var hasStory = !!_acLastStoryId;
 
-    if (!showTimer && !showClock) { bar.style.display = 'none'; return; }
+    // Only show the bar if something will be visible: clock enabled OR (timer enabled AND story active)
+    var timerWillShow = showTimer && hasStory && !!_acTimerStart;
+    if (!timerWillShow && !showClock) { bar.style.display = 'none'; return; }
     bar.style.display = '';
 
     // Timer segment
@@ -1833,6 +1837,8 @@ function _populateRoomOtherSettings() {
     if (minEl) minEl.value = styleData.minColor || '#495057';
     var secEl = document.getElementById('tc-sec-color');
     if (secEl) secEl.value = styleData.secColor || '#dc3545';
+    var prev = document.getElementById('tc-clock-preview');
+    if (prev) _acRenderClock(prev);
 }
 window._populateRoomOtherSettings = _populateRoomOtherSettings;
 

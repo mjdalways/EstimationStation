@@ -293,14 +293,34 @@ function _seaInjectNextDates() {
         if (!el) return;
         var row = el.closest('.sea-row');
         if (!row) return;
-        // skip if the row's visible date text already contains the next date day+month
-        var dateSpan = row.querySelector('span.sea-date-label, label[for="cel-seasonal-' + key + '"] ~ span, span:not(.sea-next-date)');
-        var displayed = dateSpan ? dateSpan.textContent : row.querySelector('label') ? row.querySelector('label').nextElementSibling && row.querySelector('label').nextElementSibling.textContent : '';
-        var dayMon = nextDate.getDate() + ' ' + MON[nextDate.getMonth()];
-        if (displayed && displayed.indexOf(dayMon) !== -1) { return; } // already visible
-        var span = row.querySelector('.sea-next-date');
-        if (!span) { span = document.createElement('span'); span.className = 'sea-next-date text-muted small ms-1'; row.appendChild(span); }
-        span.textContent = '(next: ' + fmt(nextDate) + ')';
+        // Find the date span (first <span> that's not a .sea-next-date)
+        var dateSpan = row.querySelector('span:not(.sea-next-date)');
+        var displayedText = dateSpan ? dateSpan.textContent : '';
+        // Normalise duplicate detection: match "Dec 26", "26 Dec", "Dec 26–31" all as same day
+        var nd = nextDate, ndDay = nd.getDate(), ndMon = nd.getMonth();
+        function _sameDay(txt) {
+            var m;
+            m = txt.match(/([A-Za-z]{3})\s+(\d+)/);
+            if (m && MON.indexOf(m[1]) === ndMon && parseInt(m[2]) === ndDay) return true;
+            m = txt.match(/(\d+)\s+([A-Za-z]{3})/);
+            if (m && MON.indexOf(m[2]) === ndMon && parseInt(m[1]) === ndDay) return true;
+            return false;
+        }
+        if (_sameDay(displayedText)) return; // date already shown inline — skip
+        // Remove any existing .sea-next-date first
+        var old = row.querySelector('.sea-next-date');
+        if (old) old.parentNode.removeChild(old);
+        // Build bracketed label and insert inline after the date span
+        var label = '[' + fmt(nextDate) + ']';
+        var span = document.createElement('span');
+        span.className = 'sea-next-date text-muted small';
+        span.style.marginLeft = '4px';
+        span.textContent = label;
+        if (dateSpan && dateSpan.parentNode) {
+            dateSpan.insertAdjacentElement('afterend', span);
+        } else {
+            row.appendChild(span);
+        }
     }
 
     // Process fixed-date seasons
@@ -1263,12 +1283,18 @@ function _seaBeachBallBounce() {
 }
 
 function _seaWaveWash() {
-    if (_seaGetAnimCfg('_seaWaveWash', 'summer').enabled === false) return;
-    var el = _seaDiv('', 'bottom:0;left:0;width:200%;font-size:3rem;letter-spacing:8px;animation:sea-wave-wash 3.5s ease-in-out forwards;');
+    var c = _seaGetAnimCfg('_seaWaveWash', 'summer');
+    if (c.enabled === false) return;
+    var m     = _seaGetSeasonMults('summer');
+    var emoji = c.emoji || '🌊';
+    var count = Math.max(1, Math.round((c.count || 25) * m.intensity));
+    var size  = c.size  || '3rem';
+    var durMs = Math.round((c.dur || 3.5) * 1000 / m.speed);
+    var el = _seaDiv('', 'bottom:0;left:0;width:200%;font-size:' + size + ';letter-spacing:8px;animation:sea-wave-wash ' + (durMs / 1000).toFixed(1) + 's ease-in-out forwards;');
     var waves = '';
-    for (var i = 0; i < 25; i++) waves += '🌊';
+    for (var i = 0; i < count; i++) waves += emoji;
     el.textContent = waves;
-    _seaRemove(el, 3800);
+    _seaRemove(el, durMs + 300);
 }
 
 function _seaSunglassesSlide() {
@@ -1278,17 +1304,23 @@ function _seaSunglassesSlide() {
 }
 
 function _seaFireflies() {
-    if (_seaGetAnimCfg('_seaFireflies', 'summer').enabled === false) return;
-    for (var i = 0; i < 9; i++) {
+    var c = _seaGetAnimCfg('_seaFireflies', 'summer');
+    if (c.enabled === false) return;
+    var m     = _seaGetSeasonMults('summer');
+    var emoji = c.emoji || '✨';
+    var count = Math.max(1, Math.round((c.count || 9) * m.intensity));
+    var size  = c.size  || '1.1rem';
+    var durMs = Math.round((c.dur || 5.0) * 1000 / m.speed);
+    for (var i = 0; i < count; i++) {
         (function(idx) {
             var el = document.createElement('div');
-            el.textContent = '✨';
-            el.style.cssText = 'position:fixed;pointer-events:none;z-index:' + SEA_Z + ';font-size:1.1rem;';
+            el.textContent = emoji;
+            el.style.cssText = 'position:fixed;pointer-events:none;z-index:' + SEA_Z + ';font-size:' + size + ';';
             document.body.appendChild(el);
             var x = Math.random() * window.innerWidth;
             var y = Math.random() * window.innerHeight;
             var phase = Math.random() * Math.PI * 2;
-            var end = Date.now() + 5000 + idx * 400;
+            var end = Date.now() + durMs + idx * 400;
             function tick() {
                 if (Date.now() > end) { if (el.parentNode) el.parentNode.removeChild(el); return; }
                 var t = Date.now();
@@ -1329,11 +1361,16 @@ function _seaIceCreamDrip() {
 function _seaSharkFin()        { _seaRunnerFn('_seaSharkFin', 'summer', 85, 8); }
 
 function _seaHeatWave() {
-    if (_seaGetAnimCfg('_seaHeatWave', 'summer').enabled === false) return;
+    var c = _seaGetAnimCfg('_seaHeatWave', 'summer');
+    if (c.enabled === false) return;
+    var m     = _seaGetSeasonMults('summer');
+    var color = c.color || 'rgba(255,160,0,0.09)';
+    var dur   = (c.dur || 7.5) / m.speed;
+    var durMs = Math.round(dur * 1000);
     var el = _seaDiv('', 'top:0;left:0;width:100%;height:100%;z-index:9975;' +
-        'background:linear-gradient(transparent 35%,rgba(255,160,0,0.09) 50%,transparent 65%);' +
-        'animation:sea-heat-wave 1.8s ease-in-out 4 forwards;');
-    _seaRemove(el, 7500);
+        'background:linear-gradient(transparent 35%,' + color + ' 50%,transparent 65%);' +
+        'animation:sea-heat-wave 1.8s ease-in-out ' + Math.max(1, Math.round(dur / 1.8)) + ' forwards;');
+    _seaRemove(el, durMs + 300);
 }
 
 function _seaIceCreamTruck() {
@@ -1379,11 +1416,15 @@ function _seaAcornDrop() {
 }
 
 function _seaFogRoll() {
-    if (_seaGetAnimCfg('_seaFogRoll', 'autumn').enabled === false) return;
+    var c = _seaGetAnimCfg('_seaFogRoll', 'autumn');
+    if (c.enabled === false) return;
+    var m     = _seaGetSeasonMults('autumn');
+    var color = c.color || 'rgba(160,160,160,0.32)';
+    var dur   = (c.dur || 6.5) / m.speed;
     var el = _seaDiv('', 'bottom:0;left:0;width:200%;height:28%;' +
-        'background:linear-gradient(to top,rgba(160,160,160,0.32) 0%,transparent 100%);' +
-        'animation:sea-fog-roll 6.5s ease-in-out forwards;');
-    _seaRemove(el, 6800);
+        'background:linear-gradient(to top,' + color + ' 0%,transparent 100%);' +
+        'animation:sea-fog-roll ' + dur.toFixed(1) + 's ease-in-out forwards;');
+    _seaRemove(el, Math.round(dur * 1000) + 300);
 }
 
 function _seaMushroomGrow()    { _seaCornerFn('_seaMushroomGrow',    'autumn'); }
@@ -1404,15 +1445,20 @@ function _seaHarvestMoon() {
 function _seaScarecrow()       { _seaCornerFn('_seaScarecrow',       'autumn'); }
 
 function _seaCiderMug() {
-    if (_seaGetAnimCfg('_seaCiderMug', 'autumn').enabled === false) return;
+    var c = _seaGetAnimCfg('_seaCiderMug', 'autumn');
+    if (c.enabled === false) return;
+    var m     = _seaGetSeasonMults('autumn');
+    var emoji = c.emoji || '☕';
+    var size  = c.size  || '4.5rem';
+    var holdMs = Math.round((c.dur || 4.5) * 1000 / m.speed);
     var el = _seaDiv(
-        '<div style="font-size:4.5rem;animation:sea-wobble 2s ease-in-out infinite;">☕</div>' +
+        '<div style="font-size:' + size + ';animation:sea-wobble 2s ease-in-out infinite;">' + emoji + '</div>' +
         '<div style="font-size:1.3rem;position:absolute;bottom:80%;left:35%;animation:sea-float-up 1.3s ease-in infinite;opacity:0.5;">💨</div>',
         'bottom:20px;left:' + (20 + Math.random() * 60) + '%;animation:sea-slide-up-in 0.5s ease-out forwards;');
     setTimeout(function() {
         el.style.animation = 'sea-slide-up-out 0.5s ease-in forwards';
         _seaRemove(el, 600);
-    }, 4500);
+    }, holdMs);
 }
 
 function _seaSpiderWebCorner() { _seaCornerFn('_seaSpiderWebCorner', 'autumn'); }
@@ -1432,15 +1478,20 @@ function _seaTurkeyRun() {
 }
 
 function _seaPieCooling() {
-    if (_seaGetAnimCfg('_seaPieCooling', 'thanksgiving').enabled === false) return;
+    var c = _seaGetAnimCfg('_seaPieCooling', 'thanksgiving');
+    if (c.enabled === false) return;
+    var m     = _seaGetSeasonMults('thanksgiving');
+    var emoji = c.emoji || '🥧';
+    var size  = c.size  || '4.5rem';
+    var holdMs = Math.round((c.dur || 4.5) * 1000 / m.speed);
     var el = _seaDiv(
-        '<div style="font-size:4.5rem;">🥧</div>' +
+        '<div style="font-size:' + size + ';">' + emoji + '</div>' +
         '<div style="font-size:1.2rem;position:absolute;bottom:80%;left:28%;animation:sea-float-up 1.4s ease-in 0.2s infinite;opacity:0.55;">💨</div>',
         'bottom:20px;left:50%;transform:translateX(-50%);animation:sea-slide-up-in 0.5s ease-out forwards;');
     setTimeout(function() {
         el.style.animation = 'sea-slide-up-out 0.5s ease-in forwards';
         _seaRemove(el, 600);
-    }, 4500);
+    }, holdMs);
 }
 
 function _seaCornucopia()      { _seaCornerFn('_seaCornucopia',      'thanksgiving'); }
@@ -1482,14 +1533,19 @@ function _seaAppleRoll() {
 function _seaCornStalk()       { _seaCornerFn('_seaCornStalk',       'thanksgiving'); }
 
 function _seaFeastTable() {
-    if (_seaGetAnimCfg('_seaFeastTable', 'thanksgiving').enabled === false) return;
-    var el = _seaDiv('🍽️🍗🥧🌽🍎',
-        'bottom:20px;left:50%;transform:translateX(-50%);font-size:2.2rem;white-space:nowrap;letter-spacing:6px;' +
+    var c = _seaGetAnimCfg('_seaFeastTable', 'thanksgiving');
+    if (c.enabled === false) return;
+    var m     = _seaGetSeasonMults('thanksgiving');
+    var text  = c.text || '🍽️🍗🥧🌽🍎';
+    var size  = c.size || '2.2rem';
+    var holdMs = Math.round((c.dur || 5.5) * 1000 / m.speed);
+    var el = _seaDiv(_escHtml(text),
+        'bottom:20px;left:50%;transform:translateX(-50%);font-size:' + size + ';white-space:nowrap;letter-spacing:6px;' +
         'animation:sea-slide-up-in 0.5s ease-out forwards;');
     setTimeout(function() {
         el.style.animation = 'sea-slide-up-out 0.5s ease-in forwards';
         _seaRemove(el, 600);
-    }, 5000);
+    }, holdMs);
 }
 
 function _seaHayBale() {
@@ -1575,9 +1631,16 @@ function _seaBlossomTree()      { _seaCornerFn('_seaBlossomTree',   'hanami'); }
 // APRIL FOOLS (Apr 1)
 // ══════════════════════════════════════════════════════════
 function _seaGlitchEffect() {
-    if (_seaGetAnimCfg('_seaGlitchEffect', 'aprilfools').enabled === false) return;
-    var o = _seaDiv('', 'top:0;left:0;width:100%;height:100%;z-index:9988;pointer-events:none;animation:sea-lightning 0.6s ease-in-out 3;filter:hue-rotate(180deg);opacity:0.15;');
-    _seaRemove(o, 2000);
+    var c = _seaGetAnimCfg('_seaGlitchEffect', 'aprilfools');
+    if (c.enabled === false) return;
+    var m     = _seaGetSeasonMults('aprilfools');
+    var color = c.color || '#ffffff';
+    var dur   = (c.dur || 2.0) / m.speed;
+    var durMs = Math.round(dur * 1000);
+    var cycles = Math.max(1, Math.round(dur / 0.6));
+    var o = _seaDiv('', 'top:0;left:0;width:100%;height:100%;z-index:9988;pointer-events:none;' +
+        'background:' + color + ';animation:sea-lightning 0.6s ease-in-out ' + cycles + ';filter:hue-rotate(180deg);opacity:0.15;');
+    _seaRemove(o, durMs + 300);
 }
 function _seaFakeAlert()        { _seaPopupFn('_seaFakeAlert',       'aprilfools'); }
 function _seaJokerCard()        { _seaRunnerFn('_seaJokerCard',      'aprilfools', 30, 30); }
@@ -1981,22 +2044,57 @@ function _seaBuildAnimRow(fnName, c) {
             + testBtn + '</div>';
     } else if (c.type === 'alias') {
         var tgtMeta = SEA_ANIM_META[c.target] || {};
-        row += '<div class="small text-muted">↪ Alias of <strong>' + (tgtMeta.name || c.target) + '</strong> — configure via that animation.' + testBtn + '</div>';
+        var tgtSafe = (c.target || '').replace(/[^a-zA-Z0-9]/g, '_');
+        row += '<div class="small text-muted">↪ Alias of <a href="#" onclick="document.getElementById(\'scfg_en_' + tgtSafe + '\').closest(\'.sea-cfg-row\').scrollIntoView({behavior:\'smooth\'});return false;" class="text-decoration-none"><strong>' + (tgtMeta.name || c.target) + '</strong></a> — configure via that animation.' + testBtn + '</div>';
     } else {
-        // custom — show special fields if defined, then test button
-        var extras = '';
+        // custom — field-presence based renderer
         if (fnName === '_seaStarWarsCrawl') {
-            extras = '<div class="mt-1" style="font-size:0.78rem;">'
+            row += '<div class="mt-1" style="font-size:0.78rem;">'
                 + 'Text <textarea id="scfg_crawlText_' + safe + '" rows="3" style="width:100%;font-size:0.75rem;" class="form-control form-control-sm">' + _escHtml(c.crawlText || '') + '</textarea>'
                 + ' Color <input type="color" id="scfg_crawlColor_' + safe + '" value="' + (c.crawlColor || '#ffe81f') + '">'
-                + '</div>';
+                + testBtn + '</div>';
+        } else {
+            var meta = SEA_ANIM_META[fnName] || {};
+            var fields = '';
+            if (meta.emoji   !== undefined) fields += ' Emoji <input type="text" id="scfg_emoji_'   + safe + '" value="' + _escHtml(c.emoji   !== undefined ? c.emoji   : meta.emoji)   + '" style="width:70px;font-size:0.85rem;" class="form-control form-control-sm d-inline-block">';
+            if (meta.size    !== undefined) fields += ' Size <input type="text" id="scfg_size_'     + safe + '" value="' + _escHtml(c.size    !== undefined ? c.size    : meta.size)    + '" style="width:65px" class="form-control form-control-sm d-inline-block" placeholder="2rem">';
+            if (meta.count   !== undefined) fields += ' Count <input type="number" id="scfg_count_' + safe + '" value="' + (c.count   !== undefined ? c.count   : meta.count)   + '" min="1" max="50" style="width:55px" class="form-control form-control-sm d-inline-block">';
+            if (meta.dur     !== undefined) fields += ' Dur <input type="number" id="scfg_dur_'     + safe + '" value="' + (c.dur     !== undefined ? c.dur     : meta.dur)     + '" min="0.5" max="20" step="0.5" style="width:60px" class="form-control form-control-sm d-inline-block">s';
+            if (meta.color   !== undefined) fields += ' Color <input type="color" id="scfg_color_'  + safe + '" value="' + _cssColorToHex(c.color   !== undefined ? c.color   : meta.color)   + '" style="width:34px;height:24px" class="form-control form-control-sm d-inline-block p-0 border-0">';
+            if (meta.bgColor !== undefined) fields += ' BG <input type="color" id="scfg_bgColor_'   + safe + '" value="' + _cssColorToHex(c.bgColor !== undefined ? c.bgColor : meta.bgColor) + '" style="width:34px;height:24px" class="form-control form-control-sm d-inline-block p-0 border-0">';
+            if (meta.text    !== undefined) fields += '<br>Text <input type="text" id="scfg_text_'  + safe + '" value="' + _escHtml(c.text    !== undefined ? c.text    : meta.text)    + '" style="width:200px;max-width:100%" class="form-control form-control-sm d-inline-block">';
+            if (fields) {
+                row += '<div class="d-flex flex-wrap gap-1 align-items-center mt-1" style="font-size:0.78rem;">' + fields + testBtn + '</div>';
+            } else {
+                row += '<div class="small text-muted">Wrapper animation — enable/disable only.' + testBtn + '</div>';
+            }
         }
-        row += '<div class="small text-muted">Complex animation — enable/disable only.' + testBtn + '</div>' + extras;
     }
     return row + '</div>';
 }
 
 function _escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Convert any CSS color (rgba/named) to #rrggbb for <input type="color">
+function _cssColorToHex(val) {
+    if (!val) return '#808080';
+    var s = String(val).trim();
+    if (/^#[0-9a-fA-F]{3,8}$/.test(s)) return s.length <= 5 ? '#' + s[1]+s[1]+s[2]+s[2]+s[3]+s[3] : s.slice(0,7);
+    try {
+        var d = document.createElement('div');
+        d.style.color = s;
+        document.body.appendChild(d);
+        var rgb = window.getComputedStyle(d).color;
+        document.body.removeChild(d);
+        var m = rgb.match(/\d+/g);
+        if (m && m.length >= 3) {
+            return '#' + ('0'+parseInt(m[0]).toString(16)).slice(-2)
+                       + ('0'+parseInt(m[1]).toString(16)).slice(-2)
+                       + ('0'+parseInt(m[2]).toString(16)).slice(-2);
+        }
+    } catch(e) {}
+    return '#808080';
+}
 
 function testSeasonAnim(fnName) {
     var fn = window[fnName];
@@ -2031,11 +2129,21 @@ function saveSeasonConfig() {
         } else if (meta.type === 'corner') {
             o.emoji = document.getElementById('scfg_emoji_' + safe).value;
             o.side  = document.getElementById('scfg_side_' + safe).value;
-        } else if (meta.type === 'custom' && fnName === '_seaStarWarsCrawl') {
-            var ctEl = document.getElementById('scfg_crawlText_' + safe);
-            var ccEl = document.getElementById('scfg_crawlColor_' + safe);
-            if (ctEl) o.crawlText  = ctEl.value;
-            if (ccEl) o.crawlColor = ccEl.value;
+        } else if (meta.type === 'custom') {
+            if (fnName === '_seaStarWarsCrawl') {
+                var ctEl = document.getElementById('scfg_crawlText_' + safe);
+                var ccEl = document.getElementById('scfg_crawlColor_' + safe);
+                if (ctEl) o.crawlText  = ctEl.value;
+                if (ccEl) o.crawlColor = ccEl.value;
+            } else {
+                if (meta.emoji   !== undefined) { var v = document.getElementById('scfg_emoji_'   + safe); if (v) o.emoji   = v.value; }
+                if (meta.size    !== undefined) { var v = document.getElementById('scfg_size_'    + safe); if (v) o.size    = v.value; }
+                if (meta.count   !== undefined) { var v = document.getElementById('scfg_count_'   + safe); if (v) o.count   = parseInt(v.value)   || meta.count; }
+                if (meta.dur     !== undefined) { var v = document.getElementById('scfg_dur_'     + safe); if (v) o.dur     = parseFloat(v.value) || meta.dur; }
+                if (meta.color   !== undefined) { var v = document.getElementById('scfg_color_'   + safe); if (v) o.color   = v.value; }
+                if (meta.bgColor !== undefined) { var v = document.getElementById('scfg_bgColor_' + safe); if (v) o.bgColor = v.value; }
+                if (meta.text    !== undefined) { var v = document.getElementById('scfg_text_'    + safe); if (v) o.text    = v.value; }
+            }
         }
         overrides[fnName] = o;
     });
