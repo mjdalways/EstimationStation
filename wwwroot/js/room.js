@@ -273,6 +273,7 @@ function registerHandlers() {
         document.getElementById('hideBtn').style.display = 'none';
         document.getElementById('statsBar').style.display = 'none';
         _myVibe = null;
+        localStorage.removeItem('es_hideVibeCheck'); // reset vibe hide on new round
         const vibePanel = document.getElementById('vibeCheckPanel');
         if (vibePanel) vibePanel.style.display = '';
         const vibeClearBtn = document.getElementById('vibeClearBtn');
@@ -1453,6 +1454,61 @@ var _acLastStoryId = null;
 function loadTimerClockSettings() {
     setInterval(_acTick, 1000);
     _acTick();
+    _addPanelCloseButtons();
+}
+
+// AE7: Add × close buttons to dismissable panels
+function _addPanelCloseButtons() {
+    var panels = [
+        {
+            id: 'vibeCheckPanel',
+            hide: function() {
+                localStorage.setItem('es_hideVibeCheck', '1');
+            }
+        },
+        {
+            id: 'keyboard-legend',
+            hide: function() {
+                localStorage.setItem('es_kbShortcuts', 'false');
+                var cb = document.getElementById('kb-shortcuts-toggle');
+                if (cb) cb.checked = false;
+                if (typeof toggleKbShortcuts === 'function') toggleKbShortcuts(false);
+            }
+        },
+        {
+            id: 'session-tc-bar',
+            hide: function() {
+                localStorage.setItem('es_showClock', '0');
+                localStorage.setItem('es_showTimer', '0');
+                var cbC = document.getElementById('tc-show-clock');
+                var cbT = document.getElementById('tc-show-timer');
+                if (cbC) cbC.checked = false;
+                if (cbT) cbT.checked = false;
+            }
+        }
+    ];
+    panels.forEach(function(p) {
+        var panel = document.getElementById(p.id);
+        if (!panel) return;
+        if (panel.querySelector('.panel-close-btn')) return;
+        if (getComputedStyle(panel).position === 'static') panel.style.position = 'relative';
+        var btn = document.createElement('button');
+        btn.className = 'panel-close-btn';
+        btn.title = 'Hide this panel';
+        btn.setAttribute('aria-label', 'Close panel');
+        btn.innerHTML = '&times;';
+        btn.onclick = function(e) {
+            e.stopPropagation();
+            panel.style.display = 'none';
+            p.hide();
+        };
+        panel.insertBefore(btn, panel.firstChild);
+    });
+    // Respect saved vibe hide state
+    if (localStorage.getItem('es_hideVibeCheck') === '1') {
+        var vibe = document.getElementById('vibeCheckPanel');
+        if (vibe) vibe.style.display = 'none';
+    }
 }
 
 function acStartStoryTimer(storyId) {

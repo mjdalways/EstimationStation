@@ -72,16 +72,15 @@
                 <div id="timerDisplay" class="timer-display" style="display:none;">
                     <span id="timerIcon">⏱️</span> <span id="timerValue">0</span>s
                 </div>
+                <!-- AC: Session Timer + Clock — inline right side -->
+                <div id="session-tc-bar" class="ms-auto d-flex align-items-center gap-2" style="display:none;">
+                    <span id="stc-timer" class="stc-segment" title="Time on current story"></span>
+                    <span class="stc-sep" id="stc-sep">·</span>
+                    <span id="stc-clock" class="stc-segment"></span>
+                </div>
             </div>
         </div>
         <div id="currentStoryNote" class="current-story-note" style="display:none;"></div>
-
-        <!-- AC: Session Timer + Clock widget -->
-        <div id="session-tc-bar" class="session-tc-bar" style="display:none;">
-            <span id="stc-timer" class="stc-segment" title="Time on current story"></span>
-            <span class="stc-sep" id="stc-sep">·</span>
-            <span id="stc-clock" class="stc-segment"></span>
-        </div>
 
         <!-- Stats Bar (shown when votes revealed) -->
         <div id="statsBar" class="stats-bar" style="display:none;">

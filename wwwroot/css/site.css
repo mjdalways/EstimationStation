@@ -1486,25 +1486,25 @@ h1, h2, h3, h4, h5, h6 {
     z-index: 2;
 }
 
-/* AC — Session Timer & Clock bar */
+/* AC/AE6 — Session Timer & Clock (now inline in current-story-bar) */
 .session-tc-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 2px 8px;
-    margin-top: 4px;
-    font-size: 0.78rem;
+    /* display and flex set inline via JS; no standalone bar styles needed */
+    font-size: 0.88rem;
     color: var(--text-secondary, #6c757d);
-    background: var(--bg2, #f8f9fa);
-    border: 1px solid var(--panel-border, #dee2e6);
-    border-radius: 6px;
     user-select: none;
+    gap: 6px;
 }
 .stc-segment {
     display: inline-flex;
     align-items: center;
     gap: 3px;
     font-variant-numeric: tabular-nums;
+    font-size: 0.88rem;
+}
+#stc-clock {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary, #212529);
 }
 .stc-sep {
     opacity: 0.4;
@@ -1848,6 +1848,9 @@ mark.search-highlight { background: #fff176; color: inherit; border-radius: 2px;
 /* Fix #5 — card back flip preview animation */
 @keyframes flip-preview { 0%{transform:rotateY(0)} 50%{transform:rotateY(90deg)} 100%{transform:rotateY(0)} }
 .flip-preview { animation: flip-preview 0.6s ease-in-out; }
+/* AE2 — vote picker card flip preview */
+@keyframes cardFlip { 0%{transform:rotateY(0)} 50%{transform:rotateY(90deg)} 100%{transform:rotateY(0)} }
+.card-flipping { animation: cardFlip 0.6s ease-in-out; }
 .story-notes-area { padding: 4px 0 2px; }
 .story-notes-area textarea { font-size: 0.78rem; resize: vertical; min-height: 56px; }
 .story-note-btn { line-height: 1; }
@@ -2110,5 +2113,27 @@ mark.search-highlight { background: #fff176; color: inherit; border-radius: 2px;
 @keyframes adSlideIn {
     from { transform: translateX(100%); opacity: 0; }
     to   { transform: translateX(0); opacity: 1; }
+}
+
+/* AE7 — Panel close (×) buttons */
+.panel-close-btn {
+    position: absolute;
+    top: 4px; right: 6px;
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 1px 4px;
+    color: var(--text-muted, #6c757d);
+    cursor: pointer;
+    opacity: 0.55;
+    z-index: 10;
+    border-radius: 3px;
+    transition: opacity 0.15s, background 0.15s;
+}
+.panel-close-btn:hover {
+    opacity: 1;
+    background: rgba(0,0,0,0.07);
+    color: var(--text-primary, #333);
 }
 

@@ -178,6 +178,7 @@
   <a href="#group-j">J — Mobile Experience (carry)</a>
   <a href="#group-k">K — Room Persistence (carry)</a>
   <a href="#group-ac">AC — Timer &amp; Clock ✅</a>
+  <a href="#group-ae">AE — Widget Panel System</a>
   <div class="nav-section">Archive</div>
   <a href="#done">✅ v4.0 Completed</a>
   <a href="#archive">Won't Do / Deferred</a>
@@ -843,6 +844,23 @@
     <li><b>Implementation:</b> build a lightweight drag+zoom component in vanilla JS (no library dependency); reuse for all image upload flows via a shared <code>openCropDialog(file, aspectRatio, onConfirm)</code> utility</li>
     <li><b>Mobile:</b> touch events (pinch-to-zoom, single-finger drag) must work on mobile devices</li>
   </ul>
+
+  <h4 style="margin-top:14px;">AB5 — Star Wars Day / Custom Season Background Image Import <em>(deferred from AA4)</em></h4>
+  <ul>
+    <li>Import a custom background image for Star Wars Day or any custom season (replaces the default seasonal overlay)</li>
+    <li>Stored as base64 in <code>sea_cfg_{season}</code>; applied as <code>background-image</code> on the seasonal overlay div</li>
+    <li>Crop/pan handled by the shared <code>openCropDialog()</code> utility from this group</li>
+    <li>Clear button removes the custom image and reverts to the default seasonal CSS</li>
+  </ul>
+
+  <h4 style="margin-top:14px;">AB6 — Custom Seasonal Theme Builder <em>(deferred from AA9)</em></h4>
+  <ul>
+    <li>Allow users to define a fully custom season: name, date range (month/day start–end), icon emoji, color palette, background image</li>
+    <li>Custom seasons stored in <code>es_customSeasons</code> localStorage as JSON array</li>
+    <li>Appear in the Seasons tab alongside built-in seasons; can be enabled/disabled like any other season</li>
+    <li>Background image upload uses the shared crop dialog from this group</li>
+    <li>Custom seasons integrate with <code>_seaGetSeason()</code> date-matching logic</li>
+  </ul>
 </div>
 
 <div class="group-card hard" id="group-j">
@@ -870,6 +888,22 @@
     <li><code>SemaphoreSlim</code> per room for async file I/O; extends existing <code>lock(room)</code> pattern</li>
     <li>File path configurable via <code>appsettings.json</code></li>
     <li>In-scope: stories, participants, votes. Out-of-scope: vote history, analytics (client localStorage)</li>
+  </ul>
+</div>
+
+<div class="group-card hard" id="group-ae">
+  <h3>Group AE — 🪟 Widget Panel System <span class="new-tag">new</span></h3>
+  <span class="tag">Hard</span><span class="tag">room.js · site.css · Index.cshtml</span>
+  <div class="callout warn" style="margin-top:12px;">
+    <strong>Desktop only</strong> — No drag/reorder on mobile. Mobile layout unchanged.
+  </div>
+  <ul style="margin-top:10px;">
+    <li><b>AE10a — Draggable widgets:</b> Clock, Timer, Vibe Check, Keyboard Legend, Vote Cards, Participant Cards — each a moveable panel on desktop</li>
+    <li><b>AE10b — Drag-to-reorder:</b> drag panels to any position; layout persisted to <code>es_widgetLayout</code> localStorage</li>
+    <li><b>AE10c — Panel registry:</b> define N widget slots; each slot knows its default position, content component, and visibility state</li>
+    <li><b>AE10d — Close/show toggles:</b> each widget has × close button; restored via settings or right-click on the widget bar</li>
+    <li><b>AE10e — Mobile detection:</b> <code>window.innerWidth &lt; 768</code> disables drag entirely; panels revert to stacked layout</li>
+    <li>Implement with vanilla JS HTML5 drag API (no library); z-index management for dragged panel bring-to-front</li>
   </ul>
 </div>
 

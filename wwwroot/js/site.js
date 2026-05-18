@@ -884,6 +884,13 @@ function _previewFlip() {
     setTimeout(function() { back.classList.remove('flip-preview'); }, 700);
 }
 
+function _previewFlipVoteCard() {
+    const card = document.getElementById('vote-card-preview');
+    if (!card) return;
+    card.classList.add('card-flipping');
+    setTimeout(function() { card.classList.remove('card-flipping'); }, 700);
+}
+
 // ── Live preview ──────────────────────────────────────────────
 function updateThemePreview() {
     const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
