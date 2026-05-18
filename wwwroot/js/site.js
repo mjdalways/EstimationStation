@@ -114,6 +114,7 @@ function openSettingsModal(tab) {
     populateJiraTab();
     applyCardBackDesign();
     if (typeof _epAutoAttach === 'function') _epAutoAttach();
+    if (typeof _populateRoomOtherSettings === 'function') _populateRoomOtherSettings();
     var ct = document.getElementById('show-confidence-toggle');
     if (ct) ct.checked = localStorage.getItem('es_showConfidence') !== '0';
 
@@ -133,7 +134,6 @@ function filterSettings(query) {
     var q = (query || '').trim().toLowerCase();
     var resultEl = document.getElementById('settings-search-results');
     if (!resultEl) return;
-    if (!q) { resultEl.innerHTML = ''; return; }
 
     var tabs = [
         { id: 'tab-theme',       btn: 'tab-theme-btn',       label: '🎨 Theme' },
@@ -146,6 +146,15 @@ function filterSettings(query) {
         { id: 'tab-other',       btn: 'tab-other-btn',       label: '⚙️ Other' },
         { id: 'tab-about',       btn: 'tab-about-btn',       label: 'ℹ️ About' },
     ];
+
+    // Remove any existing highlights from all tabs
+    tabs.forEach(function(t) {
+        var el = document.getElementById(t.id);
+        if (el) _removeSearchHighlights(el);
+    });
+
+    if (!q) { resultEl.innerHTML = ''; return; }
+
     var matches = tabs.filter(function(t) {
         var el = document.getElementById(t.id);
         return el && el.textContent.toLowerCase().indexOf(q) !== -1;
@@ -157,10 +166,47 @@ function filterSettings(query) {
     resultEl.innerHTML = matches.map(function(t) {
         return '<a href="#" class="badge bg-secondary text-decoration-none me-1" onclick="event.preventDefault();document.getElementById(\'' + t.btn + '\').click()">' + t.label + '</a>';
     }).join('');
+
+    // Highlight matching text in matching tabs
+    matches.forEach(function(t) {
+        var el = document.getElementById(t.id);
+        if (el) _applySearchHighlights(el, q);
+    });
+
     if (matches.length === 1) {
         var btn = document.getElementById(matches[0].btn);
         if (btn) btn.click();
     }
+}
+
+function _removeSearchHighlights(el) {
+    el.querySelectorAll('mark.search-highlight').forEach(function(m) {
+        var p = m.parentNode;
+        if (p) { p.replaceChild(document.createTextNode(m.textContent), m); p.normalize(); }
+    });
+}
+
+function _applySearchHighlights(el, q) {
+    var SKIP = {INPUT:1, SELECT:1, TEXTAREA:1, BUTTON:1, SCRIPT:1, STYLE:1, OPTION:1, MARK:1};
+    function walk(node) {
+        if (node.nodeType === 3) {
+            var text = node.textContent;
+            var idx = text.toLowerCase().indexOf(q);
+            if (idx === -1) return;
+            var frag = document.createDocumentFragment();
+            if (idx > 0) frag.appendChild(document.createTextNode(text.substring(0, idx)));
+            var mark = document.createElement('mark');
+            mark.className = 'search-highlight';
+            mark.textContent = text.substring(idx, idx + q.length);
+            frag.appendChild(mark);
+            var rest = text.substring(idx + q.length);
+            if (rest) frag.appendChild(document.createTextNode(rest));
+            node.parentNode.replaceChild(frag, node);
+        } else if (node.nodeType === 1 && !SKIP[node.tagName]) {
+            Array.from(node.childNodes).forEach(walk);
+        }
+    }
+    Array.from(el.childNodes).forEach(walk);
 }
 
 // ── Z2: Per-tab bulk controls ───────────────────────────────
@@ -823,6 +869,13 @@ function ctToggleSection(sectionId, headerEl) {
     const isCollapsed = body.style.display === 'none';
     body.style.display = isCollapsed ? '' : 'none';
     if (headerEl) headerEl.classList.toggle('collapsed', !isCollapsed);
+}
+
+function _previewFlip() {
+    const back = document.getElementById('card-back-preview');
+    if (!back) return;
+    back.classList.add('flip-preview');
+    setTimeout(function() { back.classList.remove('flip-preview'); }, 700);
 }
 
 // ── Live preview ──────────────────────────────────────────────

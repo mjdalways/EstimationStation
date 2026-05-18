@@ -76,6 +76,13 @@
         </div>
         <div id="currentStoryNote" class="current-story-note" style="display:none;"></div>
 
+        <!-- AC: Session Timer + Clock widget -->
+        <div id="session-tc-bar" class="session-tc-bar" style="display:none;">
+            <span id="stc-timer" class="stc-segment" title="Time on current story"></span>
+            <span class="stc-sep" id="stc-sep">·</span>
+            <span id="stc-clock" class="stc-segment"></span>
+        </div>
+
         <!-- Stats Bar (shown when votes revealed) -->
         <div id="statsBar" class="stats-bar" style="display:none;">
             <div class="stat-item">
@@ -119,6 +126,10 @@
         <div class="voting-section">
             <h6 class="section-label">Your Vote</h6>
             <div id="cardContainer" class="card-container"></div>
+            <!-- P1: keyboard shortcut legend (populated by JS) -->
+            <div id="keyboard-legend" class="keyboard-legend" style="display:none;"></div>
+            <!-- P2: emoji reaction bar (populated by JS) -->
+            <div id="reactionPanel" class="reaction-panel" style="display:none;"></div>
         </div>
 
         <!-- Confidence selector (shown after voting, hidden on reveal/reset) -->

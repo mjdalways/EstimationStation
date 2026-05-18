@@ -639,6 +639,15 @@ public class PokerHub : Hub
         }));
     }
 
+    // P2 — Emoji Reactions: relay emoji to room; no state stored; rate-limit is client-side
+    public async Task SendReaction(string emoji)
+    {
+        if (string.IsNullOrWhiteSpace(emoji) || emoji.Length > 10) return;
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        await Clients.Group(roomName).SendAsync("ReceiveReaction", Context.ConnectionId, emoji);
+    }
+
     public async Task TriggerCustomSound(string base64Data, string label)
     {
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);

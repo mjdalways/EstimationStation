@@ -124,11 +124,10 @@
   transform-origin: bottom center;
 }
 .sw-crawl-text {
-  color: #ffe81f;
+  /* color set inline from config (default #ffe81f applied in JS) */
   font-size: 1.1rem;
   font-weight: 600;
   text-align: center;
-  text-shadow: 0 0 10px #ffe81f88;
   line-height: 1.6;
   letter-spacing: 0.04em;
   background: transparent;

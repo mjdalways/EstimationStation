@@ -84,6 +84,11 @@
                     <button class="btn btn-outline-danger btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="settingsAllOff()">🔇 All Off</button>
                     <button class="btn btn-outline-success btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="settingsAllOn()">✨ All On</button>
                     <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="settingsResetAll()">↩ Reset All</button>
+                    <div class="input-group input-group-sm ms-1" style="width:175px;max-width:35%;">
+                        <span class="input-group-text" style="font-size:0.72rem;padding:1px 6px;">🔍</span>
+                        <input type="search" id="settings-search" class="form-control" placeholder="Search…" oninput="filterSettings(this.value)" style="font-size:0.72rem;">
+                    </div>
+                    <span id="settings-search-results" class="small"></span>
                     <div class="ms-auto d-flex gap-1">
                         <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="exportAllSettings()">📤 Export</button>
                         <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem;padding:1px 7px;" onclick="importAllSettings()">📥 Import</button>
@@ -120,17 +125,6 @@
                         <button class="nav-link settings-tab-btn" id="tab-about-btn" data-bs-toggle="tab" data-bs-target="#tab-about" type="button" role="tab">ℹ️ <span class="tab-label">About</span></button>
                     </li>
                 </ul>
-
-                <!-- Z1: Settings search -->
-                <div class="px-3 pt-2 pb-1 border-bottom" id="settings-search-wrap">
-                    <div class="d-flex align-items-center gap-2" style="max-width:400px;">
-                        <div class="input-group input-group-sm flex-fill">
-                            <span class="input-group-text">🔍</span>
-                            <input type="search" id="settings-search" class="form-control" placeholder="Search settings…" oninput="filterSettings(this.value)">
-                        </div>
-                        <span id="settings-search-results" class="small"></span>
-                    </div>
-                </div>
 
                 <!-- Tab content -->
                 <div class="tab-content flex-fill overflow-hidden" id="settingsTabContent">
@@ -399,23 +393,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Card Back Design section -->
-                                <div class="ct-section mb-2">
-                                    <button class="ct-section-toggle w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#sec-card-back">
-                                        🃏 Participant Card Backs
-                                    </button>
-                                    <div id="sec-card-back" class="ct-section-body">
-                                        <label class="ct-field-label" for="cardBackSelect">Style when voted (face-down)</label>
-                                        <select class="form-select form-select-sm" id="cardBackSelect" onchange="setCardBackDesign(this.value)">
-                                            <option value="default">Default</option>
-                                            <option value="baize">🟢 Baize (green felt)</option>
-                                            <option value="space">🌌 Deep Space</option>
-                                            <option value="retro">🃏 Retro Diamonds</option>
-                                            <option value="seasonal">🍂 Seasonal</option>
-                                        </select>
-                                        <p class="text-muted mt-1 mb-0" style="font-size:0.72rem;">Voted badges show this design until votes are revealed.</p>
-                                    </div>
-                                </div>
+                                <!-- Card Backs moved to Visual tab -->
 
                             </div><!-- end left controls -->
 
@@ -480,16 +458,20 @@
                             <div class="text-muted small mb-2 fw-bold">Live Preview</div>
                             <div class="d-flex gap-3 align-items-flex-start flex-wrap">
                                 <div>
+                                    <div class="text-muted small mb-1">Unselected</div>
+                                    <div class="poker-card" id="live-preview-vote-card" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;">5</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small mb-1">Selected</div>
+                                    <div class="poker-card selected" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;">5</div>
+                                </div>
+                                <div>
                                     <div class="text-muted small mb-1">Participant</div>
                                     <div class="participant-badge" id="live-preview-badge" style="pointer-events:none;display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--panel-border,#dee2e6);">
                                         <div style="width:30px;height:30px;border-radius:50%;background:var(--accent,#5b8dee);display:flex;align-items:center;justify-content:center;font-size:0.8rem;color:#fff;">A</div>
                                         <span style="font-size:var(--card-font-size,0.8rem);">Alex</span>
                                         <span style="opacity:0.5;">✓</span>
                                     </div>
-                                </div>
-                                <div>
-                                    <div class="text-muted small mb-1">Vote Card</div>
-                                    <div class="poker-card" id="live-preview-vote-card" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;width:42px;height:56px;border-radius:6px;border:2px solid var(--card-border,#dee2e6);font-size:var(--card-font-size,1.25rem);font-weight:700;">5</div>
                                 </div>
                                 <div>
                                     <div class="text-muted small mb-1">Revealed</div>
@@ -538,6 +520,38 @@
                                 <input class="form-check-input" type="checkbox" id="show-confidence-toggle" checked
                                     onchange="localStorage.setItem('es_showConfidence', this.checked ? '1' : '0')" />
                                 <label class="form-check-label" for="show-confidence-toggle">Show "How confident are you?" prompt after voting</label>
+                            </div>
+                        </div>
+
+                        <!-- Card Back Design -->
+                        <hr class="my-2">
+                        <div class="mb-1 fw-bold small">🃏 Participant Card Backs</div>
+                        <div class="d-flex gap-3 align-items-start flex-wrap mb-2">
+                            <div>
+                                <label class="form-label small mb-1" for="cardBackSelect">Style when voted (face-down)</label>
+                                <select class="form-select form-select-sm" id="cardBackSelect" onchange="setCardBackDesign(this.value)" style="width:auto;">
+                                    <option value="default">Default</option>
+                                    <option value="baize">🟢 Baize (green felt)</option>
+                                    <option value="space">🌌 Deep Space</option>
+                                    <option value="retro">🃏 Retro Diamonds</option>
+                                    <option value="seasonal">🍂 Seasonal</option>
+                                </select>
+                                <p class="text-muted mt-1 mb-0" style="font-size:0.72rem;">Voted badges show this design until votes are revealed.</p>
+                            </div>
+                            <div>
+                                <div class="text-muted small mb-1">Preview</div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <div>
+                                        <div class="text-muted" style="font-size:0.65rem;text-align:center;">Front</div>
+                                        <div class="poker-card selected" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;">5</div>
+                                    </div>
+                                    <div style="font-size:1.2rem;opacity:0.4;">⇌</div>
+                                    <div>
+                                        <div class="text-muted" style="font-size:0.65rem;text-align:center;">Back</div>
+                                        <div class="participant-badge voted" id="card-back-preview" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;min-width:64px;height:90px;border-radius:var(--border-radius,8px);border:2px solid var(--card-border,#dee2e6);">?</div>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm align-self-end" onclick="_previewFlip()" title="Test flip animation">🔄 Flip</button>
+                                </div>
                             </div>
                         </div>
 
@@ -1323,6 +1337,19 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/18/2026 (63)</strong></p>
+                        <ul class="mb-2">
+                            <li>⏱️ Session Timer &amp; Clock — a compact bar above the story panel now shows how long the current story has been in discussion, plus the current time (with optional timezone). Switch between digital and analog clock face; customise hand colours. Configure in Other → Timer &amp; Clock.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (62)</strong></p>
+                        <ul class="mb-2">
+                            <li>⌨️ Keyboard shortcuts legend — a compact key reference now appears below your voting cards (toggle in Other → Keyboard Shortcuts). New keys: <kbd>C</kbd> selects ☕, <kbd>Q</kbd> selects ?, <kbd>−</kbd> selects skip vote.</li>
+                            <li>💬 Emoji reactions — a customisable reaction bar appears below your voting cards. Click any emoji to broadcast it to the room; it floats up from your participant badge (and from the sender's badge for everyone else). Configure the palette and toggle the bar in Other → Emoji Reactions.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/17/2026 (61)</strong></p>
+                        <ul class="mb-2">
+                            <li>🛠️ Bug fixes &amp; UX polish (Group FX): variable season next-dates (Lunar New Year, Diwali, Easter, Mother's/Father's Day, etc.); 🧪 test buttons on all animation types; 15+ animations promoted to popup/corner/alias types with full config; Star Wars crawl text + colour now configurable; emoji picker expanded with Food, Travel, Activities &amp; Flags categories; settings search highlights matches in yellow; search bar moved into global controls row; section headers now accent-tinted; story note edit icons stay pinned right; sidebar min-width 80 px with narrow mode; resize handle shows ⋮ grip; card navigation with arrow keys + comma/period; vibe deselect by clicking same vibe again (✕ clear button); Card Backs moved to Visual tab with live flip preview; Visual tab preview uses real vote card HTML; <code>d-none</code> season status bar bug fixed.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/17/2026 (60)</strong></p>
                         <ul class="mb-2">
                             <li>⚙️ Settings quality: global controls bar (All Off/On, Reset All, Export/Import); per-tab bulk toggles (✓ All / ✗ None / ↩ Reset) on Events, Audio, Seasons, Visual tabs; real-time settings search with tab-match badges; collapsible sections in Audio tab (Ambient, Timer, Soundboard, Voice); sound preference confirmation modal on room join.</li>
@@ -1693,6 +1720,127 @@
                          TAB: ⚙️ Other
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-other" role="tabpanel">
+
+                        <!-- P1: Keyboard Shortcuts -->
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#kb-shortcuts-section">
+                            ⌨️ Keyboard Shortcuts <span class="settings-section-chevron">▾</span>
+                        </div>
+                        <div id="kb-shortcuts-section" class="collapse show">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="kb-shortcuts-toggle"
+                                       onchange="if(typeof toggleKbShortcuts==='function') toggleKbShortcuts(this.checked)">
+                                <label class="form-check-label small" for="kb-shortcuts-toggle">Show shortcut legend below voting cards</label>
+                            </div>
+                            <p class="small text-muted mb-3">
+                                <kbd>1</kbd>–<kbd>9</kbd> select nth card &nbsp;·&nbsp;
+                                <kbd>C</kbd> ☕ &nbsp;·&nbsp; <kbd>Q</kbd> ? &nbsp;·&nbsp; <kbd>−</kbd> skip vote &nbsp;·&nbsp;
+                                <kbd>,</kbd>/<kbd>←</kbd> prev &nbsp;·&nbsp; <kbd>.</kbd>/<kbd>→</kbd> next &nbsp;·&nbsp;
+                                <kbd>Space</kbd>/<kbd>Enter</kbd> reveal &nbsp;·&nbsp;
+                                <kbd>R</kbd> reset &nbsp;·&nbsp; <kbd>F</kbd> fullscreen
+                            </p>
+                        </div>
+
+                        <!-- P2: Emoji Reactions -->
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#reaction-section">
+                            💬 Emoji Reactions <span class="settings-section-chevron">▾</span>
+                        </div>
+                        <div id="reaction-section" class="collapse show mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="reaction-enabled-toggle"
+                                       onchange="if(typeof saveReactionSettings==='function') saveReactionSettings()">
+                                <label class="form-check-label small" for="reaction-enabled-toggle">Show emoji reaction bar in room</label>
+                            </div>
+                            <div class="mb-1 small">Reaction palette (up to 8, space-separated):</div>
+                            <div class="input-group input-group-sm" style="max-width:280px;">
+                                <input type="text" id="reaction-palette-input" class="form-control"
+                                       style="font-size:1rem;" placeholder="👍 👏 🎉 😂 ❤️ 🔥 😮 💡"
+                                       data-picker-target
+                                       oninput="if(typeof saveReactionSettings==='function') saveReactionSettings()">
+                            </div>
+                            <p class="small text-muted mt-1 mb-0">Click a reaction during estimation to broadcast it — floats up from your participant badge. Rate-limited to 1 per 2 seconds.</p>
+                        </div>
+
+                        <!-- AC3/AC4: Timer & Clock settings -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
+                            <h6 class="text-muted mb-0 me-auto">⏱️ Timer &amp; Clock</h6>
+                        </div>
+                        <div class="form-check form-switch mb-1">
+                            <input class="form-check-input" type="checkbox" id="tc-show-timer" onchange="saveTimerClockSettings()">
+                            <label class="form-check-label small" for="tc-show-timer">Show count-up timer</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="tc-show-clock" onchange="saveTimerClockSettings()">
+                            <label class="form-check-label small" for="tc-show-clock">Show clock</label>
+                        </div>
+                        <div class="mb-2 d-flex align-items-center gap-2 small">
+                            <label class="text-nowrap" for="tc-timezone">Timezone</label>
+                            <select id="tc-timezone" class="form-select form-select-sm" style="max-width:230px;" onchange="saveTimerClockSettings()">
+                                <option value="">Local (browser)</option>
+                                <optgroup label="Americas">
+                                    <option value="America/New_York">New York (ET)</option>
+                                    <option value="America/Chicago">Chicago (CT)</option>
+                                    <option value="America/Denver">Denver (MT)</option>
+                                    <option value="America/Los_Angeles">Los Angeles (PT)</option>
+                                    <option value="America/Toronto">Toronto (ET)</option>
+                                    <option value="America/Vancouver">Vancouver (PT)</option>
+                                    <option value="America/Sao_Paulo">São Paulo (BRT)</option>
+                                </optgroup>
+                                <optgroup label="Europe">
+                                    <option value="Europe/London">London (GMT/BST)</option>
+                                    <option value="Europe/Paris">Paris (CET)</option>
+                                    <option value="Europe/Berlin">Berlin (CET)</option>
+                                    <option value="Europe/Amsterdam">Amsterdam (CET)</option>
+                                    <option value="Europe/Stockholm">Stockholm (CET)</option>
+                                    <option value="Europe/Warsaw">Warsaw (CET)</option>
+                                    <option value="Europe/Athens">Athens (EET)</option>
+                                    <option value="Europe/Istanbul">Istanbul (TRT)</option>
+                                    <option value="Europe/Moscow">Moscow (MSK)</option>
+                                </optgroup>
+                                <optgroup label="Africa / Middle East">
+                                    <option value="Africa/Cairo">Cairo (EET)</option>
+                                    <option value="Africa/Johannesburg">Johannesburg (SAST)</option>
+                                    <option value="Asia/Dubai">Dubai (GST)</option>
+                                </optgroup>
+                                <optgroup label="Asia">
+                                    <option value="Asia/Karachi">Karachi (PKT)</option>
+                                    <option value="Asia/Kolkata">Mumbai/Kolkata (IST)</option>
+                                    <option value="Asia/Dhaka">Dhaka (BST)</option>
+                                    <option value="Asia/Bangkok">Bangkok (ICT)</option>
+                                    <option value="Asia/Singapore">Singapore (SGT)</option>
+                                    <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
+                                    <option value="Asia/Shanghai">Shanghai (CST)</option>
+                                    <option value="Asia/Tokyo">Tokyo (JST)</option>
+                                    <option value="Asia/Seoul">Seoul (KST)</option>
+                                </optgroup>
+                                <optgroup label="Pacific / Oceania">
+                                    <option value="Australia/Sydney">Sydney (AEST)</option>
+                                    <option value="Australia/Melbourne">Melbourne (AEST)</option>
+                                    <option value="Australia/Perth">Perth (AWST)</option>
+                                    <option value="Pacific/Auckland">Auckland (NZST)</option>
+                                    <option value="Pacific/Honolulu">Honolulu (HST)</option>
+                                </optgroup>
+                                <optgroup label="UTC">
+                                    <option value="UTC">UTC</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="mb-2 small">
+                            <span class="me-3">Mode</span>
+                            <label class="me-3"><input type="radio" name="tc-mode" value="digital" onchange="saveTimerClockSettings();_tcToggleMode('digital')"> Digital</label>
+                            <label><input type="radio" name="tc-mode" value="analog" onchange="saveTimerClockSettings();_tcToggleMode('analog')"> Analog</label>
+                        </div>
+                        <div id="tc-digital-opts" class="mb-3 d-flex flex-wrap gap-3 align-items-center small">
+                            <label>Color <input type="color" id="tc-color" value="#6c757d" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                            <label>Size <input type="number" id="tc-font-size" value="13" min="10" max="22" style="width:50px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()">px</label>
+                        </div>
+                        <div id="tc-analog-opts" class="mb-3 small" style="display:none;">
+                            <div class="d-flex flex-wrap gap-3 align-items-center mb-2">
+                                <label>Face <select id="tc-face" class="form-select form-select-sm d-inline-block" style="width:100px;" onchange="saveTimerClockSettings()"><option value="minimal">Minimal</option><option value="classic">Classic</option><option value="filled">Filled</option></select></label>
+                                <label>Hour <input type="color" id="tc-hour-color" value="#212529" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                                <label>Min <input type="color" id="tc-min-color" value="#495057" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                                <label>Sec <input type="color" id="tc-sec-color" value="#dc3545" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                            </div>
+                        </div>
 
                         <!-- Mobile Animations -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">

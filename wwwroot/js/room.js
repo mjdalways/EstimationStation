@@ -14,6 +14,14 @@ let _esConsensusStreak = 0;
 let _myVibe = null;
 let _counterSpellOutlierId = null;
 const VIBE_EMOJIS = ['🚀','😱','😴','🤔','💪','🤷'];
+// P1 — Keyboard Shortcuts
+let _kbShortcutsEnabled = true;
+// P2 — Emoji Reactions
+const REACTION_DEFAULT_PALETTE = ['👍','👏','🎉','😂','❤️','🔥','😮','💡'];
+let _reactionPalette = [...REACTION_DEFAULT_PALETTE];
+let _reactionEnabled = true;
+let _reactionLastMs = 0;
+const REACTION_RATE_LIMIT_MS = 2000;
 let _roundVoteOrder  = [];                // connectionIds in order votes were cast this round
 let _roundFlipCounts = {};                // connectionId → number of vote changes this round
 let _pendingRoomName = null;              // PIN: used when re-joining after PIN_REQUIRED
@@ -239,6 +247,8 @@ function registerHandlers() {
         _myVibe = null;
         const vibePanel = document.getElementById('vibeCheckPanel');
         if (vibePanel) vibePanel.style.display = '';
+        const vibeClearBtn = document.getElementById('vibeClearBtn');
+        if (vibeClearBtn) vibeClearBtn.classList.add('d-none');
         renderVibeDisplay({});
         renderCards();
         renderParticipants();
@@ -299,6 +309,7 @@ function registerHandlers() {
         updateCurrentStoryDisplay();
         renderStories();
         renderCards();
+        acStartStoryTimer(storyId);  // AC1: start per-story timer
     });
 
     connection.on('StoryDeleted', (storyId) => {
@@ -359,6 +370,7 @@ function registerHandlers() {
     });
 
     connection.on('VibeUpdated', (counts) => { renderVibeDisplay(counts); });
+    connection.on('ReceiveReaction', (senderCid, emoji) => { _reactionFloatFromBadge(senderCid, emoji); });
     connection.on('SoundTriggered', (soundId, senderName) => {
         const sr = _getSoundReceiveSettings();
         if (sr.receive !== false) {
@@ -424,6 +436,7 @@ function renderCards() {
         }
         container.appendChild(card);
     });
+    _updateKeyboardLegend();
 }
 
 function renderParticipants() {
@@ -1272,24 +1285,46 @@ document.addEventListener('keydown', (e) => {
     if (e.key === '?') {
         if (typeof openSettingsModal === 'function') openSettingsModal('about');
     }
-    // 0: select ☕ card
-    if (e.code === 'Digit0') {
-        const coffeeCard = Array.from(document.querySelectorAll('.poker-card'))
-            .find(c => c.dataset.value === '☕');
-        if (coffeeCard) coffeeCard.click();
+    if (_kbShortcutsEnabled && !e.ctrlKey && !e.altKey) {
+        // 0: select ☕ card
+        if (e.code === 'Digit0') { _selectCardByValue('☕'); }
+        // 1–9: select nth card by position
+        const numMatch = e.code.match(/^Digit([1-9])$/);
+        if (numMatch) {
+            const idx = parseInt(numMatch[1], 10) - 1;
+            const values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
+            if (idx < values.length) castVote(values[idx]);
+        }
+        // C → coffee, Q → question mark, - → skip vote
+        if (e.code === 'KeyC') { e.preventDefault(); _selectCardByValue('☕'); }
+        if (e.code === 'KeyQ') { e.preventDefault(); _selectCardByValue('?'); }
+        if (e.code === 'Minus') { e.preventDefault(); _selectCardByValue('🚫'); }
     }
-    // 1–9: select nth card by position
-    const numMatch = e.code.match(/^Digit([1-9])$/);
-    if (numMatch && !e.ctrlKey && !e.altKey) {
-        const idx = parseInt(numMatch[1], 10) - 1;
-        const values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
-        if (idx < values.length) castVote(values[idx]);
-    }
+    // ← / , → previous card;  → / . → next card
+    if ((e.key === 'ArrowLeft' || e.key === ',') && !e.ctrlKey && !e.altKey) { e.preventDefault(); _navigateCard(-1); }
+    if ((e.key === 'ArrowRight' || e.key === '.') && !e.ctrlKey && !e.altKey) { e.preventDefault(); _navigateCard(1); }
 });
+
+function _navigateCard(dir) {
+    const isObsMode = isObserver || roomState.participants.some(p => p.connectionId === connection?.connectionId && p.isGhost);
+    if (isObsMode) return;
+    const values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
+    const idx = selectedVote != null ? values.indexOf(selectedVote) : -1;
+    const next = Math.max(0, Math.min(values.length - 1, idx + dir));
+    castVote(values[next]);
+}
+
+function _selectCardByValue(val) {
+    const values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
+    if (values.includes(val)) castVote(val);
+}
 
 document.getElementById('newStoryInput').addEventListener('keypress', e => { if (e.key === 'Enter') addStory(); });
 document.getElementById('chatInput').addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
 initVibePanel();
+loadKbSettings();
+loadReactionSettings();
+loadTimerClockSettings();
 if (typeof startSeasonalAmbience === 'function') startSeasonalAmbience();
 
 // ============================================================
@@ -1312,6 +1347,185 @@ function _promptSoundPreferenceOnce() {
     sessionStorage.setItem('es_soundAsked', '1');
     var modalEl = document.getElementById('soundConfirmModal');
     if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+// ============================================================
+// AC — Session Timer + Clock (AC1, AC2)
+// ============================================================
+var _acTimerStart = null;
+var _acLastStoryId = null;
+
+// AC2: one persistent tick interval drives both timer and clock
+function loadTimerClockSettings() {
+    setInterval(_acTick, 1000);
+    _acTick();
+}
+
+function acStartStoryTimer(storyId) {
+    if (storyId && storyId === _acLastStoryId) return;
+    _acLastStoryId = storyId || null;
+    _acTimerStart = storyId ? Date.now() : null;
+    _acTick();  // immediate refresh; persistent interval handles subsequent ticks
+}
+
+// AC3: save timer/clock settings from Other tab form
+function saveTimerClockSettings() {
+    var showTimerEl = document.getElementById('tc-show-timer');
+    var showClockEl = document.getElementById('tc-show-clock');
+    var tzEl       = document.getElementById('tc-timezone');
+    var modeEl     = document.querySelector('input[name="tc-mode"]:checked');
+    var colorEl    = document.getElementById('tc-color');
+    var fsEl       = document.getElementById('tc-font-size');
+    var faceEl     = document.getElementById('tc-face');
+    var hourEl     = document.getElementById('tc-hour-color');
+    var minEl      = document.getElementById('tc-min-color');
+    var secEl      = document.getElementById('tc-sec-color');
+
+    if (showTimerEl) localStorage.setItem('es_showTimer', showTimerEl.checked ? '1' : '0');
+    if (showClockEl) localStorage.setItem('es_showClock', showClockEl.checked ? '1' : '0');
+    if (tzEl)        localStorage.setItem('es_clockTimezone', tzEl.value);
+
+    var styleData = {
+        mode:      modeEl    ? modeEl.value              : 'digital',
+        color:     colorEl   ? colorEl.value             : '#6c757d',
+        fontSize:  fsEl      ? parseInt(fsEl.value, 10)  : 13,
+        face:      faceEl    ? faceEl.value              : 'minimal',
+        hourColor: hourEl    ? hourEl.value              : '#212529',
+        minColor:  minEl     ? minEl.value               : '#495057',
+        secColor:  secEl     ? secEl.value               : '#dc3545'
+    };
+    localStorage.setItem('es_clockStyle', JSON.stringify(styleData));
+    _acTick();
+}
+window.saveTimerClockSettings = saveTimerClockSettings;
+
+function _tcToggleMode(mode) {
+    var digital = document.getElementById('tc-digital-opts');
+    var analog  = document.getElementById('tc-analog-opts');
+    if (digital) digital.style.display = (mode === 'digital') ? '' : 'none';
+    if (analog)  analog.style.display  = (mode === 'analog')  ? '' : 'none';
+}
+window._tcToggleMode = _tcToggleMode;
+
+function _acTick() {
+    var bar = document.getElementById('session-tc-bar');
+    if (!bar) return;
+
+    var showTimer = localStorage.getItem('es_showTimer') !== '0';
+    var showClock = localStorage.getItem('es_showClock') !== '0';
+    var hasStory = !!_acLastStoryId;
+
+    if (!showTimer && !showClock) { bar.style.display = 'none'; return; }
+    bar.style.display = '';
+
+    // Timer segment
+    var timerEl = document.getElementById('stc-timer');
+    if (timerEl) {
+        if (showTimer && hasStory && _acTimerStart) {
+            var elapsed = Math.floor((Date.now() - _acTimerStart) / 1000);
+            var m = Math.floor(elapsed / 60), s = elapsed % 60;
+            timerEl.textContent = '⏱ ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+            timerEl.style.display = '';
+        } else {
+            timerEl.style.display = 'none';
+        }
+    }
+
+    // Separator
+    var sep = document.getElementById('stc-sep');
+    if (sep) sep.style.display = (showTimer && hasStory && showClock) ? '' : 'none';
+
+    // Clock segment
+    var clockEl = document.getElementById('stc-clock');
+    if (clockEl) {
+        if (showClock) {
+            _acRenderClock(clockEl);
+        } else {
+            clockEl.style.display = 'none';
+        }
+    }
+}
+
+function _acRenderClock(clockEl) {
+    var tz = localStorage.getItem('es_clockTimezone') || '';
+    var styleData = {};
+    try { styleData = JSON.parse(localStorage.getItem('es_clockStyle') || '{}'); } catch(e) {}
+    var mode = styleData.mode || 'digital';
+    var now = new Date();
+
+    if (mode === 'analog') {
+        var existing = clockEl.querySelector('svg');
+        if (!existing) {
+            clockEl.innerHTML = _acAnalogSvgTemplate();
+        }
+        _acUpdateAnalogHands(clockEl, now, tz, styleData);
+        clockEl.style.display = '';
+        return;
+    }
+
+    // Digital
+    clockEl.innerHTML = '';
+    var options = { hour: '2-digit', minute: '2-digit', hour12: false };
+    var tzName = '';
+    if (tz) {
+        options.timeZone = tz;
+        try {
+            var parts = new Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: 'short' }).formatToParts(now);
+            var tzPart = parts.find(function(p) { return p.type === 'timeZoneName'; });
+            if (tzPart) tzName = ' ' + tzPart.value;
+        } catch(e) {}
+    }
+    var timeStr = now.toLocaleTimeString([], options);
+    clockEl.textContent = '🕐 ' + timeStr + tzName;
+    var color = styleData.color || '';
+    var size = styleData.fontSize ? styleData.fontSize + 'px' : '';
+    clockEl.style.color = color;
+    clockEl.style.fontSize = size;
+    clockEl.style.display = '';
+}
+
+function _acAnalogSvgTemplate() {
+    return '<svg class="ac-analog" width="52" height="52" viewBox="0 0 100 100">'
+        + '<circle id="ac-face" cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>'
+        + '<line id="ac-hour" x1="50" y1="50" x2="50" y2="28" stroke="#212529" stroke-width="5" stroke-linecap="round"/>'
+        + '<line id="ac-min"  x1="50" y1="50" x2="50" y2="16" stroke="#495057" stroke-width="3" stroke-linecap="round"/>'
+        + '<line id="ac-sec"  x1="50" y1="55" x2="50" y2="12" stroke="#dc3545" stroke-width="1.5" stroke-linecap="round"/>'
+        + '<circle cx="50" cy="50" r="2.5" fill="currentColor"/>'
+        + '</svg>';
+}
+
+function _acUpdateAnalogHands(container, now, tz, styleData) {
+    var displayDate = now;
+    if (tz) {
+        try {
+            var s = now.toLocaleString('en-US', { timeZone: tz });
+            displayDate = new Date(s);
+        } catch(e) {}
+    }
+    var sec = displayDate.getSeconds();
+    var min = displayDate.getMinutes();
+    var hr  = displayDate.getHours() % 12;
+    var sDeg = sec * 6;
+    var mDeg = min * 6 + sec * 0.1;
+    var hDeg = hr * 30 + min * 0.5;
+    var svg = container.querySelector('svg');
+    if (!svg) return;
+    var setRot = function(id, deg) {
+        var el = svg.querySelector('#' + id);
+        if (el) el.setAttribute('transform', 'rotate(' + deg + ',50,50)');
+    };
+    setRot('ac-hour', hDeg);
+    setRot('ac-min',  mDeg);
+    setRot('ac-sec',  sDeg);
+    var face = svg.querySelector('#ac-face');
+    var face_style = styleData.face || 'minimal';
+    if (face) {
+        face.setAttribute('fill', face_style === 'filled' ? 'var(--bg3,#f8f9fa)' : 'none');
+        face.setAttribute('stroke', face_style === 'minimal' ? 'none' : 'currentColor');
+    }
+    var hour = svg.querySelector('#ac-hour'); if (hour && styleData.hourColor) hour.setAttribute('stroke', styleData.hourColor);
+    var minH = svg.querySelector('#ac-min');  if (minH && styleData.minColor)  minH.setAttribute('stroke', styleData.minColor);
+    var secH = svg.querySelector('#ac-sec');  if (secH && styleData.secColor)  secH.setAttribute('stroke', styleData.secColor);
 }
 
 // ============================================================
@@ -1342,13 +1556,33 @@ function initVibePanel() {
         btn.onclick = () => castVibeLocal(emoji);
         container.appendChild(btn);
     });
+    // Clear button — hidden until a vibe is cast
+    const clearBtn = document.createElement('button');
+    clearBtn.id = 'vibeClearBtn';
+    clearBtn.className = 'btn btn-xs btn-outline-secondary ms-1 py-0 px-1 d-none';
+    clearBtn.title = 'Clear vibe';
+    clearBtn.textContent = '✕';
+    clearBtn.onclick = () => { if (_myVibe) castVibeLocal(_myVibe); }; // toggle off
+    container.appendChild(clearBtn);
 }
 
 function castVibeLocal(emoji) {
+    const isDeselect = _myVibe === emoji;
+    if (isDeselect) {
+        _myVibe = null;
+        document.querySelectorAll('.vibe-btn').forEach(b => b.classList.remove('vibe-selected'));
+        connection.invoke('CastVibe', '').catch(e => console.error(e));
+        const clr = document.getElementById('vibeClearBtn');
+        if (clr) clr.classList.add('d-none');
+        return;
+    }
     _myVibe = emoji;
     document.querySelectorAll('.vibe-btn').forEach(b =>
         b.classList.toggle('vibe-selected', b.dataset.vibe === emoji));
     connection.invoke('CastVibe', emoji).catch(e => console.error(e));
+    // Show clear button
+    const clr = document.getElementById('vibeClearBtn');
+    if (clr) clr.classList.remove('d-none');
 
     const btn = document.querySelector('.vibe-btn[data-vibe="' + emoji + '"]');
     if (btn) {
@@ -1377,6 +1611,152 @@ function renderVibeDisplay(counts) {
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     if (total === 0) { summary.textContent = ''; return; }
     summary.textContent = total + ' teammate' + (total !== 1 ? 's' : '') + ' checked in';
+}
+
+// ============================================================
+// P1 — Keyboard Shortcuts
+// ============================================================
+function loadKbSettings() {
+    var v = localStorage.getItem('es_kbShortcuts');
+    _kbShortcutsEnabled = (v === null) ? true : (v === 'true');
+    var el = document.getElementById('kb-shortcuts-toggle');
+    if (el) el.checked = _kbShortcutsEnabled;
+    _updateKeyboardLegend();
+}
+
+function toggleKbShortcuts(enabled) {
+    _kbShortcutsEnabled = enabled;
+    localStorage.setItem('es_kbShortcuts', String(enabled));
+    _updateKeyboardLegend();
+}
+window.toggleKbShortcuts = toggleKbShortcuts;
+
+function _updateKeyboardLegend() {
+    var legend = document.getElementById('keyboard-legend');
+    if (!legend) return;
+    if (!_kbShortcutsEnabled) { legend.style.display = 'none'; return; }
+    var values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
+    var parts = [];
+    values.forEach(function(v, i) {
+        if (i < 9) parts.push('<kbd>' + (i + 1) + '</kbd> ' + escHtml(v));
+    });
+    if (values.includes('☕')) parts.push('<kbd>C</kbd> ☕');
+    if (values.includes('?'))  parts.push('<kbd>Q</kbd> ?');
+    if (values.includes('🚫')) parts.push('<kbd>−</kbd> 🚫');
+    parts.push('<kbd>,/←</kbd> ◄ <kbd>./→</kbd> ►');
+    legend.innerHTML = parts.join(' · ');
+    legend.style.display = '';
+}
+
+function _populateRoomOtherSettings() {
+    var kbEl = document.getElementById('kb-shortcuts-toggle');
+    if (kbEl) kbEl.checked = _kbShortcutsEnabled;
+    var rEnEl = document.getElementById('reaction-enabled-toggle');
+    if (rEnEl) rEnEl.checked = _reactionEnabled;
+    var rPalEl = document.getElementById('reaction-palette-input');
+    if (rPalEl) rPalEl.value = _reactionPalette.join(' ');
+
+    // AC4: populate timer/clock form
+    var showTimerEl = document.getElementById('tc-show-timer');
+    if (showTimerEl) showTimerEl.checked = localStorage.getItem('es_showTimer') !== '0';
+    var showClockEl = document.getElementById('tc-show-clock');
+    if (showClockEl) showClockEl.checked = localStorage.getItem('es_showClock') !== '0';
+    var tzEl = document.getElementById('tc-timezone');
+    if (tzEl) tzEl.value = localStorage.getItem('es_clockTimezone') || '';
+
+    var styleData = {};
+    try { styleData = JSON.parse(localStorage.getItem('es_clockStyle') || '{}'); } catch(e) {}
+    var mode = styleData.mode || 'digital';
+    var modeRadio = document.querySelector('input[name="tc-mode"][value="' + mode + '"]');
+    if (modeRadio) modeRadio.checked = true;
+    _tcToggleMode(mode);
+
+    var colorEl = document.getElementById('tc-color');
+    if (colorEl) colorEl.value = styleData.color || '#6c757d';
+    var fsEl = document.getElementById('tc-font-size');
+    if (fsEl) fsEl.value = styleData.fontSize || 13;
+    var faceEl = document.getElementById('tc-face');
+    if (faceEl) faceEl.value = styleData.face || 'minimal';
+    var hourEl = document.getElementById('tc-hour-color');
+    if (hourEl) hourEl.value = styleData.hourColor || '#212529';
+    var minEl = document.getElementById('tc-min-color');
+    if (minEl) minEl.value = styleData.minColor || '#495057';
+    var secEl = document.getElementById('tc-sec-color');
+    if (secEl) secEl.value = styleData.secColor || '#dc3545';
+}
+window._populateRoomOtherSettings = _populateRoomOtherSettings;
+
+// ============================================================
+// P2 — Emoji Reactions
+// ============================================================
+function loadReactionSettings() {
+    var v = localStorage.getItem('es_reactionEnabled');
+    _reactionEnabled = (v === null) ? true : (v === 'true');
+    try {
+        var p = JSON.parse(localStorage.getItem('es_reactionPalette') || 'null');
+        if (Array.isArray(p) && p.length > 0) _reactionPalette = p.slice(0, 8);
+    } catch(e) {}
+    initReactionPanel();
+}
+
+function saveReactionSettings() {
+    var rEnEl = document.getElementById('reaction-enabled-toggle');
+    if (rEnEl) {
+        _reactionEnabled = rEnEl.checked;
+        localStorage.setItem('es_reactionEnabled', String(_reactionEnabled));
+    }
+    var rPalEl = document.getElementById('reaction-palette-input');
+    if (rPalEl) {
+        var parts = rPalEl.value.split(/\s+/).filter(Boolean).slice(0, 8);
+        _reactionPalette = parts.length > 0 ? parts : [...REACTION_DEFAULT_PALETTE];
+        localStorage.setItem('es_reactionPalette', JSON.stringify(_reactionPalette));
+    }
+    initReactionPanel();
+}
+window.saveReactionSettings = saveReactionSettings;
+
+function initReactionPanel() {
+    var panel = document.getElementById('reactionPanel');
+    if (!panel) return;
+    panel.innerHTML = '';
+    panel.style.display = _reactionEnabled ? '' : 'none';
+    if (!_reactionEnabled) return;
+    _reactionPalette.forEach(function(emoji) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'reaction-btn';
+        btn.title = 'React: ' + emoji;
+        btn.textContent = emoji;
+        btn.onclick = function() { castReaction(emoji); };
+        panel.appendChild(btn);
+    });
+}
+
+async function castReaction(emoji) {
+    var now = Date.now();
+    if (now - _reactionLastMs < REACTION_RATE_LIMIT_MS) return;
+    _reactionLastMs = now;
+    try { await connection.invoke('SendReaction', emoji); } catch(e) { console.error(e); }
+}
+
+function _reactionFloatFromBadge(senderCid, emoji) {
+    var badge = document.querySelector('[data-connection-id="' + senderCid + '"]');
+    var x, y;
+    if (badge) {
+        var r = badge.getBoundingClientRect();
+        x = r.left + r.width / 2 - 16;
+        y = r.top - 10;
+    } else {
+        x = window.innerWidth / 2 - 16;
+        y = window.innerHeight * 0.6;
+    }
+    var floater = document.createElement('div');
+    floater.className = 'reaction-float';
+    floater.textContent = emoji;
+    floater.style.left = x + 'px';
+    floater.style.top  = y + 'px';
+    document.body.appendChild(floater);
+    setTimeout(function() { floater.remove(); }, 1400);
 }
 
 // ============================================================
@@ -1773,8 +2153,13 @@ function testSoundboard() {
     if (!handle) return;
     var dragging = false, startX, startW;
     var panel = document.getElementById('storiesPanel');
-    var MIN_W = 180;
+    var MIN_W = 80, NARROW_THRESHOLD = 160;
     function maxW() { return Math.floor(window.innerWidth * 0.4); }
+    function applyWidth(w) {
+        document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+        var storiesPanel = document.querySelector('.stories-panel');
+        if (storiesPanel) storiesPanel.classList.toggle('narrow', w < NARROW_THRESHOLD);
+    }
     handle.addEventListener('mousedown', function(e) {
         dragging = true; startX = e.clientX; startW = panel.offsetWidth;
         document.body.style.cursor = 'ew-resize'; document.body.style.userSelect = 'none';
@@ -1783,7 +2168,7 @@ function testSoundboard() {
     document.addEventListener('mousemove', function(e) {
         if (!dragging) return;
         var w = Math.max(MIN_W, Math.min(maxW(), startW + (e.clientX - startX)));
-        document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+        applyWidth(w);
     });
     document.addEventListener('mouseup', function() {
         if (!dragging) return;
@@ -1793,7 +2178,7 @@ function testSoundboard() {
         if (w >= MIN_W) localStorage.setItem('es_sidebarWidth', w);
     });
     var saved = parseInt(localStorage.getItem('es_sidebarWidth'));
-    if (saved >= MIN_W) document.documentElement.style.setProperty('--sidebar-width', saved + 'px');
+    if (saved >= MIN_W) applyWidth(saved);
 })();
 
 // ============================================================

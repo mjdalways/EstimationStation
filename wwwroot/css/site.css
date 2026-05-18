@@ -333,11 +333,29 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
+/* Fix #10 — sidebar min-width */
+.stories-panel { min-width: 80px; }
+/* Fix #10 — narrow mode: hide text labels, keep icons */
+.stories-panel.narrow .story-title-text { display: none; }
+.stories-panel.narrow .btn-label-text { display: none; }
+.stories-panel.narrow .story-item-estimate { display: none; }
+
+/* Fix #15 — sidebar drag handle with visual grip */
 #sidebar-resize-handle {
-  position: absolute; right: 0; top: 0; width: 5px; height: 100%;
+  position: absolute; right: 0; top: 0; width: 8px; height: 100%;
   cursor: ew-resize; z-index: 10; background: transparent;
+  display: flex; align-items: center; justify-content: center;
 }
-#sidebar-resize-handle:hover { background: rgba(91,141,238,0.3); }
+#sidebar-resize-handle::after {
+  content: '⋮';
+  font-size: 14px;
+  color: var(--panel-border, #dee2e6);
+  opacity: 0.4;
+  pointer-events: none;
+  line-height: 1;
+}
+#sidebar-resize-handle:hover { background: rgba(91,141,238,0.12); }
+#sidebar-resize-handle:hover::after { opacity: 1; color: var(--accent, #5b8dee); }
 
 .panel-header {
   padding: 0.75rem 1rem;
@@ -374,7 +392,8 @@ h1, h2, h3, h4, h5, h6 {
 .story-item.active { background-color: var(--story-active); border-color: var(--accent); }
 .story-item.completed { background-color: var(--story-completed); opacity: 0.75; }
 
-.story-text { overflow: hidden; min-width: 0; }
+.story-text { overflow: hidden; min-width: 0; flex: 1 1 0; }
+.story-row-main { overflow: hidden; }
 .story-item-title {
   display: block;
   font-size: 0.875rem;
@@ -395,6 +414,8 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   gap: 0.25rem;
   flex-shrink: 0;
+  margin-left: auto;
+  align-self: flex-start;
 }
 
 .jira-key-badge {
@@ -1446,6 +1467,94 @@ h1, h2, h3, h4, h5, h6 {
     z-index:9997; animation:vibe-float 0.9s ease-out forwards;
 }
 
+/* AC — Session Timer & Clock bar */
+.session-tc-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 8px;
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: var(--text-secondary, #6c757d);
+    background: var(--bg2, #f8f9fa);
+    border: 1px solid var(--panel-border, #dee2e6);
+    border-radius: 6px;
+    user-select: none;
+}
+.stc-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-variant-numeric: tabular-nums;
+}
+.stc-sep {
+    opacity: 0.4;
+    font-size: 0.7rem;
+}
+.ac-analog {
+    display: inline-block;
+    vertical-align: middle;
+    color: var(--text, #212529);
+}
+
+/* P1 — Keyboard legend */
+.keyboard-legend {
+    margin-top: 6px;
+    font-size: 0.72rem;
+    color: var(--text-secondary, #6c757d);
+    line-height: 1.8;
+    user-select: none;
+}
+.keyboard-legend kbd {
+    display: inline-block;
+    padding: 1px 4px;
+    font-size: 0.68rem;
+    font-family: var(--bs-font-monospace, monospace);
+    color: var(--text, #212529);
+    background: var(--bg2, #f8f9fa);
+    border: 1px solid var(--border, #dee2e6);
+    border-radius: 3px;
+    box-shadow: 0 1px 0 var(--border, #dee2e6);
+    line-height: 1.4;
+}
+
+/* P2 — Emoji Reaction panel */
+.reaction-panel {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding: 4px 6px;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--panel-border, #dee2e6);
+    border-radius: 8px;
+}
+.reaction-btn {
+    font-size: 1.3rem;
+    line-height: 1;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 4px;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.1s;
+}
+.reaction-btn:hover { transform: scale(1.2); border-color: var(--panel-border, #dee2e6); }
+.reaction-btn:active { transform: scale(0.9); }
+
+@keyframes reaction-float {
+    0%   { opacity:1; transform:translateY(0) scale(1); }
+    60%  { opacity:1; transform:translateY(-40px) scale(1.5); }
+    100% { opacity:0; transform:translateY(-80px) scale(1.2); }
+}
+.reaction-float {
+    position: fixed;
+    pointer-events: none;
+    font-size: 2rem;
+    z-index: 9998;
+    animation: reaction-float 1.4s ease-out forwards;
+}
+
 /* Speed badges */
 .speed-badge { font-size:0.9rem; margin-left:4px; vertical-align:middle; }
 
@@ -1604,13 +1713,34 @@ body.presentation-mode #currentStoryDisplay {
 .story-notes-preview { font-size: 0.72rem; color: var(--text-secondary, #888); padding: 2px 0 0;
     opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 
-/* U5 — collapsible settings sections */
+/* Fix #8 — collapsible settings sections: accent-color styling + animated chevron */
 .settings-section-header {
-  cursor: pointer; padding: 6px 10px; background: var(--bg3, rgba(255,255,255,0.06));
-  border-radius: 7px; margin: 10px 0 4px; display: flex; align-items: center;
-  font-weight: 600; font-size: 0.88rem; user-select: none; }
-.settings-section-header:hover { background: var(--bg2, rgba(255,255,255,0.1)); }
+  cursor: pointer;
+  padding: 0.45rem 0.75rem;
+  background: color-mix(in srgb, var(--accent, #5b8dee) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #5b8dee) 25%, transparent);
+  border-radius: 6px;
+  margin: 10px 0 4px;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--accent, #5b8dee);
+  user-select: none;
+}
+.settings-section-header:hover {
+  background: color-mix(in srgb, var(--accent, #5b8dee) 18%, transparent);
+}
+/* Animate the ▾ character via last-char trick: rotate the entire span when collapsed */
+.settings-section-header span[data-bs-toggle="collapse"] { transition: none; }
+.settings-section-header span[data-bs-toggle="collapse"].collapsed { opacity: 0.75; }
 .just-changed { outline: 2px solid var(--accent, #5b8dee); outline-offset: 4px; transition: outline 0.5s; }
+/* Fix #6 — search result highlight */
+mark.search-highlight { background: #fff176; color: inherit; border-radius: 2px; padding: 0 1px; }
+[data-theme="dark"] mark.search-highlight, [data-theme="forest"] mark.search-highlight { background: #b8860b; color: #fff; }
+/* Fix #5 — card back flip preview animation */
+@keyframes flip-preview { 0%{transform:rotateY(0)} 50%{transform:rotateY(90deg)} 100%{transform:rotateY(0)} }
+.flip-preview { animation: flip-preview 0.6s ease-in-out; }
 .story-notes-area { padding: 4px 0 2px; }
 .story-notes-area textarea { font-size: 0.78rem; resize: vertical; min-height: 56px; }
 .story-note-btn { line-height: 1; }

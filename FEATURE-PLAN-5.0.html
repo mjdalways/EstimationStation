@@ -166,8 +166,9 @@
   <a href="#group-y">Y — Card Back Redesign</a>
   <a href="#group-z">Z — Settings Quality</a>
   <a href="#group-aa">AA — Seasons Polish</a>
+  <a href="#group-fx">FX — Bug Fixes &amp; UX Polish ✅</a>
   <a href="#group-o">O — Card &amp; UI Custom (carry)</a>
-  <a href="#group-p">P — Keyboard &amp; Reactions (carry)</a>
+  <a href="#group-p">P — Keyboard &amp; Reactions ✅</a>
   <a href="#group-q">Q — Sound &amp; Notifications (carry)</a>
   <a href="#group-c">C — Sprint Dashboard (carry)</a>
   <a href="#group-f">F — Room PIN (carry)</a>
@@ -176,7 +177,7 @@
   <a href="#group-ab">AB — Image Upload Crop</a>
   <a href="#group-j">J — Mobile Experience (carry)</a>
   <a href="#group-k">K — Room Persistence (carry)</a>
-  <a href="#group-ac">AC — Timer &amp; Clock</a>
+  <a href="#group-ac">AC — Timer &amp; Clock ✅</a>
   <div class="nav-section">Archive</div>
   <a href="#done">✅ v4.0 Completed</a>
   <a href="#archive">Won't Do / Deferred</a>
@@ -722,6 +723,113 @@
   </ul>
 </div>
 
+<div class="group-card" id="group-fx">
+  <h3>Group FX — 🛠️ Bug Fixes &amp; UX Polish <span class="done-tag">✅ All Done</span> <span class="new-tag">new</span></h3>
+  <span class="tag">Medium</span><span class="tag">seasonal.js · room.js · site.js · emoji-picker.js · _Layout.cshtml · site.css · seasonal.css</span>
+
+  <h4 style="margin-top:14px;">FX1 — Season next-occurrence dates: variable seasons + smart suppression <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Added lookup tables and formulas for variable-date seasons (Lunar New Year, Diwali, Ramadan, Mother's Day, Father's Day, Mothering Sunday, Easter, Memorial Day, Labour Day)</li>
+    <li>Next-date only injected if it differs from already-displayed range text; omitted for broad active ranges</li>
+  </ul>
+
+  <h4>FX2 — Promote remaining custom animations to typed META entries + test buttons everywhere <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Promoted popup-type: Ghost Jumpscare, Skull Float, Hand From Grave, Snowflake Spin, Gift Drop, Top Hat Float, Fireworks Emoji, Ice Cream Drip, Acorn Drop, Pilgrim Hat Float</li>
+    <li>Promoted corner-type: Sun Peek, Harvest Moon, Cider Mug</li>
+    <li>Introduced <code>type:'alias'</code>: Deep Winter Snow → Snowfall, Hanami Blossoms → Cherry Blossom, Thanksgiving Leaves → Leaves Swirl, Summer Sun → Sun Peek, Shark Swim → Shark Fin, Winter Snowfall → Snowfall</li>
+    <li>🧪 test button now rendered for <em>all</em> animation types (runner, popup, corner, particles, custom, alias)</li>
+  </ul>
+
+  <h4>FX3 — Visual tab: preview cards use real <code>.poker-card</code> HTML <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Replaced simplified placeholder divs in the Visual tab live preview with actual <code>.poker-card</code> and <code>.poker-card.selected</code> divs — theme and colour changes now reflect accurately</li>
+  </ul>
+
+  <h4>FX4 — Events tab: section headers collapse correctly + accent styling <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Audited all Events tab section headers — Bootstrap collapse IDs and targets aligned</li>
+    <li>Section headers now use accent-tinted background via <code>color-mix()</code>, animated chevron indicator</li>
+  </ul>
+
+  <h4>FX5 — Card Backs moved to Visual tab with front/back preview + flip test <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Participant Card Backs section cut from Theme tab, added to bottom of Visual tab</li>
+    <li>Mini preview shows front card (5) ⇌ back card side-by-side with live design applied</li>
+    <li>🔄 Flip button triggers CSS flip animation to preview the reveal effect</li>
+  </ul>
+
+  <h4>FX6 — Settings search: matched text highlighted with <code>&lt;mark&gt;</code> <span class="done-tag">✅</span></h4>
+  <ul>
+    <li><code>_applySearchHighlights()</code> walks text nodes (skipping inputs/buttons) and wraps matches in <code>&lt;mark class="search-highlight"&gt;</code></li>
+    <li>Highlights are removed on clear or next search via <code>_removeSearchHighlights()</code></li>
+    <li>Dark/forest themes get a gold highlight; light themes get <code>#fff176</code></li>
+  </ul>
+
+  <h4>FX7 — Search input moved into global settings bar <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Search input (🔍) now lives inside the global controls bar row alongside Export/Import — cleaner layout, one less row</li>
+  </ul>
+
+  <h4>FX8 — Collapsible section headers: accent colour + better styling <span class="done-tag">✅</span></h4>
+  <ul>
+    <li><code>.settings-section-header</code> now has accent-tinted background (<code>color-mix</code>), border, flex layout, and <code>font-weight:700</code> in accent colour</li>
+    <li>Hover state deepens the tint; collapse state reduces opacity on the chevron character</li>
+  </ul>
+
+  <h4>FX9 — Story note icons no longer pushed off-screen by long note previews <span class="done-tag">✅</span></h4>
+  <ul>
+    <li><code>.story-text</code> gets <code>min-width:0; overflow:hidden; flex:1 1 0</code> so long note previews are clipped</li>
+    <li><code>.story-item-actions</code> pinned right with <code>flex-shrink:0; margin-left:auto</code></li>
+  </ul>
+
+  <h4>FX10 — Sidebar at minimum width keeps icons visible <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Hard min clamped to 80 px; below 160 px the panel gains a <code>narrow</code> class that hides text labels, story estimates</li>
+    <li><code>.narrow .story-title-text</code>, <code>.narrow .btn-label-text</code>, <code>.narrow .story-item-estimate</code> hidden via CSS</li>
+  </ul>
+
+  <h4>FX11 — Star Wars crawl: configurable text + colour <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>META gains <code>crawlText</code> and <code>crawlColor</code> fields; config modal shows a textarea + colour picker for Star Wars crawl</li>
+    <li>Hardcoded <code>color: #ffe81f</code> removed from <code>.sw-crawl-text</code> in seasonal.css; colour applied inline from config</li>
+  </ul>
+
+  <h4>FX12 — Emoji picker: new categories + expanded existing <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Added four new categories: Food &amp; Drink (30), Travel (25), Activities &amp; Sports (26), Flags (6)</li>
+    <li>Expanded Smileys (+19), Symbols (+18), Shapes (+10), Nature (+15), Animals (+17), Objects (+14)</li>
+  </ul>
+
+  <h4>FX13 — AA1 status bar not appearing (Bootstrap <code>d-none</code> bug) <span class="done-tag">✅</span></h4>
+  <ul>
+    <li><code>bar.style.display = ''</code> fails against Bootstrap's <code>!important</code> on <code>d-none</code>; fixed with <code>classList.remove/add('d-none')</code></li>
+  </ul>
+
+  <h4>FX14 — Card navigation: arrow keys + comma/period <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>← / , selects previous card; → / . selects next card</li>
+    <li>Guard: no-op in observer/ghost mode; wraps within card list bounds</li>
+  </ul>
+
+  <h4>FX15 — Sidebar resize handle: visual drag hint (⋮) <span class="done-tag">✅</span></h4>
+  <ul>
+    <li><code>#sidebar-resize-handle::after</code> shows ⋮ grip dots; faint at rest, accent-coloured on hover</li>
+    <li>Handle widened from 5 px to 8 px for easier grabbing</li>
+  </ul>
+
+  <h4>FX16 — Vibe check: double-click deselect + Clear (✕) button <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Clicking the active vibe again deselects it (toggle behaviour); broadcasts empty CastVibe to server</li>
+    <li>✕ Clear button appears when a vibe is active, hidden when none selected</li>
+  </ul>
+
+  <h4>FX17 — Test buttons missing for non-runner animation types <span class="done-tag">✅</span></h4>
+  <ul>
+    <li>Shared <code>testBtn</code> HTML string now included in every type branch of <code>_seaBuildAnimRow()</code></li>
+  </ul>
+</div>
+
 <hr>
 
 <!-- ═══════════ CARRY-OVER GROUPS ═══════════ -->
@@ -744,11 +852,25 @@
 </div>
 
 <div class="group-card" id="group-p">
-  <h3>Group P — ⌨️ Keyboard Voting + Emoji Reactions <span class="carry-tag">carry-over</span></h3>
-  <span class="tag">Medium</span><span class="tag">room.js · Index.cshtml · PokerHub.cs · _Layout.cshtml · site.css</span>
+  <h3>Group P — ⌨️ Keyboard Voting + Emoji Reactions <span class="carry-tag">carry-over</span> <span class="done-tag">✅ All Done</span></h3>
+  <span class="tag">Medium</span><span class="tag">room.js · Views/Room/Index.cshtml · PokerHub.cs · _Layout.cshtml · site.js · site.css</span>
+
+  <h4 style="margin-top:14px;">P1 — Keyboard Voting: extra keys + shortcut legend <span class="done-tag">✅</span></h4>
   <ul>
-    <li><b>P1</b> — Keyboard Voting: digit keys 1–9/0/-, special C→☕, Q→?, dynamic shortcut legend below card row, toggle in Appearance</li>
-    <li><b>P2</b> — Emoji Reactions: broadcast <code>SendReaction(emoji)</code> hub method, float-up animation from sender's badge, customisable palette up to 8 emojis, rate-limit 1 per 2s</li>
+    <li>Digit keys <kbd>1</kbd>–<kbd>9</kbd> select nth card (already existed); <kbd>0</kbd>/<kbd>C</kbd> → ☕; <kbd>Q</kbd> → ?; <kbd>−</kbd> → skip vote (🚫 when enabled)</li>
+    <li>All digit/special shortcuts respect a <code>_kbShortcutsEnabled</code> flag; navigation keys (arrows/comma/period) always active</li>
+    <li>Dynamic shortcut legend rendered below <code>#cardContainer</code>; refreshed on every <code>renderCards()</code> call</li>
+    <li>Toggle "Show shortcut legend" in Other → Keyboard Shortcuts; persisted in <code>es_kbShortcuts</code></li>
+    <li>Reference cheatsheet in the settings section covers all shortcuts (reveal, reset, fullscreen, etc.)</li>
+  </ul>
+
+  <h4>P2 — Emoji Reactions: float-up broadcast <span class="done-tag">✅</span></h4>
+  <ul>
+    <li><code>SendReaction(string emoji)</code> hub method added to <code>PokerHub.cs</code> — relays <code>ReceiveReaction(senderCid, emoji)</code> to room; no server-side state</li>
+    <li>Reaction bar (up to 8 emoji buttons) shown below voting cards; client rate-limit 1 per 2s</li>
+    <li>On receive, emoji floats up from the sender's participant badge (<code>[data-connection-id]</code>) with CSS keyframe animation; falls back to screen centre if badge not found</li>
+    <li>Palette (space-separated emoji) configurable in Other → Emoji Reactions; toggled on/off; saved to <code>es_reactionEnabled</code> + <code>es_reactionPalette</code></li>
+    <li>Emoji picker (😊) auto-attaches to the palette input via <code>data-picker-target</code></li>
   </ul>
 </div>
 
@@ -851,42 +973,36 @@
 </div>
 
 <div class="group-card" id="group-ac">
-  <h3>Group AC — ⏱️ Timer &amp; Clock <span class="new-tag">new</span></h3>
-  <span class="tag">Medium</span><span class="tag">wwwroot/js/room.js · wwwroot/js/site.js · wwwroot/css/site.css · Views/Shared/_Layout.cshtml</span>
+  <h3>Group AC — ⏱️ Timer &amp; Clock ✅ All Done <span class="new-tag">new</span></h3>
+  <span class="tag">Medium</span><span class="tag">wwwroot/js/room.js · wwwroot/css/site.css</span>
 
-  <h4 style="margin-top:14px;">AC1 — Count-Up Timer</h4>
+  <h4 style="margin-top:14px;">AC1 — Count-Up Timer ✅</h4>
   <ul>
-    <li>Starts automatically when a player joins or a new story becomes active</li>
-    <li>Resets to 0:00 each time the active story changes (new story selected or current story completed)</li>
-    <li>Displayed in the room UI near the story title or vote area; compact format mm:ss</li>
-    <li>Pauses when no story is active; resumes on next story</li>
-    <li>Timer state is local (client-side only) — no server sync needed</li>
+    <li>✅ <code>acStartStoryTimer(storyId)</code> wired to <code>CurrentStoryChanged</code> SignalR handler — resets and restarts timer each story change</li>
+    <li>✅ Compact <code>⏱ mm:ss</code> display in <code>#stc-timer</code> inside <code>#session-tc-bar</code> above stats bar</li>
+    <li>✅ Hidden when no story is active; pauses gracefully</li>
   </ul>
 
-  <h4>AC2 — Live Clock with Timezone Support</h4>
+  <h4>AC2 — Live Clock with Timezone Support ✅</h4>
   <ul>
-    <li>Shows current time alongside (or near) the count-up timer</li>
-    <li>Default: browser local time (<code>new Date()</code>)</li>
-    <li>User can select a display timezone from a dropdown (IANA timezone list, e.g. "America/New_York", "Europe/London"); saved in <code>localStorage</code> as <code>es_clockTimezone</code></li>
-    <li>User profile timezone: if a timezone is set it applies as the default for that user across rooms</li>
-    <li>Timezone offset label shown next to time (e.g. "14:32 EST")</li>
+    <li>✅ One persistent <code>setInterval(_acTick, 1000)</code> drives both timer and clock</li>
+    <li>✅ Digital mode: <code>🕐 HH:MM TZ</code> with IANA timezone selector (<code>es_clockTimezone</code>)</li>
+    <li>✅ Analog mode: SVG clock with rotating hour/minute/second hands (<code>_acUpdateAnalogHands</code>)</li>
   </ul>
 
-  <h4>AC3 — Enable/Disable in Settings</h4>
+  <h4>AC3 — Enable/Disable in Settings ✅</h4>
   <ul>
-    <li>Two independent toggles in the "Other" settings tab (or a new "Timer" sub-section):</li>
-    <li><strong>Show Count-Up Timer</strong> — <code>es_showTimer</code> boolean; default on</li>
-    <li><strong>Show Clock</strong> — <code>es_showClock</code> boolean; default on</li>
-    <li>When both are off the widget area collapses to zero height</li>
+    <li>✅ <code>saveTimerClockSettings()</code> reads Other tab form fields and persists to <code>es_showTimer</code>, <code>es_showClock</code>, <code>es_clockTimezone</code>, <code>es_clockStyle</code></li>
+    <li>✅ <code>_tcToggleMode(mode)</code> shows/hides <code>#tc-digital-opts</code> / <code>#tc-analog-opts</code> panels</li>
+    <li>✅ Both are off → bar collapses (<code>style.display='none'</code>)</li>
   </ul>
 
-  <h4>AC4 — Clock Display Customization</h4>
+  <h4>AC4 — Clock Display Customization ✅</h4>
   <ul>
-    <li><strong>Mode:</strong> Digital (text) or Analog (SVG canvas); toggle in settings</li>
-    <li><strong>Digital options:</strong> font family (System / Monospace / Serif / custom Google Font name), font size slider, color picker for clock text</li>
-    <li><strong>Analog options:</strong> face style (minimal / classic / filled); hour hand color, minute hand color, second hand color (color pickers); face background color / transparent; optional tick marks toggle</li>
-    <li>All customization persisted in <code>localStorage</code> under <code>es_clockStyle</code> object</li>
-    <li>Live preview in settings panel (small 80px analog or sample digital string that updates in real time as sliders/pickers change)</li>
+    <li>✅ Digital: color picker + font-size number input → stored in <code>es_clockStyle</code> JSON</li>
+    <li>✅ Analog: face style (minimal/classic/filled), hour/min/sec hand color pickers</li>
+    <li>✅ Form fields populated by <code>_populateRoomOtherSettings()</code> when settings modal opens</li>
+    <li>✅ CSS: <code>.session-tc-bar</code>, <code>.stc-segment</code>, <code>.stc-sep</code>, <code>.ac-analog</code> added to site.css</li>
   </ul>
 </div>
 
@@ -909,6 +1025,9 @@
     <tr><td><b>W</b></td><td>👁️ Visual Settings Tab — new tab between Theme and Events; live preview (participant badge + vote card); card font size slider moved here; compact mode toggle with before/after preview; confidence prompt toggle (W4) gates <code>confidenceSelector</code> display in room.js.</td></tr>
     <tr><td><b>Z</b></td><td>⚙️ Settings Quality — global controls bar (🔇 All Off / ✨ All On / ↩ Reset All / 📤 Export / 📥 Import); per-tab bulk ✓ All / ✗ None / ↩ Reset on Events, Audio, Seasons, Visual; real-time settings search with tab-match badge chips; Audio tab sections (Ambient, Timer, Soundboard, Voice) now collapsible (N4); sound preference modal on room join with 4 options All/Local/Broadcast/None (N5 upgraded from banner).</td></tr>
     <tr><td><b>AA</b></td><td>🌸 Seasons Polish — 20+ custom animations promoted to fully configurable runners with motionStyle dropdown (none/wave/bounce/hop/spin/run/wobble/zigzag); sea-zigzag CSS keyframe; Star Wars crawl animation; active season status bar; next-occurrence dates; per-animation 🧪 test buttons; frequency sliders (min/max seconds); Export/Import config as JSON; emoji picker wired to all season config emoji inputs. AA4 (image upload) and AA9 (custom season builder) deferred to Group AB.</td></tr>
+    <tr><td><b>AC</b></td><td>⏱️ Timer &amp; Clock — AC1: <code>acStartStoryTimer</code> wired to <code>CurrentStoryChanged</code>, compact <code>⏱ mm:ss</code> in <code>#session-tc-bar</code>; AC2: persistent <code>setInterval(_acTick, 1000)</code> drives both timer + clock; digital (<code>🕐 HH:MM TZ</code>) and analog SVG modes; AC3: <code>saveTimerClockSettings()</code> + <code>_tcToggleMode()</code> wired from Other tab form; AC4: color/font-size/face/hand-color pickers, form populated on modal open; <code>.session-tc-bar / .stc-segment / .stc-sep / .ac-analog</code> CSS added.</td></tr>
+    <tr><td><b>P</b></td><td>⌨️ Keyboard Voting + Emoji Reactions — P1: <kbd>1</kbd>–<kbd>9</kbd> nth card, <kbd>C</kbd> ☕, <kbd>Q</kbd> ?, <kbd>−</kbd> skip vote, dynamic shortcut legend below card row, toggle in Other tab, <code>es_kbShortcuts</code>. P2: <code>SendReaction</code>/<code>ReceiveReaction</code> hub relay; emoji reaction bar (up to 8, configurable, emoji picker attached); reaction floats up from sender badge; 2s client-side rate limit; <code>es_reactionEnabled</code> + <code>es_reactionPalette</code>.</td></tr>
+    <tr><td><b>FX</b></td><td>🛠️ Bug Fixes &amp; UX Polish — variable season next-dates (Lunar New Year, Diwali, Easter, etc.); popup/corner/alias META promotions for 15+ animations; 🧪 test buttons on all animation types; Visual tab preview uses real <code>.poker-card</code> HTML; Card Backs section moved to Visual tab with flip test; settings search highlights matched text in yellow; search input merged into global controls bar; accent-tinted section headers with collapse chevron; story note icons pinned right; sidebar narrow mode (80 px min); sidebar resize handle ⋮ grip; Star Wars crawl text + colour configurable; emoji picker expanded with Food/Travel/Activities/Flags categories; <code>d-none</code> status bar bug fixed; arrow/comma/period card navigation; vibe deselect toggle + ✕ clear button.</td></tr>
     <tr><td><b>V</b></td><td>↔️ Sidebar Resize — drag handle on right edge of Stories panel; CSS variable <code>--sidebar-width</code>; min 180 px, max 40% viewport; persisted to localStorage. Story title tooltips fire when text overflows narrow sidebar.</td></tr>
     <tr><td><b>S</b></td><td>🧪 Test Polish — decider wheel standalone test; floor is lava test button added (stop toggle partial — see T4)</td></tr>
     <tr><td><b>N1</b></td><td>🗂️ Audio Tab — all sound settings moved from Events to dedicated Audio tab</td></tr>
