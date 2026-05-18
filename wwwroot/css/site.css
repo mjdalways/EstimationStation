@@ -1467,6 +1467,25 @@ h1, h2, h3, h4, h5, h6 {
     z-index:9997; animation:vibe-float 0.9s ease-out forwards;
 }
 
+/* X1 — Flip on vote: reuses poker-flip keyframe (already defined) */
+/* X2 — Change vote hint overlay on local user's voted badge */
+.show-change-hint .participant-badge.voted.me { cursor: pointer; }
+.show-change-hint .participant-badge.voted.me:not(.chicken-overlay):hover::after {
+    content: '↩ Change';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 2;
+}
+
 /* AC — Session Timer & Clock bar */
 .session-tc-bar {
     display: flex;
@@ -1675,6 +1694,55 @@ body.card-back-seasonal.season-autumn .participant-badge.voted {
 body.card-back-seasonal.season-autumn .participant-badge.voted .participant-name { color: rgba(255,235,215,0.92); }
 body.card-back-seasonal.season-autumn .participant-badge.voted .vote-hidden,
 body.card-back-seasonal.season-autumn .participant-badge.voted .vote-waiting { color: rgba(255,210,170,0.5); }
+
+/* Y2 — Solid color */
+body.card-back-solid .participant-badge.voted {
+    background: var(--cb-solid, #6366f1);
+    border-color: color-mix(in srgb, var(--cb-solid, #6366f1) 60%, #000) !important;
+    box-shadow: inset 0 1px 3px rgba(255,255,255,0.15);
+}
+body.card-back-solid .participant-badge.voted .participant-name { color: rgba(255,255,255,0.9); }
+body.card-back-solid .participant-badge.voted .vote-hidden,
+body.card-back-solid .participant-badge.voted .vote-waiting { color: rgba(255,255,255,0.4); }
+
+/* Y2 — Gradient */
+body.card-back-gradient .participant-badge.voted {
+    background: linear-gradient(var(--cb-grad-dir, 135deg), var(--cb-grad-a, #6366f1), var(--cb-grad-b, #ec4899));
+    border-color: color-mix(in srgb, var(--cb-grad-a, #6366f1) 50%, var(--cb-grad-b, #ec4899)) !important;
+    box-shadow: inset 0 1px 3px rgba(255,255,255,0.15);
+}
+body.card-back-gradient .participant-badge.voted .participant-name { color: rgba(255,255,255,0.92); }
+body.card-back-gradient .participant-badge.voted .vote-hidden,
+body.card-back-gradient .participant-badge.voted .vote-waiting { color: rgba(255,255,255,0.35); }
+
+/* Y2 — Checkerboard */
+body.card-back-checker .participant-badge.voted {
+    background-image: repeating-conic-gradient(#aaa 0% 25%, var(--bg, #fff) 0% 50%);
+    background-size: 14px 14px;
+    border-color: #888 !important;
+}
+
+/* Y2 — Diagonal stripes */
+body.card-back-stripes .participant-badge.voted {
+    background: repeating-linear-gradient(
+        -45deg,
+        var(--accent, #5b8dee) 0px, var(--accent, #5b8dee) 5px,
+        var(--bg2, #f8f9fa) 5px, var(--bg2, #f8f9fa) 13px
+    );
+    border-color: var(--accent, #5b8dee) !important;
+}
+
+/* Y3 — Custom image */
+body.card-back-customimage .participant-badge.voted {
+    background-image: var(--cb-custom-img, none);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-color: #888 !important;
+}
+body.card-back-customimage .participant-badge.voted .participant-name { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+body.card-back-customimage .participant-badge.voted .vote-hidden,
+body.card-back-customimage .participant-badge.voted .vote-waiting { color: rgba(255,255,255,0.35); }
 
 /* ── Presentation Mode ── */
 body.presentation-mode #mainNav { display: none !important; }

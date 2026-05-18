@@ -523,6 +523,24 @@
                             </div>
                         </div>
 
+                        <!-- X1/X2: Vote animation toggles -->
+                        <hr class="my-2">
+                        <div class="mb-1 fw-bold small">🃏 Voting Animations</div>
+                        <div class="mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="flip-on-vote-toggle" checked
+                                       onchange="localStorage.setItem('es_flipOnVote', this.checked ? '1' : '0')" />
+                                <label class="form-check-label small" for="flip-on-vote-toggle">Flip your badge when casting a vote</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="change-vote-hint-toggle" checked
+                                       onchange="localStorage.setItem('es_changeVoteHint', this.checked ? '1' : '0'); document.body.classList.toggle('show-change-hint', this.checked)" />
+                                <label class="form-check-label small" for="change-vote-hint-toggle">Show ↩ Change hint on your badge when you hover it after voting</label>
+                            </div>
+                        </div>
+
                         <!-- Card Back Design -->
                         <hr class="my-2">
                         <div class="mb-1 fw-bold small">🃏 Participant Card Backs</div>
@@ -535,7 +553,41 @@
                                     <option value="space">🌌 Deep Space</option>
                                     <option value="retro">🃏 Retro Diamonds</option>
                                     <option value="seasonal">🍂 Seasonal</option>
+                                    <option value="checker">⬛ Checkerboard</option>
+                                    <option value="stripes">↗ Diagonal Stripes</option>
+                                    <option value="solid">🎨 Solid Color</option>
+                                    <option value="gradient">🌈 Gradient</option>
+                                    <option value="customimage">🖼️ Custom Image</option>
                                 </select>
+                                <!-- Y2: solid color picker -->
+                                <div id="cb-solid-opts" class="mt-2 d-flex align-items-center gap-2 small" style="display:none!important;">
+                                    <label class="mb-0">Color</label>
+                                    <input type="color" id="cb-solid-color" value="#6366f1"
+                                           oninput="setCbSolidColor(this.value)"
+                                           style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;" />
+                                </div>
+                                <!-- Y2: gradient pickers -->
+                                <div id="cb-gradient-opts" class="mt-2 d-flex flex-wrap align-items-center gap-2 small" style="display:none!important;">
+                                    <label class="mb-0">From</label>
+                                    <input type="color" id="cb-grad-a" value="#6366f1" oninput="applyCbGradient()"
+                                           style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;" />
+                                    <label class="mb-0">To</label>
+                                    <input type="color" id="cb-grad-b" value="#ec4899" oninput="applyCbGradient()"
+                                           style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;" />
+                                    <select id="cb-grad-dir" class="form-select form-select-sm d-inline-block" style="width:120px;" onchange="applyCbGradient()">
+                                        <option value="135deg">↘ Diagonal</option>
+                                        <option value="180deg">↓ Vertical</option>
+                                        <option value="90deg">→ Horizontal</option>
+                                        <option value="45deg">↗ Anti-diag</option>
+                                    </select>
+                                </div>
+                                <!-- Y3: image import -->
+                                <div id="cb-image-opts" class="mt-2 small" style="display:none!important;">
+                                    <input type="file" id="cb-image-file" class="form-control form-control-sm mb-1"
+                                           accept="image/*" onchange="handleCardBackImage(this)" />
+                                    <button class="btn btn-outline-secondary btn-sm py-0" onclick="clearCardBackImage()">✕ Clear image</button>
+                                    <div class="text-muted mt-1" style="font-size:0.68rem;">Max 200 KB. Centered and cropped automatically.</div>
+                                </div>
                                 <p class="text-muted mt-1 mb-0" style="font-size:0.72rem;">Voted badges show this design until votes are revealed.</p>
                             </div>
                             <div>
@@ -648,11 +700,19 @@
                             </div>
                             <div id="cel-reveal-particles-sub" class="ms-4 mt-1 mb-2 d-flex flex-wrap gap-3 align-items-center small">
                                 <label for="cel-reveal-particle-type" class="mb-0">Shape</label>
-                                <select class="form-select form-select-sm d-inline-block" id="cel-reveal-particle-type" style="width:90px;">
+                                <select class="form-select form-select-sm d-inline-block" id="cel-reveal-particle-type" style="width:120px;"
+                                        onchange="document.getElementById('cel-particle-emoji-wrap').style.display=this.value==='emoji'?'':'none'">
                                     <option value="star">⭐ Star</option>
                                     <option value="circle">● Circle</option>
                                     <option value="square">■ Square</option>
+                                    <option value="mixed">🎲 Mixed</option>
+                                    <option value="emoji">😊 Custom emoji</option>
                                 </select>
+                                <div id="cel-particle-emoji-wrap" style="display:none;">
+                                    <input type="text" id="cel-particle-emoji" class="form-control form-control-sm text-center"
+                                           style="width:54px;font-size:1.2rem;" maxlength="4" placeholder="🎉"
+                                           data-picker-target title="Pick an emoji for confetti particles" />
+                                </div>
                                 <label for="cel-reveal-particle-count" class="mb-0">Count</label>
                                 <input type="number" class="form-control form-control-sm d-inline-block" id="cel-reveal-particle-count" min="1" max="99" value="8" style="width:60px;" />
                             </div>
@@ -1207,6 +1267,36 @@
                             </div>
                         </div>
 
+                        <!-- Q1: Vote Cast Tick (collapsible) -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-2">
+                            <span class="flex-grow-1 d-flex align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#sec-audio-votetick">
+                                <h6 class="text-muted mb-0 me-auto">🖱️ Vote Interaction</h6>
+                            </span>
+                        </div>
+                        <div class="collapse show" id="sec-audio-votetick">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="vote-tick-enabled"
+                                       onchange="localStorage.setItem('es_voteTick',this.checked?'1':'0')">
+                                <label class="form-check-label small" for="vote-tick-enabled">Play a soft tick when casting a vote</label>
+                            </div>
+                            <p class="text-muted small mb-3">A brief 440 Hz sine tone on each vote cast. Very subtle.</p>
+                        </div>
+
+                        <!-- Q2: Desktop Notification on Reveal (collapsible) -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-2">
+                            <span class="flex-grow-1 d-flex align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#sec-audio-desktopnotify">
+                                <h6 class="text-muted mb-0 me-auto">🔔 Desktop Notifications</h6>
+                            </span>
+                        </div>
+                        <div class="collapse show" id="sec-audio-desktopnotify">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" id="desktop-notify-enabled"
+                                       onchange="localStorage.setItem('es_desktopNotify',this.checked?'1':'0');_qRequestNotifyPermission(this.checked)">
+                                <label class="form-check-label small" for="desktop-notify-enabled">Notify me when votes are revealed (background tab)</label>
+                            </div>
+                            <p class="text-muted small mb-3">Fires a browser notification when you're in another tab and votes are revealed. Requires notification permission. Works in Chrome/Edge/Firefox.</p>
+                        </div>
+
                     </div><!-- end tab-audio -->
 
                     <!-- ══════════════════════════════════════════
@@ -1337,6 +1427,26 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/18/2026 (68)</strong></p>
+                        <ul class="mb-2">
+                            <li>🃏 Card Back Designs — five new styles for face-down participant badges: Checkerboard, Diagonal Stripes, Solid Color (choose any colour), Gradient (pick two colours and direction), and Custom Image (upload any image up to 200 KB). Configure in Visual → Participant Card Backs.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (67)</strong></p>
+                        <ul class="mb-2">
+                            <li>🃏 Voting Animations — X1: your participant badge now flips (poker-style) the instant you cast a vote; X2: hovering your own badge after voting shows a subtle ↩ Change hint so you know you can re-vote. Both toggles in Visual → Voting Animations (default on).</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (66)</strong></p>
+                        <ul class="mb-2">
+                            <li>✨ Card Reveal Particles — two new shape modes: <strong>🎲 Mixed</strong> randomly fires star, circle, and square particles together; <strong>😊 Custom Emoji</strong> lets you pick any emoji (e.g. 🎉) to use as the confetti shape. Configure in Events → Card Reveal Particles.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (65)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔒 Room PIN — join screen now has a collapsible "Room has a PIN?" section in the Join tab; enter the PIN before navigating so you're never prompted after landing in the room. PIN is cached in sessionStorage for reconnects. Recent Rooms show a 🔒 badge when a cached PIN exists.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (64)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔔 Sound &amp; Notifications — Q1: optional soft 440 Hz tick when casting a vote (Audio → Vote Interaction, default off). Q2: browser desktop notification fires when votes are revealed while you're in another tab — requires notification permission (Audio → Desktop Notifications, default off).</li>
+                        </ul>
                         <p class="mb-2"><strong>5/18/2026 (63)</strong></p>
                         <ul class="mb-2">
                             <li>⏱️ Session Timer &amp; Clock — a compact bar above the story panel now shows how long the current story has been in discussion, plus the current time (with optional timezone). Switch between digital and analog clock face; customise hand colours. Configure in Other → Timer &amp; Clock.</li>

@@ -106,6 +106,7 @@ const DEFAULT_CELEBRATION = {
     revealParticles:         true,
     revealParticleType:      'star',
     revealParticleCount:     8,
+    revealParticleEmoji:     '🎉',
     revealFlipGap:           380,
     suspenseReveal:          true,
     suspenseSpeed:           'normal',
@@ -713,8 +714,11 @@ function populateCelebrationTab() {
     _celSet('cel-reveal-particles',     'checked', s.revealParticles    !== false);
     _celSet('cel-reveal-particle-type', 'value',   s.revealParticleType || 'star');
     _celSet('cel-reveal-particle-count','value',   s.revealParticleCount || 8);
+    _celSet('cel-particle-emoji',       'value',   s.revealParticleEmoji || '🎉');
     var revPartSub = document.getElementById('cel-reveal-particles-sub');
     if (revPartSub) revPartSub.style.display = s.revealParticles !== false ? '' : 'none';
+    var emojiWrap = document.getElementById('cel-particle-emoji-wrap');
+    if (emojiWrap) emojiWrap.style.display = (s.revealParticleType === 'emoji') ? '' : 'none';
 
     _celSet('cel-seasonal-theme',    'checked', s.seasonalTheme !== false);
     _celSet('cel-seasonal-halloween',    'checked', s.seasonalHalloween    !== false);
@@ -814,6 +818,7 @@ function saveCelebrationSettingsFromForm() {
         revealParticles:        _celGet('cel-reveal-particles', 'checked') !== false,
         revealParticleType:     _celGet('cel-reveal-particle-type', 'value') || 'star',
         revealParticleCount:    _celGetInt('cel-reveal-particle-count', 8),
+        revealParticleEmoji:    (_celGet('cel-particle-emoji', 'value') || '🎉').trim() || '🎉',
         lavaColor:              _celGet('cel-lava-color', 'value') || DEFAULT_CELEBRATION.lavaColor,
         seasonalTheme:          _celGet('cel-seasonal-theme',    'checked') !== false,
         seasonalHalloween:      _celGet('cel-seasonal-halloween',    'checked') !== false,
@@ -908,17 +913,34 @@ function _liveParticleCount() {
     return Math.min(Math.max(parseInt((inp && inp.value) || 8), 1), 99);
 }
 
+// O5: resolve confetti shapes array from type + optional emoji string
+function _resolveParticleShapes(type, emoji) {
+    if (type === 'mixed') return ['star', 'circle', 'square'];
+    if (type === 'emoji') {
+        var e = (emoji || '🎉').trim() || '🎉';
+        if (typeof confetti !== 'undefined' && typeof confetti.shapeFromText === 'function') {
+            return [confetti.shapeFromText({ text: e, scalar: 2 })];
+        }
+        return ['star']; // fallback when library doesn't support shapeFromText
+    }
+    return [type || 'star'];
+}
+
 function previewParticlesAt(el) {
     if (typeof confetti === 'undefined') return;
     var r = el.getBoundingClientRect();
+    var type  = _liveParticleShape();
+    var emoji = (document.getElementById('cel-particle-emoji') || {}).value || '🎉';
+    var shapes = _resolveParticleShapes(type, emoji);
     confetti({
         particleCount: _liveParticleCount(),
         spread: 60,
         startVelocity: 22,
         decay: 0.88,
+        scalar: type === 'emoji' ? 2 : 1,
         zIndex: 2100,
         origin: { x: (r.left + r.width / 2) / window.innerWidth, y: (r.top + r.height / 2) / window.innerHeight },
-        shapes: [_liveParticleShape()],
+        shapes: shapes,
         colors: ['#ffd700', '#ff6b6b', '#00ff88', '#ffffff', '#00cfff']
     });
 }

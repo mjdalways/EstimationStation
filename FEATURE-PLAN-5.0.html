@@ -161,17 +161,17 @@
   <a href="#group-u">U — UI Polish</a>
   <a href="#group-v">V — Sidebar Resize</a>
   <div class="nav-section">Medium</div>
-  <a href="#group-w">W — Visual Settings Tab</a>
-  <a href="#group-x">X — Card Flip &amp; Voting UX</a>
-  <a href="#group-y">Y — Card Back Redesign</a>
-  <a href="#group-z">Z — Settings Quality</a>
-  <a href="#group-aa">AA — Seasons Polish</a>
+  <a href="#group-w">W — Visual Settings Tab ✅</a>
+  <a href="#group-x">X — Card Flip &amp; Voting UX ✅</a>
+  <a href="#group-y">Y — Card Back Redesign ✅</a>
+  <a href="#group-z">Z — Settings Quality ✅</a>
+  <a href="#group-aa">AA — Seasons Polish ✅</a>
   <a href="#group-fx">FX — Bug Fixes &amp; UX Polish ✅</a>
   <a href="#group-o">O — Card &amp; UI Custom (carry)</a>
   <a href="#group-p">P — Keyboard &amp; Reactions ✅</a>
-  <a href="#group-q">Q — Sound &amp; Notifications (carry)</a>
-  <a href="#group-c">C — Sprint Dashboard (carry)</a>
-  <a href="#group-f">F — Room PIN (carry)</a>
+  <a href="#group-q">Q — Sound &amp; Notifications ✅</a>
+  <a href="#group-c">C — Sprint Dashboard ✅</a>
+  <a href="#group-f">F — Room PIN ✅</a>
   <a href="#group-n">N — Settings Org (deferred)</a>
   <div class="nav-section">Hard</div>
   <a href="#group-ab">AB — Image Upload Crop</a>
@@ -244,28 +244,28 @@
       <td>🔄 Card Flip &amp; Voting UX — flip on vote, click to change vote, flip back on change</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>New</td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>Y</b></td>
       <td>🃏 Card Back Redesign — separate vote/participant backs, gradients, image import, live preview, flip test</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>New</td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>Z</b></td>
       <td>⚙️ Settings Quality — search, bulk on/off/reset per tab, global export/import settings file</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>New</td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>AA</b></td>
       <td>🌸 Seasons Polish — active season display, next dates, Star Wars crawl, promote runner-variant animations to configurable (motionStyle: wave/spin/bounce/run/wobble/zigzag + image upload), per-season test buttons, frequency sliders, custom builder, add-to-existing-season, JSON export/import</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>New + Carry</td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>O</b></td>
@@ -279,21 +279,21 @@
       <td>⌨️ Keyboard Voting + Emoji Reactions</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>Carry-over</td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>Q</b></td>
       <td>🔔 Sound &amp; Notifications — vote cast tick, desktop notifications on reveal</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>Carry-over</td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>C</b></td>
       <td>📊 Sprint Dashboard — running points total, sparkline, historical localStorage</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>Carry-over</td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
     <tr>
       <td><b>F</b></td>
@@ -335,7 +335,7 @@
       <td>⏱️ Timer &amp; Clock — count-up timer (resets per story), live clock, timezone support, digital/analog display, full font/color/size customization</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>New</td>
-      <td class="status-pending">⏳ Pending</td>
+      <td class="status-done">✅ Done</td>
     </tr>
   </tbody>
 </table>
@@ -513,34 +513,28 @@
 </div>
 
 <div class="group-card" id="group-x">
-  <h3>Group X — 🔄 Card Flip &amp; Voting UX <span class="new-tag">new</span></h3>
-  <span class="tag">Medium</span><span class="tag">room.js · site.css · _Layout.cshtml</span>
+  <h3>Group X — 🔄 Card Flip &amp; Voting UX <span class="new-tag">new</span> ✅ All Done</h3>
+  <span class="tag">Medium</span><span class="tag">room.js · site.css · site.js · _Layout.cshtml</span>
 
-  <h4 style="margin-top:14px;">X1 — Flip Animation When a User Votes</h4>
-  <p>When a participant casts their vote, their participant card should flip over (front-to-back) to display the card back, indicating a vote has been placed without revealing the value.</p>
+  <h4 style="margin-top:14px;">X1 — Flip Animation When a User Votes ✅</h4>
   <ul>
-    <li>Trigger: on <code>VoteCast</code> / <code>ParticipantVoted</code> signal received, apply CSS 3D flip to the participant badge</li>
-    <li>Card front (face) → card back (showing the active card back design) in one smooth flip</li>
-    <li>For the local user: animate immediately on <code>castVote()</code> before the hub response</li>
-    <li>Flip speed uses the existing <code>revealFlipGap</code> / flip speed setting (O2)</li>
-    <li>Toggle: "Flip card on vote" — default on. In Visual tab.</li>
+    <li>✅ In <code>VoteCast</code> handler: when <code>hasVoted &amp;&amp; !wasVoted</code>, adds <code>poker-flip</code> CSS class to the freshly-rendered badge after <code>renderParticipants()</code>; removed after 500 ms</li>
+    <li>✅ Reuses existing <code>@keyframes poker-flip</code> (defined for poker hand reveal) — no new CSS keyframes needed</li>
+    <li>✅ Toggle <code>es_flipOnVote</code> in Visual → Voting Animations (default on); populated by <code>openSettingsModal</code> in site.js</li>
   </ul>
 
-  <h4>X2 — Change Vote Flow: Flip Back to Reveal, Re-vote, Flip to Card Back</h4>
-  <p>After voting, a participant should be able to change their vote through a tactile flip-based flow rather than a plain click.</p>
+  <h4>X2 — Change Vote Hint on Hover ✅</h4>
   <ul>
-    <li>After voting: clicking the card back (participant badge) triggers a flip to front, revealing the current vote number</li>
-    <li>The revealed card shows a "Change Vote" affordance (hover state or small overlay label)</li>
-    <li>User selects a new vote value from the card row (or via keyboard) — the badge flips back to the card back with the new vote registered</li>
-    <li>Alternative: a subtle "↩ Change vote" text/icon appears on the card back on hover; clicking opens the vote picker without a full flip sequence</li>
-    <li>Before votes are revealed: this flow only works for the local user's own card</li>
-    <li>Toggle: "Click card to change vote" — default on. In Visual tab.</li>
+    <li>✅ <code>.show-change-hint</code> class on <code>&lt;body&gt;</code> acts as CSS feature flag — set on init + toggled by checkbox</li>
+    <li>✅ CSS: <code>.show-change-hint .participant-badge.voted.me:not(.chicken-overlay):hover::after</code> overlays "↩ Change" label (semi-transparent dark, white text) — only on the local user's own voted badge</li>
+    <li>✅ Toggle <code>es_changeVoteHint</code> in Visual → Voting Animations (default on)</li>
+    <li>Re-voting itself already works: clicking any vote card re-invokes <code>castVote()</code> which calls <code>CastVote</code> hub method</li>
   </ul>
 </div>
 
 <div class="group-card" id="group-y">
-  <h3>Group Y — 🃏 Card Back Redesign <span class="new-tag">new</span></h3>
-  <span class="tag">Medium</span><span class="tag">room.js · site.css · _Layout.cshtml · celebration.js</span>
+  <h3>Group Y — 🃏 Card Back Redesign ✅ All Done <span class="new-tag">new</span></h3>
+  <span class="tag">Medium</span><span class="tag">site.js · site.css · _Layout.cshtml</span>
 
   <div class="callout note" style="margin-top:12px;">
     <strong>Terminology clarification</strong>
@@ -841,12 +835,12 @@
 </div>
 
 <div class="group-card" id="group-o">
-  <h3>Group O — 🎨 Card &amp; UI Customization <span class="carry-tag">carry-over</span> <span class="partial-tag">🔶 O2–O4, O6 Done</span></h3>
+  <h3>Group O — 🎨 Card &amp; UI Customization <span class="carry-tag">carry-over</span> <span class="partial-tag">🔶 O2–O6 Done; O1 → Group Y</span></h3>
   <span class="tag">Medium</span><span class="tag">celebration.js · room.js · site.css · _Layout.cshtml</span>
-  <p>O2 (flip speed slider), O3 (card font size slider) and O4 (compact mode) are ✅ done. Remaining:</p>
+  <p>O2 (flip speed slider), O3 (card font size slider), O4 (compact mode), O5, and O6 are ✅ done. O1 superseded by Group Y.</p>
   <ul>
-    <li><b>O1</b> — Custom Card Back Upload (superseded/extended by Group Y; still needed for the base upload mechanism)</li>
-    <li><b>O5</b> — Card Reveal Particle Shapes + Custom Emoji: preset shape buttons, custom emoji text input, mixed random burst</li>
+    <li><b>O1</b> — Custom Card Back Upload (superseded by Group Y — Y3 covers image import)</li>
+    <li><b>O5</b> <span class="done-tag">✅</span> — Card Reveal Particle Shapes + Custom Emoji: added <strong>🎲 Mixed</strong> (star+circle+square random burst) and <strong>😊 Custom Emoji</strong> (any emoji via <code>confetti.shapeFromText</code>) options to shape select; emoji input with <code>data-picker-target</code> shown only when "emoji" selected; <code>_resolveParticleShapes(type, emoji)</code> helper shared between <code>previewParticlesAt</code> and <code>_emitRevealParticles</code>; <code>revealParticleEmoji</code> persisted in celebration settings.</li>
     <li><b>O6</b> <span class="done-tag">✅</span> — Reusable Emoji/Shape/Unicode Picker — <code>emoji-picker.js</code>; categories, search, recently used, <code>data-picker-target</code> auto-attach.</li>
   </ul>
 </div>
@@ -875,36 +869,34 @@
 </div>
 
 <div class="group-card" id="group-q">
-  <h3>Group Q — 🔔 Sound &amp; Notifications <span class="carry-tag">carry-over</span></h3>
-  <span class="tag">Medium</span><span class="tag">room.js · _Layout.cshtml</span>
+  <h3>Group Q — 🔔 Sound &amp; Notifications <span class="carry-tag">carry-over</span> ✅ All Done</h3>
+  <span class="tag">Medium</span><span class="tag">room.js · audio.js · _Layout.cshtml</span>
   <ul>
-    <li><b>Q1</b> — Vote Cast Tick: sine ~220 Hz, 80 ms decay; triggered in <code>castVote()</code>; toggle in Audio tab (default off)</li>
-    <li><b>Q2</b> — Desktop Notification on Reveal: fires when tab is hidden; permission flow; toggle in Audio tab (default off)</li>
+    <li><b>Q1</b> ✅ — Vote Cast Tick: 440 Hz sine tone, 80 ms decay via Web Audio API; triggered in <code>castVote()</code> when a vote is selected; respects master mute; toggle in Audio → Vote Interaction (<code>es_voteTick</code>, default off)</li>
+    <li><b>Q2</b> ✅ — Desktop Notification on Reveal: <code>_qTryDesktopNotify(stats)</code> fires when <code>document.hidden</code> is true; permission requested via <code>_qRequestNotifyPermission()</code> on checkbox enable; shows "🎉 Consensus!" or "Votes revealed · Avg: X"; toggle in Audio → Desktop Notifications (<code>es_desktopNotify</code>, default off)</li>
   </ul>
 </div>
 
 <div class="group-card" id="group-c">
-  <h3>Group C — 📊 Sprint Dashboard <span class="carry-tag">carry-over</span></h3>
-  <span class="tag">Medium</span><span class="tag">room.js · site.css · _Layout.cshtml</span>
+  <h3>Group C — 📊 Sprint Dashboard <span class="carry-tag">carry-over</span> ✅ All Done</h3>
+  <span class="tag">Medium</span><span class="tag">room.js · analytics.js · Views/Room/Index.cshtml</span>
   <ul>
-    <li>Running points total chip below story list (sums numeric <code>finalEstimate</code> values)</li>
-    <li>Current session sparkline: SVG polyline of estimates across stories, renders after 2+ completed stories</li>
-    <li>Historical data: append to <code>es_estimationHistory</code> in localStorage (cap 20 sessions)</li>
-    <li>Historical trend chart in Settings → About or Analytics tab; no backend changes</li>
+    <li>✅ Running points total chip (<code>#sprintTotal</code>) below story list — sums numeric <code>finalEstimate</code> values; shown after first completed story</li>
+    <li>✅ Current session sparkline (<code>#sprintSparkline</code>): SVG polyline with accent-coloured dots, renders after 2+ completed stories</li>
+    <li>✅ Historical velocity: appended to <code>es_velocityHistory</code> in localStorage via <code>saveSessionSummary()</code> / <code>saveVelocityForSession()</code>, capped at 20 sessions</li>
+    <li>✅ Past sessions trend chart (<code>#sprintVelocityChart</code>): dashed SVG polyline shown when 2+ historical sessions exist; visible in Analytics modal via <code>showAnalyticsModal()</code></li>
   </ul>
 </div>
 
 <div class="group-card" id="group-f">
-  <h3>Group F — 🔒 Room PIN (UI only) <span class="carry-tag">carry-over</span></h3>
-  <span class="tag">Medium</span><span class="tag">Views/Home/Index.cshtml · room.js</span>
-  <div class="callout good" style="margin-top:10px;">
-    <strong>Backend done</strong>
-    <code>JoinRoom</code> hub method already accepts and validates an optional PIN parameter. Only the home-screen UI remains.
-  </div>
+  <h3>Group F — 🔒 Room PIN (UI only) <span class="carry-tag">carry-over</span> ✅ All Done</h3>
+  <span class="tag">Medium</span><span class="tag">Views/Home/Index.cshtml</span>
   <ul>
-    <li>Optional "Set PIN (4 digits)" input on home/join screen</li>
-    <li>PIN prompt dialog if joining a PIN-protected room without supplying the correct PIN</li>
-    <li>🔒 badge in room header when PIN protection is active</li>
+    <li>✅ Collapsible "🔒 Room has a PIN?" section in Join tab — reveals password input; on join, PIN stored to <code>sessionStorage['es_roomPin_'+room]</code> before navigation so <code>JoinRoom</code> hub call uses it immediately</li>
+    <li>✅ PIN prompt dialog (<code>openPinModal(true)</code>) fires when server returns <code>PIN_REQUIRED</code> — already fully implemented in room.js</li>
+    <li>✅ 🔒 badge in current-story bar (<code>#pinBadge</code>) synced from <code>state.hasPin</code> and <code>RoomPinSet</code> event — already implemented</li>
+    <li>✅ Recent Rooms show a <code>🔒</code> badge chip when a cached PIN exists in sessionStorage for that room</li>
+    <li>✅ 🔒 PIN button in room right-panel calls <code>openPinModal(false)</code> → <code>SetRoomPin</code> hub method to set/clear PIN — already implemented</li>
   </ul>
 </div>
 
@@ -1025,6 +1017,12 @@
     <tr><td><b>W</b></td><td>👁️ Visual Settings Tab — new tab between Theme and Events; live preview (participant badge + vote card); card font size slider moved here; compact mode toggle with before/after preview; confidence prompt toggle (W4) gates <code>confidenceSelector</code> display in room.js.</td></tr>
     <tr><td><b>Z</b></td><td>⚙️ Settings Quality — global controls bar (🔇 All Off / ✨ All On / ↩ Reset All / 📤 Export / 📥 Import); per-tab bulk ✓ All / ✗ None / ↩ Reset on Events, Audio, Seasons, Visual; real-time settings search with tab-match badge chips; Audio tab sections (Ambient, Timer, Soundboard, Voice) now collapsible (N4); sound preference modal on room join with 4 options All/Local/Broadcast/None (N5 upgraded from banner).</td></tr>
     <tr><td><b>AA</b></td><td>🌸 Seasons Polish — 20+ custom animations promoted to fully configurable runners with motionStyle dropdown (none/wave/bounce/hop/spin/run/wobble/zigzag); sea-zigzag CSS keyframe; Star Wars crawl animation; active season status bar; next-occurrence dates; per-animation 🧪 test buttons; frequency sliders (min/max seconds); Export/Import config as JSON; emoji picker wired to all season config emoji inputs. AA4 (image upload) and AA9 (custom season builder) deferred to Group AB.</td></tr>
+    <tr><td><b>X</b></td><td>🔄 Card Flip &amp; Voting UX — X1: <code>poker-flip</code> CSS class added to badge on <code>VoteCast</code> (hasVoted &amp;&amp; !wasVoted), removed after 500 ms; toggle <code>es_flipOnVote</code> in Visual tab. X2: <code>.show-change-hint</code> body class (set from <code>es_changeVoteHint</code>) drives <code>.participant-badge.voted.me:hover::after</code> overlay "↩ Change" hint; toggle in Visual tab. Both populated by <code>openSettingsModal</code> in site.js.</td></tr>
+    <tr><td><b>Y</b></td><td>🃏 Card Back Redesign — Y2: five new styles (Checkerboard, Diagonal Stripes, Solid Color, Gradient, Custom Image); CSS classes <code>.card-back-checker/.card-back-stripes/.card-back-solid/.card-back-gradient/.card-back-customimage</code> in site.css using <code>--cb-solid</code>/<code>--cb-grad-*</code>/<code>--cb-custom-img</code> CSS vars; sub-option panels <code>#cb-solid-opts/#cb-gradient-opts/#cb-image-opts</code> in _Layout; <code>_cbUpdateSubOpts()</code>, <code>setCbSolidColor()</code>, <code>applyCbGradient()</code> in site.js. Y3: <code>handleCardBackImage()</code> — FileReader, 200 KB cap, base64 stored as <code>es_cardBackCustomImage</code>; <code>clearCardBackImage()</code> reverts. Y4/Y5: flip speed slider (<code>cel-flip-gap</code>) and <code>_previewFlip()</code> already existed. Y1 (separate vote card back) deferred.</td></tr>
+    <tr><td><b>O5</b></td><td>✨ Card Reveal Particles — extended shape select with <strong>🎲 Mixed</strong> (multi-shape random burst) and <strong>😊 Custom Emoji</strong>; emoji input (<code>data-picker-target</code>) shown only for emoji mode; <code>_resolveParticleShapes(type, emoji)</code> shared helper in celebration.js; <code>revealParticleEmoji</code> persisted in celebration settings JSON; <code>_emitRevealParticles</code> in room.js uses helper with typeof guard.</td></tr>
+    <tr><td><b>F</b></td><td>🔒 Room PIN UI — collapsible PIN input in Join tab; PIN stored to <code>sessionStorage['es_roomPin_'+room]</code> before navigation; <code>openPinModal(true)</code> prompt on <code>PIN_REQUIRED</code>; <code>#pinBadge</code> synced from hub; Recent Rooms show 🔒 badge when cached PIN exists; 🔒 PIN button in room calls <code>SetRoomPin</code>. (Room.js side was already complete — only home screen join UI was missing.)</td></tr>
+    <tr><td><b>C</b></td><td>📊 Sprint Dashboard — <code>#sprintDashboard</code> panel below story list; <code>#sprintTotal</code> running numeric total; <code>#sprintSparkline</code> SVG polyline current-session chart (2+ stories); <code>#sprintVelocityChart</code> dashed historical trend; velocity persisted in <code>es_velocityHistory</code> (cap 20) via <code>saveSessionSummary</code>/<code>saveVelocityForSession</code> in analytics.js; wired to <code>StoryCompleted</code> + <code>renderStories()</code>. (Was already implemented — audited and confirmed complete.)</td></tr>
+    <tr><td><b>Q</b></td><td>🔔 Sound &amp; Notifications — Q1: 440 Hz sine tick on vote cast (<code>_qPlayVoteTick</code>, respects mute, <code>es_voteTick</code>); Q2: desktop notification on reveal when tab hidden (<code>_qTryDesktopNotify</code>, permission flow via <code>_qRequestNotifyPermission</code>, <code>es_desktopNotify</code>). Both toggles in Audio tab new collapsible sections; <code>populateAudioTab()</code> extended.</td></tr>
     <tr><td><b>AC</b></td><td>⏱️ Timer &amp; Clock — AC1: <code>acStartStoryTimer</code> wired to <code>CurrentStoryChanged</code>, compact <code>⏱ mm:ss</code> in <code>#session-tc-bar</code>; AC2: persistent <code>setInterval(_acTick, 1000)</code> drives both timer + clock; digital (<code>🕐 HH:MM TZ</code>) and analog SVG modes; AC3: <code>saveTimerClockSettings()</code> + <code>_tcToggleMode()</code> wired from Other tab form; AC4: color/font-size/face/hand-color pickers, form populated on modal open; <code>.session-tc-bar / .stc-segment / .stc-sep / .ac-analog</code> CSS added.</td></tr>
     <tr><td><b>P</b></td><td>⌨️ Keyboard Voting + Emoji Reactions — P1: <kbd>1</kbd>–<kbd>9</kbd> nth card, <kbd>C</kbd> ☕, <kbd>Q</kbd> ?, <kbd>−</kbd> skip vote, dynamic shortcut legend below card row, toggle in Other tab, <code>es_kbShortcuts</code>. P2: <code>SendReaction</code>/<code>ReceiveReaction</code> hub relay; emoji reaction bar (up to 8, configurable, emoji picker attached); reaction floats up from sender badge; 2s client-side rate limit; <code>es_reactionEnabled</code> + <code>es_reactionPalette</code>.</td></tr>
     <tr><td><b>FX</b></td><td>🛠️ Bug Fixes &amp; UX Polish — variable season next-dates (Lunar New Year, Diwali, Easter, etc.); popup/corner/alias META promotions for 15+ animations; 🧪 test buttons on all animation types; Visual tab preview uses real <code>.poker-card</code> HTML; Card Backs section moved to Visual tab with flip test; settings search highlights matched text in yellow; search input merged into global controls bar; accent-tinted section headers with collapse chevron; story note icons pinned right; sidebar narrow mode (80 px min); sidebar resize handle ⋮ grip; Star Wars crawl text + colour configurable; emoji picker expanded with Food/Travel/Activities/Flags categories; <code>d-none</code> status bar bug fixed; arrow/comma/period card navigation; vibe deselect toggle + ✕ clear button.</td></tr>

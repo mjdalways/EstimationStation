@@ -138,7 +138,7 @@ function registerHandlers() {
             const wasVoted = p.hasVoted;
             if (hasVoted) {
                 if (p.hasVoted) {
-                    // already voted — this is a flip
+                    // already voted — this is a change
                     _roundFlipCounts[connectionId] = (_roundFlipCounts[connectionId] || 0) + 1;
                 } else {
                     _roundVoteOrder.push(connectionId);
@@ -151,12 +151,20 @@ function registerHandlers() {
                 const sel = document.getElementById('confidenceSelector');
                 if (sel) sel.style.display = (hasVoted && showConf) ? 'block' : 'none';
             }
-            if (hasVoted && !wasVoted && typeof triggerCardBurst === 'function') {
+            if (hasVoted && !wasVoted) {
                 const badge = document.querySelector('[data-connection-id="' + connectionId + '"]');
                 if (badge) {
-                    const r = badge.getBoundingClientRect();
-                    triggerCardBurst((r.left + r.width / 2) / window.innerWidth,
-                                    (r.top  + r.height / 2) / window.innerHeight);
+                    // X1: flip animation when badge transitions to voted state
+                    if (localStorage.getItem('es_flipOnVote') !== '0') {
+                        badge.classList.add('poker-flip');
+                        setTimeout(() => badge.classList.remove('poker-flip'), 500);
+                    }
+                    // card burst particle effect
+                    if (typeof triggerCardBurst === 'function') {
+                        const r = badge.getBoundingClientRect();
+                        triggerCardBurst((r.left + r.width / 2) / window.innerWidth,
+                                        (r.top  + r.height / 2) / window.innerHeight);
+                    }
                 }
             }
         }
@@ -218,6 +226,7 @@ function registerHandlers() {
         });
         renderVoteHistory();
         if (typeof saveVelocityForSession === 'function') saveVelocityForSession();
+        _qTryDesktopNotify(stats);  // Q2
     });
 
     connection.on('VotesHidden', () => {
@@ -861,6 +870,7 @@ async function castVote(val) {
     const wasSelected = selectedVote === val;
     selectedVote = wasSelected ? null : val;
     renderCards();
+    if (selectedVote !== null) _qPlayVoteTick();  // Q1
 
     try {
         if (selectedVote !== null) {
@@ -1325,6 +1335,8 @@ initVibePanel();
 loadKbSettings();
 loadReactionSettings();
 loadTimerClockSettings();
+// X2: apply change-vote hint body class from saved setting
+if (localStorage.getItem('es_changeVoteHint') !== '0') document.body.classList.add('show-change-hint');
 if (typeof startSeasonalAmbience === 'function') startSeasonalAmbience();
 
 // ============================================================
@@ -1760,6 +1772,52 @@ function _reactionFloatFromBadge(senderCid, emoji) {
 }
 
 // ============================================================
+// Q1 — Vote Cast Tick
+// ============================================================
+function _qPlayVoteTick() {
+    if (getAllSoundsOff && getAllSoundsOff()) return;
+    if (localStorage.getItem('es_voteTick') !== '1') return;
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc  = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 440;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.09);
+        osc.onended = function() { ctx.close(); };
+    } catch(e) {}
+}
+
+// ============================================================
+// Q2 — Desktop Notification on Reveal
+// ============================================================
+async function _qRequestNotifyPermission(enabled) {
+    if (!enabled) return;
+    if (!('Notification' in window)) { alert('Your browser does not support desktop notifications.'); return; }
+    if (Notification.permission !== 'granted') {
+        var result = await Notification.requestPermission();
+        if (result !== 'granted') {
+            var el = document.getElementById('desktop-notify-enabled');
+            if (el) { el.checked = false; localStorage.setItem('es_desktopNotify', '0'); }
+        }
+    }
+}
+window._qRequestNotifyPermission = _qRequestNotifyPermission;
+
+function _qTryDesktopNotify(stats) {
+    if (localStorage.getItem('es_desktopNotify') !== '1') return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!document.hidden) return;   // only fire when user is in another tab
+    var msg = (stats && stats.isConsensus) ? '🎉 Consensus!' : 'Votes revealed';
+    if (stats && stats.average != null) msg += ' · Avg: ' + stats.average;
+    new Notification('EstimationStation', { body: msg, icon: '/favicon.ico', tag: 'es-reveal' });
+}
+
+// ============================================================
 // Sequential Reveal (Poker Hand)
 // ============================================================
 function _sequentialReveal(votes, stats) {
@@ -1862,16 +1920,27 @@ function _slotMachineReveal(badge, finalValue, duration, onComplete) {
 function _emitRevealParticles(badge, cs) {
     if (cs.revealParticles !== false && typeof confetti !== 'undefined') {
         const r = badge.getBoundingClientRect();
+        const type = cs.revealParticleType || 'star';
+        // O5: resolve shapes — mixed uses all 3 built-ins; emoji uses shapeFromText
+        let shapes;
+        if (typeof _resolveParticleShapes === 'function') {
+            shapes = _resolveParticleShapes(type, cs.revealParticleEmoji);
+        } else if (type === 'mixed') {
+            shapes = ['star', 'circle', 'square'];
+        } else {
+            shapes = [type === 'emoji' ? 'star' : type];
+        }
         confetti({
             particleCount: cs.revealParticleCount || 8,
             spread: 50,
             startVelocity: 18,
             decay: 0.88,
+            scalar: type === 'emoji' ? 2 : 1,
             origin: {
                 x: (r.left + r.width / 2) / window.innerWidth,
                 y: (r.top  + r.height / 2) / window.innerHeight
             },
-            shapes: [cs.revealParticleType || 'star'],
+            shapes: shapes,
             colors: ['#ffd700', '#ff6b6b', '#00ff88', '#ffffff', '#00cfff']
         });
     }

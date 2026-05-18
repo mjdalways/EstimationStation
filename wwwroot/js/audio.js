@@ -26,6 +26,11 @@ function populateAudioTab() {
     if (typeof populateTimerAudioSection === 'function') populateTimerAudioSection();
     if (typeof populateSoundReceiveSection === 'function') populateSoundReceiveSection();
     if (typeof renderCustomSoundSlots === 'function') renderCustomSoundSlots();
+    // Q1 & Q2
+    var vtEl = document.getElementById('vote-tick-enabled');
+    if (vtEl) vtEl.checked = localStorage.getItem('es_voteTick') === '1';
+    var dnEl = document.getElementById('desktop-notify-enabled');
+    if (dnEl) dnEl.checked = localStorage.getItem('es_desktopNotify') === '1';
 }
 
 // ============================================================

@@ -117,6 +117,11 @@ function openSettingsModal(tab) {
     if (typeof _populateRoomOtherSettings === 'function') _populateRoomOtherSettings();
     var ct = document.getElementById('show-confidence-toggle');
     if (ct) ct.checked = localStorage.getItem('es_showConfidence') !== '0';
+    // X1/X2: voting animation toggles
+    var fovEl = document.getElementById('flip-on-vote-toggle');
+    if (fovEl) fovEl.checked = localStorage.getItem('es_flipOnVote') !== '0';
+    var cvhEl = document.getElementById('change-vote-hint-toggle');
+    if (cvhEl) cvhEl.checked = localStorage.getItem('es_changeVoteHint') !== '0';
 
     _settingsSaved = false; // reset the save flag for this session
 
@@ -1216,7 +1221,8 @@ function clearJiraSettings() {
 
 // ── Card Back Design ──────────────────────────────────────────
 var ES_CARD_BACK_KEY = 'es_cardBack';
-var _cardBackClasses = ['card-back-baize','card-back-space','card-back-retro','card-back-seasonal'];
+var _cardBackClasses = ['card-back-baize','card-back-space','card-back-retro','card-back-seasonal',
+                        'card-back-solid','card-back-gradient','card-back-checker','card-back-stripes','card-back-customimage'];
 var _seasonClasses   = ['season-winter','season-spring','season-summer','season-autumn'];
 
 function getCardBackDesign() {
@@ -1243,8 +1249,79 @@ function applyCardBackDesign() {
                    :                       'season-autumn';
         document.body.classList.add(season);
     }
+    // Y2: restore CSS vars for dynamic designs
+    if (design === 'solid') {
+        var solidColor = localStorage.getItem('es_cbSolidColor') || '#1a1a2e';
+        document.documentElement.style.setProperty('--cb-solid', solidColor);
+        var scInp = document.getElementById('cb-solid-color');
+        if (scInp) scInp.value = solidColor;
+    }
+    if (design === 'gradient') {
+        try {
+            var grad = JSON.parse(localStorage.getItem('es_cbGrad') || '{}');
+            if (grad.a) { document.documentElement.style.setProperty('--cb-grad-a', grad.a); var gai = document.getElementById('cb-grad-a'); if (gai) gai.value = grad.a; }
+            if (grad.b) { document.documentElement.style.setProperty('--cb-grad-b', grad.b); var gbi = document.getElementById('cb-grad-b'); if (gbi) gbi.value = grad.b; }
+            if (grad.dir) { document.documentElement.style.setProperty('--cb-grad-dir', grad.dir); var gdi = document.getElementById('cb-grad-dir'); if (gdi) gdi.value = grad.dir; }
+        } catch(e) {}
+    }
+    if (design === 'customimage') {
+        var imgData = localStorage.getItem('es_cardBackCustomImage');
+        if (imgData) document.documentElement.style.setProperty('--cb-custom-img', 'url("' + imgData + '")');
+        else document.documentElement.style.removeProperty('--cb-custom-img');
+    }
+    _cbUpdateSubOpts(design);
     var sel = document.getElementById('cardBackSelect');
     if (sel) sel.value = design;
+}
+
+// Y2: Show/hide sub-option panels based on selected design
+function _cbUpdateSubOpts(design) {
+    var panels = { solid: 'cb-solid-opts', gradient: 'cb-gradient-opts', customimage: 'cb-image-opts' };
+    Object.keys(panels).forEach(function(key) {
+        var el = document.getElementById(panels[key]);
+        if (el) el.style.setProperty('display', key === design ? '' : 'none', 'important');
+    });
+}
+
+// Y2: Solid color picker handler
+function setCbSolidColor(color) {
+    localStorage.setItem('es_cbSolidColor', color);
+    document.documentElement.style.setProperty('--cb-solid', color);
+}
+
+// Y2: Gradient apply handler
+function applyCbGradient() {
+    var a   = (document.getElementById('cb-grad-a')   || {}).value || '#1a1a2e';
+    var b   = (document.getElementById('cb-grad-b')   || {}).value || '#16213e';
+    var dir = (document.getElementById('cb-grad-dir') || {}).value || '135deg';
+    localStorage.setItem('es_cbGrad', JSON.stringify({ a: a, b: b, dir: dir }));
+    document.documentElement.style.setProperty('--cb-grad-a', a);
+    document.documentElement.style.setProperty('--cb-grad-b', b);
+    document.documentElement.style.setProperty('--cb-grad-dir', dir);
+}
+
+// Y3: Custom image upload handler (200 KB cap)
+function handleCardBackImage(inp) {
+    var file = inp && inp.files && inp.files[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) { alert('Image must be under 200 KB.'); inp.value = ''; return; }
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        var data = ev.target.result;
+        localStorage.setItem('es_cardBackCustomImage', data);
+        document.documentElement.style.setProperty('--cb-custom-img', 'url("' + data + '")');
+        setCardBackDesign('customimage');
+    };
+    reader.readAsDataURL(file);
+}
+
+// Y3: Clear custom image and revert to default
+function clearCardBackImage() {
+    localStorage.removeItem('es_cardBackCustomImage');
+    document.documentElement.style.removeProperty('--cb-custom-img');
+    setCardBackDesign('default');
+    var inp = document.getElementById('cb-image-file');
+    if (inp) inp.value = '';
 }
 
 document.addEventListener('DOMContentLoaded', applyCardBackDesign);
