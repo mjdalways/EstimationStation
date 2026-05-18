@@ -1744,6 +1744,45 @@ body.card-back-customimage .participant-badge.voted .participant-name { color: #
 body.card-back-customimage .participant-badge.voted .vote-hidden,
 body.card-back-customimage .participant-badge.voted .vote-waiting { color: rgba(255,255,255,0.35); }
 
+/* ── Y1: Vote Picker Card Back styles (target unselected .poker-card) ── */
+body.vote-back-baize .poker-card:not(.selected) {
+    background: linear-gradient(135deg, #2e8b57 0%, #1c5c34 50%, #2e7d46 100%);
+    border-color: #145a28 !important;
+    color: rgba(255,255,255,0.85);
+}
+body.vote-back-space .poker-card:not(.selected) {
+    background: radial-gradient(ellipse at 25% 25%, #1e1b4b 0%, #0c0a1e 100%);
+    border-color: #4338ca !important;
+    color: rgba(165,180,252,0.9);
+}
+body.vote-back-retro .poker-card:not(.selected) {
+    background:
+        repeating-linear-gradient(45deg, transparent 0px, transparent 5px, rgba(180,0,0,0.3) 5px, rgba(180,0,0,0.3) 6px),
+        repeating-linear-gradient(-45deg, transparent 0px, transparent 5px, rgba(180,0,0,0.3) 5px, rgba(180,0,0,0.3) 6px),
+        #f5e8d8;
+    border-color: #8b1a1a !important;
+}
+body.vote-back-checker .poker-card:not(.selected) {
+    background-image: repeating-conic-gradient(rgba(0,0,0,0.08) 0% 25%, transparent 0% 50%);
+    background-size: 14px 14px;
+}
+body.vote-back-stripes .poker-card:not(.selected) {
+    background: repeating-linear-gradient(
+        135deg,
+        transparent 0px, transparent 7px,
+        rgba(91,141,238,0.18) 7px, rgba(91,141,238,0.18) 9px
+    );
+}
+body.vote-back-solid .poker-card:not(.selected) {
+    background: var(--vcb-solid, #6366f1);
+    color: rgba(255,255,255,0.92);
+    border-color: transparent !important;
+}
+body.vote-back-seasonal.season-winter .poker-card:not(.selected) { background: linear-gradient(160deg, #e8f4fd, #82bde8); }
+body.vote-back-seasonal.season-spring .poker-card:not(.selected) { background: linear-gradient(160deg, #fff5f8, #ffb3d4); }
+body.vote-back-seasonal.season-summer .poker-card:not(.selected) { background: linear-gradient(160deg, #fffde0, #ffc020); }
+body.vote-back-seasonal.season-autumn .poker-card:not(.selected) { background: linear-gradient(160deg, #fff3e0, #ff8c00); }
+
 /* ── Presentation Mode ── */
 body.presentation-mode #mainNav { display: none !important; }
 body.presentation-mode #storiesPanel { display: none !important; }

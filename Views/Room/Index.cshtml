@@ -184,6 +184,10 @@
                 <label class="form-check-label" for="autoRevealCheck">Auto-reveal</label>
             </div>
             <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="revealMajorityCheck" checked onchange="toggleRevealOrdering(this.checked)" title="Outlier voter revealed last with a dramatic pause" />
+                <label class="form-check-label" for="revealMajorityCheck" title="Outlier voter revealed last with a dramatic pause">Reveal majority first</label>
+            </div>
+            <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="observerCheck" onchange="toggleObserver(this.checked)" />
                 <label class="form-check-label" for="observerCheck">Observer mode</label>
             </div>

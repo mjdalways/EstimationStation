@@ -36,6 +36,7 @@ let roomState = {
     votesRevealed: false,
     autoReveal: false,
     ghostModeEnabled: false,
+    revealMajorityFirst: true,  // N3: room-level; overridden by RoomState on join
     currentStoryId: null,
     estimateSet: 'fibonacci',
     history: []   // full session: { story, votes, stats, voteOrder, flipCounts }
@@ -76,11 +77,14 @@ function registerHandlers() {
         roomState.votesRevealed = state.votesRevealed;
         roomState.autoReveal = state.autoReveal;
         roomState.ghostModeEnabled = state.ghostModeEnabled || false;
+        roomState.revealMajorityFirst = state.revealMajorityFirst !== false; // N3: default true
         roomState.currentStoryId = state.currentStoryId;
         roomState.estimateSet = state.estimateSet;
         currentEstimateValues = state.estimateValues || currentEstimateValues;
 
         document.getElementById('autoRevealCheck').checked = state.autoReveal;
+        var rmfChk = document.getElementById('revealMajorityCheck');
+        if (rmfChk) rmfChk.checked = state.revealMajorityFirst !== false;
         document.getElementById('estimateSetSelect').value = state.estimateSet || 'fibonacci';
         if (state.estimateSet === 'custom') {
             document.getElementById('customEstimatesDiv').style.display = 'block';
@@ -341,6 +345,13 @@ function registerHandlers() {
     connection.on('AutoRevealToggled', (enabled) => {
         roomState.autoReveal = enabled;
         document.getElementById('autoRevealCheck').checked = enabled;
+    });
+
+    // N3: room-level reveal ordering
+    connection.on('RevealOrderingToggled', (enabled) => {
+        roomState.revealMajorityFirst = enabled;
+        var rmfChk = document.getElementById('revealMajorityCheck');
+        if (rmfChk) rmfChk.checked = enabled;
     });
 
     connection.on('EstimateSetChanged', (setName, values) => {
@@ -1024,6 +1035,11 @@ async function deleteStory(storyId) {
 
 async function toggleAutoReveal(enabled) {
     try { await connection.invoke('ToggleAutoReveal', enabled); } catch(e) { console.error(e); }
+}
+
+// N3: room-level reveal ordering toggle
+async function toggleRevealOrdering(enabled) {
+    try { await connection.invoke('ToggleRevealOrdering', enabled); } catch(e) { console.error(e); }
 }
 
 async function toggleObserver(enabled) {
@@ -1822,8 +1838,9 @@ function _qTryDesktopNotify(stats) {
 // ============================================================
 function _sequentialReveal(votes, stats) {
     const cs = typeof getCelebrationSettings === 'function' ? getCelebrationSettings() : {};
-    const useSuspense  = cs.suspenseReveal     !== false;
-    const useOrdering  = cs.suspenseOrdering   !== false;
+    const useSuspense  = cs.suspenseReveal !== false;
+    // N3: room-level setting takes precedence over per-client preference
+    const useOrdering  = roomState.revealMajorityFirst !== false;
 
     // Build base order (vote-cast order, then any remaining)
     const base = _roundVoteOrder.slice();

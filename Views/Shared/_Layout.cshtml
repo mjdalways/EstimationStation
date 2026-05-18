@@ -607,6 +607,37 @@
                             </div>
                         </div>
 
+                        <!-- Y1: Vote Picker Card Style -->
+                        <hr class="my-2">
+                        <div class="mb-1 fw-bold small">🎴 Vote Picker Card Style</div>
+                        <div class="d-flex gap-3 align-items-start flex-wrap mb-2">
+                            <div>
+                                <label class="form-label small mb-1" for="voteCardBackSelect">Background on unselected vote cards</label>
+                                <select class="form-select form-select-sm" id="voteCardBackSelect" onchange="setVoteCardBackDesign(this.value)" style="width:auto;">
+                                    <option value="default">Default (theme colors)</option>
+                                    <option value="baize">🟢 Baize (green felt)</option>
+                                    <option value="space">🌌 Deep Space</option>
+                                    <option value="retro">🃏 Retro Diamonds</option>
+                                    <option value="seasonal">🍂 Seasonal</option>
+                                    <option value="checker">⬛ Checkerboard</option>
+                                    <option value="stripes">↗ Diagonal Stripes</option>
+                                    <option value="solid">🎨 Solid Color</option>
+                                </select>
+                                <!-- Y1: solid color for vote cards -->
+                                <div id="vcb-solid-opts" class="mt-2 d-flex align-items-center gap-2 small" style="display:none!important;">
+                                    <label class="mb-0">Color</label>
+                                    <input type="color" id="vcb-solid-color" value="#6366f1"
+                                           oninput="setVcbSolidColor(this.value)"
+                                           style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;" />
+                                </div>
+                                <p class="text-muted mt-1 mb-0" style="font-size:0.72rem;">Applies to the numbered cards in the vote picker row (unselected state only).</p>
+                            </div>
+                            <div>
+                                <div class="text-muted small mb-1">Preview</div>
+                                <div class="poker-card" id="vote-card-preview" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;" data-value="">5</div>
+                            </div>
+                        </div>
+
                     </div><!-- end tab-visual -->
 
                     <!-- ══════════════════════════════════════════
@@ -1427,6 +1458,14 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/18/2026 (70)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎴 Vote Picker Card Style (Y1) — vote picker cards now have their own independent back style setting separate from participant badges. Choose from Baize, Deep Space, Retro, Seasonal, Checkerboard, Stripes, or Solid Color. Configure in Visual → Vote Picker Card Style. The old <code>es_cardBack</code> setting is automatically migrated to <code>es_participantCardBack</code>.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (69)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔄 Reveal Majority First (N3) — now a room-level toggle in the ⚙️ Settings panel (on by default). When enabled, the outlier voter's badge is revealed last with a dramatic pause. Stored server-side so all participants see the same reveal ordering regardless of their individual settings.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/18/2026 (68)</strong></p>
                         <ul class="mb-2">
                             <li>🃏 Card Back Designs — five new styles for face-down participant badges: Checkerboard, Diagonal Stripes, Solid Color (choose any colour), Gradient (pick two colours and direction), and Custom Image (upload any image up to 200 KB). Configure in Visual → Participant Card Backs.</li>

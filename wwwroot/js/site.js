@@ -113,6 +113,7 @@ function openSettingsModal(tab) {
     var freqMax = document.getElementById('seaFreqMax'); if (freqMax) freqMax.value = freqData.max || 55;
     populateJiraTab();
     applyCardBackDesign();
+    applyVoteCardBackDesign();
     if (typeof _epAutoAttach === 'function') _epAutoAttach();
     if (typeof _populateRoomOtherSettings === 'function') _populateRoomOtherSettings();
     var ct = document.getElementById('show-confidence-toggle');
@@ -1220,13 +1221,20 @@ function clearJiraSettings() {
 }
 
 // ── Card Back Design ──────────────────────────────────────────
-var ES_CARD_BACK_KEY = 'es_cardBack';
+// Y1: renamed key with migration from legacy 'es_cardBack'
+var ES_CARD_BACK_KEY = 'es_participantCardBack';
 var _cardBackClasses = ['card-back-baize','card-back-space','card-back-retro','card-back-seasonal',
                         'card-back-solid','card-back-gradient','card-back-checker','card-back-stripes','card-back-customimage'];
 var _seasonClasses   = ['season-winter','season-spring','season-summer','season-autumn'];
 
 function getCardBackDesign() {
-    return localStorage.getItem(ES_CARD_BACK_KEY) || 'default';
+    // Y1: migrate legacy key
+    var val = localStorage.getItem(ES_CARD_BACK_KEY);
+    if (!val) {
+        var legacy = localStorage.getItem('es_cardBack');
+        if (legacy) { localStorage.setItem(ES_CARD_BACK_KEY, legacy); val = legacy; }
+    }
+    return val || 'default';
 }
 
 function setCardBackDesign(design) {
@@ -1324,5 +1332,47 @@ function clearCardBackImage() {
     if (inp) inp.value = '';
 }
 
+// ── Y1: Vote Picker Card Back ─────────────────────────────────
+var ES_VOTE_CARD_BACK_KEY = 'es_voteCardBack';
+var _voteBackClasses = ['vote-back-baize','vote-back-space','vote-back-retro','vote-back-seasonal',
+                        'vote-back-checker','vote-back-stripes','vote-back-solid'];
+
+function getVoteCardBackDesign() {
+    return localStorage.getItem(ES_VOTE_CARD_BACK_KEY) || 'default';
+}
+
+function setVoteCardBackDesign(design) {
+    localStorage.setItem(ES_VOTE_CARD_BACK_KEY, design);
+    applyVoteCardBackDesign();
+}
+
+function applyVoteCardBackDesign() {
+    _voteBackClasses.forEach(function(c) { document.body.classList.remove(c); });
+    var design = getVoteCardBackDesign();
+    if (design && design !== 'default') {
+        document.body.classList.add('vote-back-' + design);
+    }
+    if (design === 'solid') {
+        var solidColor = localStorage.getItem('es_vcbSolidColor') || '#6366f1';
+        document.documentElement.style.setProperty('--vcb-solid', solidColor);
+        var scInp = document.getElementById('vcb-solid-color');
+        if (scInp) scInp.value = solidColor;
+    }
+    _vcbUpdateSubOpts(design);
+    var sel = document.getElementById('voteCardBackSelect');
+    if (sel) sel.value = design;
+}
+
+function _vcbUpdateSubOpts(design) {
+    var el = document.getElementById('vcb-solid-opts');
+    if (el) el.style.setProperty('display', design === 'solid' ? '' : 'none', 'important');
+}
+
+function setVcbSolidColor(color) {
+    localStorage.setItem('es_vcbSolidColor', color);
+    document.documentElement.style.setProperty('--vcb-solid', color);
+}
+
 document.addEventListener('DOMContentLoaded', applyCardBackDesign);
+document.addEventListener('DOMContentLoaded', applyVoteCardBackDesign);
 

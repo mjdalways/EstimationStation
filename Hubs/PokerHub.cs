@@ -414,6 +414,24 @@ public class PokerHub : Hub
         await Clients.Group(roomName).SendAsync("AutoRevealToggled", enabled);
     }
 
+    // N3 — room-level reveal ordering: majority votes revealed before the outlier
+    public async Task ToggleRevealOrdering(bool enabled)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        lock (room)
+        {
+            room.RevealMajorityFirst = enabled;
+        }
+
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("RevealOrderingToggled", enabled);
+    }
+
     public async Task SetEstimateSet(string setName, string? customValues)
     {
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
@@ -741,6 +759,7 @@ public class PokerHub : Hub
             autoReveal = room.AutoReveal,
             votesRevealed = room.VotesRevealed,
             ghostModeEnabled = room.GhostModeEnabled,
+            revealMajorityFirst = room.RevealMajorityFirst,
             hasPin = room.Pin != null,
             currentStoryId = room.CurrentStoryId,
             estimateSet = room.EstimateSet,

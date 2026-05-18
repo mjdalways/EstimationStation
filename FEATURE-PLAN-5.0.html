@@ -167,12 +167,12 @@
   <a href="#group-z">Z — Settings Quality ✅</a>
   <a href="#group-aa">AA — Seasons Polish ✅</a>
   <a href="#group-fx">FX — Bug Fixes &amp; UX Polish ✅</a>
-  <a href="#group-o">O — Card &amp; UI Custom (carry)</a>
+  <a href="#group-o">O — Card &amp; UI Custom ✅</a>
   <a href="#group-p">P — Keyboard &amp; Reactions ✅</a>
   <a href="#group-q">Q — Sound &amp; Notifications ✅</a>
   <a href="#group-c">C — Sprint Dashboard ✅</a>
   <a href="#group-f">F — Room PIN ✅</a>
-  <a href="#group-n">N — Settings Org (deferred)</a>
+  <a href="#group-n">N — Settings Org ✅</a>
   <div class="nav-section">Hard</div>
   <a href="#group-ab">AB — Image Upload Crop</a>
   <a href="#group-j">J — Mobile Experience (carry)</a>
@@ -272,7 +272,7 @@
       <td>🎨 Card &amp; UI Customization — custom back upload (O1), particle shapes (O5), emoji picker (O6)</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>Carry-over</td>
-      <td class="status-partial">🔶 O2–O4, O6 Done; O1/O5 Pending</td>
+      <td class="status-done">✅ Done — O1 superseded by Y3; O2–O6 all done</td>
     </tr>
     <tr>
       <td><b>P</b></td>
@@ -307,7 +307,7 @@
       <td>🗂️ Settings Org — N3 reveal ordering global, N4 collapsible sections, N5 sound join dialog</td>
       <td><span class="badge badge-yellow">Medium</span></td>
       <td>Carry-over</td>
-      <td class="status-partial">🔶 N1–N2 Done</td>
+      <td class="status-done">✅ Done — N1–N5 all done</td>
     </tr>
     <tr>
       <td><b>AB</b></td>
@@ -534,7 +534,7 @@
 
 <div class="group-card" id="group-y">
   <h3>Group Y — 🃏 Card Back Redesign ✅ All Done <span class="new-tag">new</span></h3>
-  <span class="tag">Medium</span><span class="tag">site.js · site.css · _Layout.cshtml</span>
+  <span class="tag">Medium</span><span class="tag">site.js · site.css · _Layout.cshtml · Views/Room/Index.cshtml</span>
 
   <div class="callout note" style="margin-top:12px;">
     <strong>Terminology clarification</strong>
@@ -835,9 +835,9 @@
 </div>
 
 <div class="group-card" id="group-o">
-  <h3>Group O — 🎨 Card &amp; UI Customization <span class="carry-tag">carry-over</span> <span class="partial-tag">🔶 O2–O6 Done; O1 → Group Y</span></h3>
+  <h3>Group O — 🎨 Card &amp; UI Customization ✅ All Done <span class="carry-tag">carry-over</span></h3>
   <span class="tag">Medium</span><span class="tag">celebration.js · room.js · site.css · _Layout.cshtml</span>
-  <p>O2 (flip speed slider), O3 (card font size slider), O4 (compact mode), O5, and O6 are ✅ done. O1 superseded by Group Y.</p>
+  <p>O1 superseded by Y3 (custom image card back). O2–O6 all done.</p>
   <ul>
     <li><b>O1</b> — Custom Card Back Upload (superseded by Group Y — Y3 covers image import)</li>
     <li><b>O5</b> <span class="done-tag">✅</span> — Card Reveal Particle Shapes + Custom Emoji: added <strong>🎲 Mixed</strong> (star+circle+square random burst) and <strong>😊 Custom Emoji</strong> (any emoji via <code>confetti.shapeFromText</code>) options to shape select; emoji input with <code>data-picker-target</code> shown only when "emoji" selected; <code>_resolveParticleShapes(type, emoji)</code> helper shared between <code>previewParticlesAt</code> and <code>_emitRevealParticles</code>; <code>revealParticleEmoji</code> persisted in celebration settings.</li>
@@ -901,11 +901,11 @@
 </div>
 
 <div class="group-card med" id="group-n">
-  <h3>Group N — 🗂️ Settings Org (Deferred Items) <span class="partial-tag">🔶 N4, N5 Done</span> <span class="carry-tag">carry-over</span></h3>
-  <span class="tag">Medium</span><span class="tag">_Layout.cshtml · PokerHub.cs · room.js</span>
-  <p>N1 (Audio tab) and N2 (Other tab) are ✅ done. Remaining deferred items:</p>
+  <h3>Group N — 🗂️ Settings Org ✅ All Done <span class="carry-tag">carry-over</span></h3>
+  <span class="tag">Medium</span><span class="tag">_Layout.cshtml · PokerHub.cs · room.js · Views/Room/Index.cshtml · Models/PokerModels.cs</span>
+  <p>All N items done.</p>
   <ul>
-    <li><b>N3</b> — Move "Reveal Majority First" to room-level global setting: <code>ToggleRevealOrdering</code> hub method, store on <code>Room</code> model, broadcast to room</li>
+    <li><b>N3</b> <span class="done-tag">✅</span> — "Reveal Majority First" as room-level setting: <code>RevealMajorityFirst</code> on <code>Room</code> model (default true); <code>ToggleRevealOrdering(bool)</code> hub method; broadcasts <code>RevealOrderingToggled</code>; room.js reads <code>roomState.revealMajorityFirst</code> in <code>_sequentialReveal</code>; toggle checkbox in room ⚙️ Settings panel.</li>
     <li><b>N4</b> <span class="done-tag">✅</span> — Collapsible sections within tabs: Audio tab sections (Ambient, Timer, Soundboard, Voice) now wrapped in Bootstrap collapse divs, default open.</li>
     <li><b>N5</b> <span class="done-tag">✅</span> — Sound confirmation on room join: once-per-session modal (upgraded from banner), 4-option choice [All / Local Only / Received Only / None].</li>
   </ul>
@@ -1018,7 +1018,8 @@
     <tr><td><b>Z</b></td><td>⚙️ Settings Quality — global controls bar (🔇 All Off / ✨ All On / ↩ Reset All / 📤 Export / 📥 Import); per-tab bulk ✓ All / ✗ None / ↩ Reset on Events, Audio, Seasons, Visual; real-time settings search with tab-match badge chips; Audio tab sections (Ambient, Timer, Soundboard, Voice) now collapsible (N4); sound preference modal on room join with 4 options All/Local/Broadcast/None (N5 upgraded from banner).</td></tr>
     <tr><td><b>AA</b></td><td>🌸 Seasons Polish — 20+ custom animations promoted to fully configurable runners with motionStyle dropdown (none/wave/bounce/hop/spin/run/wobble/zigzag); sea-zigzag CSS keyframe; Star Wars crawl animation; active season status bar; next-occurrence dates; per-animation 🧪 test buttons; frequency sliders (min/max seconds); Export/Import config as JSON; emoji picker wired to all season config emoji inputs. AA4 (image upload) and AA9 (custom season builder) deferred to Group AB.</td></tr>
     <tr><td><b>X</b></td><td>🔄 Card Flip &amp; Voting UX — X1: <code>poker-flip</code> CSS class added to badge on <code>VoteCast</code> (hasVoted &amp;&amp; !wasVoted), removed after 500 ms; toggle <code>es_flipOnVote</code> in Visual tab. X2: <code>.show-change-hint</code> body class (set from <code>es_changeVoteHint</code>) drives <code>.participant-badge.voted.me:hover::after</code> overlay "↩ Change" hint; toggle in Visual tab. Both populated by <code>openSettingsModal</code> in site.js.</td></tr>
-    <tr><td><b>Y</b></td><td>🃏 Card Back Redesign — Y2: five new styles (Checkerboard, Diagonal Stripes, Solid Color, Gradient, Custom Image); CSS classes <code>.card-back-checker/.card-back-stripes/.card-back-solid/.card-back-gradient/.card-back-customimage</code> in site.css using <code>--cb-solid</code>/<code>--cb-grad-*</code>/<code>--cb-custom-img</code> CSS vars; sub-option panels <code>#cb-solid-opts/#cb-gradient-opts/#cb-image-opts</code> in _Layout; <code>_cbUpdateSubOpts()</code>, <code>setCbSolidColor()</code>, <code>applyCbGradient()</code> in site.js. Y3: <code>handleCardBackImage()</code> — FileReader, 200 KB cap, base64 stored as <code>es_cardBackCustomImage</code>; <code>clearCardBackImage()</code> reverts. Y4/Y5: flip speed slider (<code>cel-flip-gap</code>) and <code>_previewFlip()</code> already existed. Y1 (separate vote card back) deferred.</td></tr>
+    <tr><td><b>Y</b></td><td>🃏 Card Back Redesign — Y1: separate participant badge back (<code>es_participantCardBack</code>, migrated from <code>es_cardBack</code>) from vote picker card style (<code>es_voteCardBack</code>); <code>vote-back-*</code> body classes target <code>.poker-card:not(.selected)</code>; <code>applyVoteCardBackDesign()</code>, <code>setVoteCardBackDesign()</code>, <code>setVcbSolidColor()</code> in site.js; <code>#voteCardBackSelect</code> + <code>#vcb-solid-opts</code> in Visual tab. Y2: five new participant back styles (checker, stripes, solid, gradient, customimage) with CSS vars; Y3: FileReader image import, 200 KB cap; Y4/Y5: flip test + speed slider (pre-existed).</td></tr>
+    <tr><td><b>N3</b></td><td>🗂️ Reveal Majority First — room-level setting: <code>RevealMajorityFirst</code> bool on <code>Room</code> model (default true); <code>ToggleRevealOrdering(bool)</code> hub method broadcasts <code>RevealOrderingToggled</code>; included in <code>BuildRoomState()</code> as <code>revealMajorityFirst</code>; room.js reads it in <code>_sequentialReveal()</code> instead of per-client celebration setting; toggle checkbox <code>#revealMajorityCheck</code> added to room ⚙️ Settings panel in Index.cshtml.</td></tr>
     <tr><td><b>O5</b></td><td>✨ Card Reveal Particles — extended shape select with <strong>🎲 Mixed</strong> (multi-shape random burst) and <strong>😊 Custom Emoji</strong>; emoji input (<code>data-picker-target</code>) shown only for emoji mode; <code>_resolveParticleShapes(type, emoji)</code> shared helper in celebration.js; <code>revealParticleEmoji</code> persisted in celebration settings JSON; <code>_emitRevealParticles</code> in room.js uses helper with typeof guard.</td></tr>
     <tr><td><b>F</b></td><td>🔒 Room PIN UI — collapsible PIN input in Join tab; PIN stored to <code>sessionStorage['es_roomPin_'+room]</code> before navigation; <code>openPinModal(true)</code> prompt on <code>PIN_REQUIRED</code>; <code>#pinBadge</code> synced from hub; Recent Rooms show 🔒 badge when cached PIN exists; 🔒 PIN button in room calls <code>SetRoomPin</code>. (Room.js side was already complete — only home screen join UI was missing.)</td></tr>
     <tr><td><b>C</b></td><td>📊 Sprint Dashboard — <code>#sprintDashboard</code> panel below story list; <code>#sprintTotal</code> running numeric total; <code>#sprintSparkline</code> SVG polyline current-session chart (2+ stories); <code>#sprintVelocityChart</code> dashed historical trend; velocity persisted in <code>es_velocityHistory</code> (cap 20) via <code>saveSessionSummary</code>/<code>saveVelocityForSession</code> in analytics.js; wired to <code>StoryCompleted</code> + <code>renderStories()</code>. (Was already implemented — audited and confirmed complete.)</td></tr>

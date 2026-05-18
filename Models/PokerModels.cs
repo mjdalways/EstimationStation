@@ -17,6 +17,7 @@ public class Room
     public bool GhostModeEnabled { get; set; } = false;
     public string? ShameParticipantId { get; set; }
     public string? Pin { get; set; }
+    public bool RevealMajorityFirst { get; set; } = true;
 }
 
 public class Participant
