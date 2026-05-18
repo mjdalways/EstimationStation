@@ -1104,10 +1104,10 @@
                         <p class="small fw-semibold text-muted mb-1">🌍 Global &amp; Cultural</p>
                         <div class="mb-3">
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-pride"><label for="cel-seasonal-pride">🌈 Pride</label><span>Jun 1–30</span><button onclick="runTest(testSpecificSeason.bind(null, 'pride'))">▶</button></div>
-                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-holi"><label for="cel-seasonal-holi">🎨 Holi</label><span>Mar</span><button onclick="runTest(testSpecificSeason.bind(null, 'holi'))">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-holi"><label for="cel-seasonal-holi">🎨 Holi</label><span>Mar (lunar)</span><button onclick="runTest(testSpecificSeason.bind(null, 'holi'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-hanami"><label for="cel-seasonal-hanami">🌸 Hanami</label><span>Mar 20–Apr 10</span><button onclick="runTest(testSpecificSeason.bind(null, 'hanami'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-ramadan"><label for="cel-seasonal-ramadan">🌙 Ramadan/Eid</label><span>Variable</span><button onclick="runTest(testSpecificSeason.bind(null, 'ramadan'))">▶</button></div>
-                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-midautumn"><label for="cel-seasonal-midautumn">🥮 Mid-Autumn</label><span>Variable</span><button onclick="runTest(testSpecificSeason.bind(null, 'midautumn'))">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-midautumn"><label for="cel-seasonal-midautumn">🥮 Mid-Autumn</label><span>Sep–Oct (lunar)</span><button onclick="runTest(testSpecificSeason.bind(null, 'midautumn'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-tanabata"><label for="cel-seasonal-tanabata">🎋 Tanabata</label><span>Jul 7</span><button onclick="runTest(testSpecificSeason.bind(null, 'tanabata'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-bastille"><label for="cel-seasonal-bastille">🗼 Bastille Day</label><span>Jul 14</span><button onclick="runTest(testSpecificSeason.bind(null, 'bastille'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-earthday"><label for="cel-seasonal-earthday">🌍 Earth Day</label><span>Apr 22</span><button onclick="runTest(testSpecificSeason.bind(null, 'earthday'))">▶</button></div>
@@ -1115,7 +1115,7 @@
                         </div>
                         <p class="small fw-semibold text-muted mb-1">🎭 Niche / Pop Culture</p>
                         <div class="mb-3">
-                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-awards"><label for="cel-seasonal-awards">🏆 Awards Season</label><span>Feb</span><button onclick="runTest(testSpecificSeason.bind(null, 'awards'))">▶</button></div>
+                            <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-awards"><label for="cel-seasonal-awards">🏆 Awards Season</label><span>Jan–Mar</span><button onclick="runTest(testSpecificSeason.bind(null, 'awards'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-piday"><label for="cel-seasonal-piday">🥧 Pi Day</label><span>Mar 14</span><button onclick="runTest(testSpecificSeason.bind(null, 'piday'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-aprilfools"><label for="cel-seasonal-aprilfools">🃏 April Fools</label><span>Apr 1</span><button onclick="runTest(testSpecificSeason.bind(null, 'aprilfools'))">▶</button></div>
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-starwarsday"><label for="cel-seasonal-starwarsday">⚔️ Star Wars Day</label><span>May 4</span><button onclick="runTest(testSpecificSeason.bind(null, 'starwarsday'))">▶</button></div>
@@ -1461,6 +1461,18 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/18/2026 (80)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 Fixes (Group AF) — Season config aliases no longer crash when the target animation is in a different season. Custom animation emoji inputs now show the emoji picker on focus. The 🧪 test button for custom animations uses the current unsaved field values (no need to save first). Analog clock duplicate SVG IDs fixed — two clocks can now render simultaneously (story bar + settings preview).</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (79)</strong></p>
+                        <ul class="mb-2">
+                            <li>⚙️ Settings Modal + Clock Preview (Group AF) — settings modal can now be dragged by its header to move it anywhere on screen (resets to center on next open). Clock color pickers update the preview in real time as you drag. Clock preview ticks live (seconds hand moves) while the settings modal is open, even though the story bar clock may be behind the modal.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (78)</strong></p>
+                        <ul class="mb-2">
+                            <li>📅 Season Dates + TC Bar Fix (Group AF) — next occurrence dates added for Thanksgiving, Pancake Day (Shrove Tuesday), Aug Bank Holiday, Mid-Autumn Festival, and Holi. Date brackets now appear inline after the formula text (correct position for Mothering Sunday, Mother's Day, Father's Day). Static date labels updated: Awards Season → Jan–Mar, Mid-Autumn → Sep–Oct (lunar), Holi → Mar (lunar). The × button on the clock/timer bar now hides for the current session only — clock and timer remain enabled on reload.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/18/2026 (77)</strong></p>
                         <ul class="mb-2">
                             <li>🐛 Fixes (Group AE) — Season "next date" labels now appear inline after the date in brackets (e.g. <code>1st Mon Sep [7 Sep]</code>) and duplicate dates no longer show for fixed-date seasons. Clock/timer bar hides when disabled and no story is active. Panel × close buttons now use float layout (no stacking-context z-index conflict with vote cards). Clock preview added to the Other tab settings so you can see digital/analog style live before saving.</li>
@@ -2010,21 +2022,21 @@
                             <label><input type="radio" name="tc-mode" value="analog" onchange="saveTimerClockSettings();_tcToggleMode('analog')"> Analog</label>
                         </div>
                         <div id="tc-digital-opts" class="mb-3 d-flex flex-wrap gap-3 align-items-center small">
-                            <label>Color <input type="color" id="tc-color" value="#6c757d" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                            <label>Color <input type="color" id="tc-color" value="#6c757d" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                             <label>Size <input type="number" id="tc-font-size" value="13" min="10" max="22" style="width:50px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()">px</label>
                         </div>
                         <div id="tc-analog-opts" class="mb-3 small" style="display:none;">
                             <div class="d-flex flex-wrap gap-3 align-items-center mb-2">
                                 <label>Face <select id="tc-face" class="form-select form-select-sm d-inline-block" style="width:100px;" onchange="saveTimerClockSettings()"><option value="minimal">Minimal</option><option value="classic">Classic</option><option value="filled">Filled</option></select></label>
-                                <label>Hour <input type="color" id="tc-hour-color" value="#212529" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
-                                <label>Min <input type="color" id="tc-min-color" value="#495057" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
-                                <label>Sec <input type="color" id="tc-sec-color" value="#dc3545" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                                <label>Hour <input type="color" id="tc-hour-color" value="#212529" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                                <label>Min <input type="color" id="tc-min-color" value="#495057" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                                <label>Sec <input type="color" id="tc-sec-color" value="#dc3545" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                             </div>
                         </div>
                         <!-- Clock preview -->
                         <div class="mb-3 small d-flex align-items-center gap-3">
                             <span class="text-muted">Preview:</span>
-                            <span id="tc-clock-preview" class="border rounded px-2 py-1 d-inline-block" style="min-width:60px;text-align:center;background:var(--bg-secondary,#f8f9fa);">🕐</span>
+                            <span id="tc-clock-preview" class="border rounded px-2 py-1 d-inline-flex align-items-center justify-content-center" style="min-width:70px;min-height:58px;background:var(--bg-secondary,#f8f9fa);">🕐</span>
                         </div>
 
                         <!-- Mobile Animations -->

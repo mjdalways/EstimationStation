@@ -1478,12 +1478,8 @@ function _addPanelCloseButtons() {
         {
             id: 'session-tc-bar',
             hide: function() {
-                localStorage.setItem('es_showClock', '0');
-                localStorage.setItem('es_showTimer', '0');
-                var cbC = document.getElementById('tc-show-clock');
-                var cbT = document.getElementById('tc-show-timer');
-                if (cbC) cbC.checked = false;
-                if (cbT) cbT.checked = false;
+                // Session-only hide — resets on reload; use Settings to permanently disable
+                sessionStorage.setItem('es_hideTCBar', '1');
             }
         }
     ];
@@ -1493,7 +1489,9 @@ function _addPanelCloseButtons() {
         if (panel.querySelector('.panel-close-btn')) return;
         var btn = document.createElement('button');
         btn.className = 'panel-close-btn';
-        btn.title = 'Hide this panel';
+        btn.title = p.id === 'session-tc-bar'
+            ? 'Hide until reload (use Settings to permanently disable)'
+            : 'Hide this panel';
         btn.setAttribute('aria-label', 'Close panel');
         btn.innerHTML = '&times;';
         btn.onclick = function(e) {
@@ -1534,6 +1532,10 @@ function saveTimerClockSettings() {
     if (showTimerEl) localStorage.setItem('es_showTimer', showTimerEl.checked ? '1' : '0');
     if (showClockEl) localStorage.setItem('es_showClock', showClockEl.checked ? '1' : '0');
     if (tzEl)        localStorage.setItem('es_clockTimezone', tzEl.value);
+    // AF8: Clear session-hide if user explicitly re-enables clock or timer
+    if ((showClockEl && showClockEl.checked) || (showTimerEl && showTimerEl.checked)) {
+        sessionStorage.removeItem('es_hideTCBar');
+    }
 
     var styleData = {
         mode:      modeEl    ? modeEl.value              : 'digital',
@@ -1562,6 +1564,9 @@ window._tcToggleMode = _tcToggleMode;
 function _acTick() {
     var bar = document.getElementById('session-tc-bar');
     if (!bar) return;
+
+    // AF8: Session-hide — × button hides for this session only; resets on reload
+    if (sessionStorage.getItem('es_hideTCBar') === '1') { bar.style.display = 'none'; return; }
 
     var showTimer = localStorage.getItem('es_showTimer') !== '0';
     var showClock = localStorage.getItem('es_showClock') !== '0';
@@ -1639,11 +1644,12 @@ function _acRenderClock(clockEl) {
 }
 
 function _acAnalogSvgTemplate() {
+    // AF7: Use class instead of id to allow multiple analog clocks without duplicate HTML IDs
     return '<svg class="ac-analog" width="52" height="52" viewBox="0 0 100 100">'
-        + '<circle id="ac-face" cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>'
-        + '<line id="ac-hour" x1="50" y1="50" x2="50" y2="28" stroke="#212529" stroke-width="5" stroke-linecap="round"/>'
-        + '<line id="ac-min"  x1="50" y1="50" x2="50" y2="16" stroke="#495057" stroke-width="3" stroke-linecap="round"/>'
-        + '<line id="ac-sec"  x1="50" y1="55" x2="50" y2="12" stroke="#dc3545" stroke-width="1.5" stroke-linecap="round"/>'
+        + '<circle class="ac-face" cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>'
+        + '<line class="ac-hour" x1="50" y1="50" x2="50" y2="28" stroke="#212529" stroke-width="5" stroke-linecap="round"/>'
+        + '<line class="ac-min"  x1="50" y1="50" x2="50" y2="16" stroke="#495057" stroke-width="3" stroke-linecap="round"/>'
+        + '<line class="ac-sec"  x1="50" y1="55" x2="50" y2="12" stroke="#dc3545" stroke-width="1.5" stroke-linecap="round"/>'
         + '<circle cx="50" cy="50" r="2.5" fill="currentColor"/>'
         + '</svg>';
 }
@@ -1664,22 +1670,23 @@ function _acUpdateAnalogHands(container, now, tz, styleData) {
     var hDeg = hr * 30 + min * 0.5;
     var svg = container.querySelector('svg');
     if (!svg) return;
-    var setRot = function(id, deg) {
-        var el = svg.querySelector('#' + id);
+    // AF7: Use class selectors (not #id) to support multiple analog clocks on the same page
+    var setRot = function(cls, deg) {
+        var el = svg.querySelector('.' + cls);
         if (el) el.setAttribute('transform', 'rotate(' + deg + ',50,50)');
     };
     setRot('ac-hour', hDeg);
     setRot('ac-min',  mDeg);
     setRot('ac-sec',  sDeg);
-    var face = svg.querySelector('#ac-face');
+    var face = svg.querySelector('.ac-face');
     var face_style = styleData.face || 'minimal';
     if (face) {
         face.setAttribute('fill', face_style === 'filled' ? 'var(--bg3,#f8f9fa)' : 'none');
         face.setAttribute('stroke', face_style === 'minimal' ? 'none' : 'currentColor');
     }
-    var hour = svg.querySelector('#ac-hour'); if (hour && styleData.hourColor) hour.setAttribute('stroke', styleData.hourColor);
-    var minH = svg.querySelector('#ac-min');  if (minH && styleData.minColor)  minH.setAttribute('stroke', styleData.minColor);
-    var secH = svg.querySelector('#ac-sec');  if (secH && styleData.secColor)  secH.setAttribute('stroke', styleData.secColor);
+    var hour = svg.querySelector('.ac-hour'); if (hour && styleData.hourColor) hour.setAttribute('stroke', styleData.hourColor);
+    var minH = svg.querySelector('.ac-min');  if (minH && styleData.minColor)  minH.setAttribute('stroke', styleData.minColor);
+    var secH = svg.querySelector('.ac-sec');  if (secH && styleData.secColor)  secH.setAttribute('stroke', styleData.secColor);
 }
 
 // ============================================================

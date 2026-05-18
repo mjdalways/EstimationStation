@@ -126,6 +126,24 @@ function openSettingsModal(tab) {
 
     _settingsSaved = false; // reset the save flag for this session
 
+    // AF9: Start live preview tick so clock preview animates while modal is open
+    if (window._clockPreviewInterval) clearInterval(window._clockPreviewInterval);
+    window._clockPreviewInterval = setInterval(function() {
+        var prev = document.getElementById('tc-clock-preview');
+        if (prev && typeof _acRenderClock === 'function') _acRenderClock(prev);
+    }, 1000);
+    // Stop ticking when modal closes (re-registered each open)
+    modalEl.addEventListener('hidden.bs.modal', function() {
+        clearInterval(window._clockPreviewInterval);
+        window._clockPreviewInterval = null;
+    }, { once: true });
+
+    // AF11: Make modal draggable (one-time setup per modal instance)
+    if (!modalEl._dragInit) {
+        _initDraggableModal(modalEl);
+        modalEl._dragInit = true;
+    }
+
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
     modal.show();
 
@@ -133,6 +151,48 @@ function openSettingsModal(tab) {
         const btn = document.getElementById('tab-' + tab + '-btn');
         if (btn) btn.click();
     }
+}
+
+// AF11: Draggable settings modal
+function _initDraggableModal(modalEl) {
+    var dialog = modalEl.querySelector('.modal-dialog');
+    var header = modalEl.querySelector('.modal-header');
+    if (!header || !dialog) return;
+    header.style.cursor = 'move';
+    header.addEventListener('mousedown', function(e) {
+        if (e.target.closest('button')) return; // don't drag when clicking close/buttons
+        var rect = dialog.getBoundingClientRect();
+        dialog.classList.add('was-dragged');
+        dialog.style.position = 'fixed';
+        dialog.style.left = rect.left + 'px';
+        dialog.style.top  = rect.top  + 'px';
+        dialog.style.width = rect.width + 'px';
+        dialog.style.margin = '0';
+        var startX = e.clientX - rect.left;
+        var startY = e.clientY - rect.top;
+        function onMove(ev) {
+            var newLeft = Math.max(0, Math.min(ev.clientX - startX, window.innerWidth  - rect.width));
+            var newTop  = Math.max(0, Math.min(ev.clientY - startY, window.innerHeight - 60));
+            dialog.style.left = newLeft + 'px';
+            dialog.style.top  = newTop  + 'px';
+        }
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup',  onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup',  onUp);
+        e.preventDefault();
+    });
+    // Reset position on close so next open centers normally
+    modalEl.addEventListener('hidden.bs.modal', function resetDrag() {
+        dialog.classList.remove('was-dragged');
+        dialog.style.position = '';
+        dialog.style.left  = '';
+        dialog.style.top   = '';
+        dialog.style.width = '';
+        dialog.style.margin = '';
+    });
 }
 
 // ── Z1: Settings Search ─────────────────────────────────────

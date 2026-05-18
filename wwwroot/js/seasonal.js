@@ -256,9 +256,11 @@ function _seaInjectNextDates() {
         return new Date(yr, mo-1, day);
     }
     // Approximate lookup tables for lunar/Islamic calendar seasons
-    var LNY   = {2025:new Date(2025,0,29),2026:new Date(2026,1,17),2027:new Date(2027,1,6),2028:new Date(2028,0,26),2029:new Date(2029,1,13),2030:new Date(2030,2,3)};
-    var DIWAL = {2025:new Date(2025,9,20),2026:new Date(2026,10,8),2027:new Date(2027,10,28),2028:new Date(2028,10,17),2029:new Date(2029,10,5),2030:new Date(2030,9,26)};
-    var RAMA  = {2025:new Date(2025,2,1),2026:new Date(2026,1,18),2027:new Date(2027,1,7),2028:new Date(2028,0,28),2029:new Date(2029,1,15),2030:new Date(2030,2,6)};
+    var LNY      = {2025:new Date(2025,0,29),2026:new Date(2026,1,17),2027:new Date(2027,1,6),2028:new Date(2028,0,26),2029:new Date(2029,1,13),2030:new Date(2030,2,3)};
+    var DIWAL    = {2025:new Date(2025,9,20),2026:new Date(2026,10,8),2027:new Date(2027,10,28),2028:new Date(2028,10,17),2029:new Date(2029,10,5),2030:new Date(2030,9,26)};
+    var RAMA     = {2025:new Date(2025,2,1),2026:new Date(2026,1,18),2027:new Date(2027,1,7),2028:new Date(2028,0,28),2029:new Date(2029,1,15),2030:new Date(2030,2,6)};
+    var MIDAUTUMN= {2025:new Date(2025,9,6),2026:new Date(2026,8,24),2027:new Date(2027,9,14),2028:new Date(2028,9,2),2029:new Date(2029,8,21),2030:new Date(2030,9,10)};
+    var HOLI     = {2025:new Date(2025,2,14),2026:new Date(2026,2,3),2027:new Date(2027,2,22),2028:new Date(2028,2,11),2029:new Date(2029,2,31),2030:new Date(2030,2,20)};
 
     // Fixed-date seasons
     var FIXED = {
@@ -283,6 +285,11 @@ function _seaInjectNextDates() {
             else if (key === 'lunarnew')        c = LNY[yr] || null;
             else if (key === 'diwali')          c = DIWAL[yr] || null;
             else if (key === 'ramadan')         c = RAMA[yr] || null;
+            else if (key === 'thanksgiving')    c = nthWd(yr, 11, 4, 4);    // 4th Thu Nov
+            else if (key === 'pancakeday')      { var ep=easter(yr); c=new Date(ep); c.setDate(ep.getDate()-47); } // Shrove Tue = Easter-47
+            else if (key === 'augbankholiday')  c = nthWd(yr, 8, 1, -1);    // last Mon Aug
+            else if (key === 'midautumn')       c = MIDAUTUMN[yr] || null;
+            else if (key === 'holi')            c = HOLI[yr] || null;
             if (c && c > now) return c;
         }
         return null;
@@ -293,8 +300,8 @@ function _seaInjectNextDates() {
         if (!el) return;
         var row = el.closest('.sea-row');
         if (!row) return;
-        // Find the date span (first <span> that's not a .sea-next-date)
-        var dateSpan = row.querySelector('span:not(.sea-next-date)');
+        // Find the date span — only direct children of .sea-row (avoid spans nested inside labels)
+        var dateSpan = row.querySelector(':scope > span:not(.sea-next-date)');
         var displayedText = dateSpan ? dateSpan.textContent : '';
         // Normalise duplicate detection: match "Dec 26", "26 Dec", "Dec 26–31" all as same day
         var nd = nextDate, ndDay = nd.getDate(), ndMon = nd.getMonth();
@@ -333,7 +340,8 @@ function _seaInjectNextDates() {
 
     // Process variable-date seasons
     ['mothersday','fathersday','motheringsunday','easterweek','mlkday','presidentsday',
-     'memorialday','laborday','indigenousday','lunarnew','diwali','ramadan'].forEach(function(key) {
+     'memorialday','laborday','indigenousday','lunarnew','diwali','ramadan',
+     'thanksgiving','pancakeday','augbankholiday','midautumn','holi'].forEach(function(key) {
         var next = getVariableNext(key);
         if (next) injectDate(key, next);
     });
@@ -2005,7 +2013,8 @@ function openSeasonConfig(seasonKey, label) {
 
 function _seaBuildAnimRow(fnName, c) {
     var safe = fnName.replace(/[^a-zA-Z0-9]/g, '_');
-    var testBtn = ' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="testSeasonAnim(\'' + fnName + '\')" title="Test animation">🧪</button>';
+    var testBtn     = ' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="testSeasonAnim(\'' + fnName + '\')" title="Test animation">🧪</button>';
+    var liveTestBtn = ' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="_seaTestAnimLive(\'' + fnName + '\')" title="Test with current values">🧪</button>';
     var row = '<div class="sea-cfg-row mb-2 p-2 border rounded"><div class="d-flex align-items-center gap-2 mb-1">'
         + '<input type="checkbox" id="scfg_en_' + safe + '"' + (c.enabled !== false ? ' checked' : '') + '>'
         + '<strong class="small">' + (c.name || fnName) + '</strong>'
@@ -2045,7 +2054,21 @@ function _seaBuildAnimRow(fnName, c) {
     } else if (c.type === 'alias') {
         var tgtMeta = SEA_ANIM_META[c.target] || {};
         var tgtSafe = (c.target || '').replace(/[^a-zA-Z0-9]/g, '_');
-        row += '<div class="small text-muted">↪ Alias of <a href="#" onclick="document.getElementById(\'scfg_en_' + tgtSafe + '\').closest(\'.sea-cfg-row\').scrollIntoView({behavior:\'smooth\'});return false;" class="text-decoration-none"><strong>' + (tgtMeta.name || c.target) + '</strong></a> — configure via that animation.' + testBtn + '</div>';
+        var tgtName = '<strong>' + _escHtml(tgtMeta.name || c.target) + '</strong>';
+        // AF4: Detect whether target is in the currently-open season panel
+        var tgtSeason = null;
+        Object.keys(SEA_ANIMS || {}).forEach(function(sk) {
+            if ((SEA_ANIMS[sk] || []).some(function(fn) { return fn.name === c.target; })) tgtSeason = sk;
+        });
+        if (tgtSeason === _seaConfigSeasonKey) {
+            // Same-season — safe scroll link with null guard
+            var js = "var el=document.getElementById('scfg_en_" + tgtSafe + "');if(el)el.closest('.sea-cfg-row').scrollIntoView({behavior:'smooth'});return false;";
+            row += '<div class="small text-muted">↪ Alias of <a href="#" onclick="' + js + '" class="text-decoration-none">' + tgtName + '</a> — configure via that animation. ' + testBtn + '</div>';
+        } else {
+            // Cross-season — show which season to open instead (null ref would crash)
+            var seaLabel = tgtSeason ? (' (' + tgtSeason + ')') : '';
+            row += '<div class="small text-muted">↪ Alias of ' + tgtName + seaLabel + ' — open that season\'s ⚙ config to customize. ' + testBtn + '</div>';
+        }
     } else {
         // custom — field-presence based renderer
         if (fnName === '_seaStarWarsCrawl') {
@@ -2056,7 +2079,7 @@ function _seaBuildAnimRow(fnName, c) {
         } else {
             var meta = SEA_ANIM_META[fnName] || {};
             var fields = '';
-            if (meta.emoji   !== undefined) fields += ' Emoji <input type="text" id="scfg_emoji_'   + safe + '" value="' + _escHtml(c.emoji   !== undefined ? c.emoji   : meta.emoji)   + '" style="width:70px;font-size:0.85rem;" class="form-control form-control-sm d-inline-block">';
+            if (meta.emoji   !== undefined) fields += ' Emoji <input type="text" id="scfg_emoji_'   + safe + '" data-picker-target="scfg_emoji_' + safe + '" value="' + _escHtml(c.emoji   !== undefined ? c.emoji   : meta.emoji)   + '" style="width:70px;font-size:0.85rem;" class="form-control form-control-sm d-inline-block">';
             if (meta.size    !== undefined) fields += ' Size <input type="text" id="scfg_size_'     + safe + '" value="' + _escHtml(c.size    !== undefined ? c.size    : meta.size)    + '" style="width:65px" class="form-control form-control-sm d-inline-block" placeholder="2rem">';
             if (meta.count   !== undefined) fields += ' Count <input type="number" id="scfg_count_' + safe + '" value="' + (c.count   !== undefined ? c.count   : meta.count)   + '" min="1" max="50" style="width:55px" class="form-control form-control-sm d-inline-block">';
             if (meta.dur     !== undefined) fields += ' Dur <input type="number" id="scfg_dur_'     + safe + '" value="' + (c.dur     !== undefined ? c.dur     : meta.dur)     + '" min="0.5" max="20" step="0.5" style="width:60px" class="form-control form-control-sm d-inline-block">s';
@@ -2064,9 +2087,10 @@ function _seaBuildAnimRow(fnName, c) {
             if (meta.bgColor !== undefined) fields += ' BG <input type="color" id="scfg_bgColor_'   + safe + '" value="' + _cssColorToHex(c.bgColor !== undefined ? c.bgColor : meta.bgColor) + '" style="width:34px;height:24px" class="form-control form-control-sm d-inline-block p-0 border-0">';
             if (meta.text    !== undefined) fields += '<br>Text <input type="text" id="scfg_text_'  + safe + '" value="' + _escHtml(c.text    !== undefined ? c.text    : meta.text)    + '" style="width:200px;max-width:100%" class="form-control form-control-sm d-inline-block">';
             if (fields) {
-                row += '<div class="d-flex flex-wrap gap-1 align-items-center mt-1" style="font-size:0.78rem;">' + fields + testBtn + '</div>';
+                // AF6: Use liveTestBtn so unsaved DOM values are used during preview
+                row += '<div class="d-flex flex-wrap gap-1 align-items-center mt-1" style="font-size:0.78rem;">' + fields + liveTestBtn + '</div>';
             } else {
-                row += '<div class="small text-muted">Wrapper animation — enable/disable only.' + testBtn + '</div>';
+                row += '<div class="small text-muted">Wrapper animation — enable/disable only.' + liveTestBtn + '</div>';
             }
         }
     }
@@ -2097,6 +2121,32 @@ function _cssColorToHex(val) {
 }
 
 function testSeasonAnim(fnName) {
+    var fn = window[fnName];
+    if (typeof fn === 'function') fn();
+}
+
+// AF6 — Test using current unsaved DOM field values (custom animations only)
+function _seaTestAnimLive(fnName) {
+    var key = _seaConfigSeasonKey;
+    if (!key) { testSeasonAnim(fnName); return; }
+    var meta = SEA_ANIM_META[fnName] || {};
+    var safe = fnName.replace(/[^a-zA-Z0-9]/g, '_');
+    // Read current saved config
+    var allCfg = {};
+    try { allCfg = JSON.parse(localStorage.getItem('sea_cfg_' + key) || '{}'); } catch(e) {}
+    var o = Object.assign({}, allCfg[fnName] || {});
+    // Override with current DOM values (unsaved)
+    function rf(id) { var el = document.getElementById(id); return el ? el.value : undefined; }
+    if (meta.emoji   !== undefined) { var v = rf('scfg_emoji_'   + safe); if (v !== undefined) o.emoji   = v; }
+    if (meta.size    !== undefined) { var v = rf('scfg_size_'    + safe); if (v !== undefined) o.size    = v; }
+    if (meta.count   !== undefined) { var v = rf('scfg_count_'   + safe); if (v !== undefined) o.count   = parseInt(v) || meta.count; }
+    if (meta.dur     !== undefined) { var v = rf('scfg_dur_'     + safe); if (v !== undefined) o.dur     = parseFloat(v) || meta.dur; }
+    if (meta.color   !== undefined) { var v = rf('scfg_color_'   + safe); if (v !== undefined) o.color   = v; }
+    if (meta.bgColor !== undefined) { var v = rf('scfg_bgColor_' + safe); if (v !== undefined) o.bgColor = v; }
+    if (meta.text    !== undefined) { var v = rf('scfg_text_'    + safe); if (v !== undefined) o.text    = v; }
+    // Temporarily write merged config, run animation, restore original
+    allCfg[fnName] = o;
+    localStorage.setItem('sea_cfg_' + key, JSON.stringify(allCfg));
     var fn = window[fnName];
     if (typeof fn === 'function') fn();
 }

@@ -2140,3 +2140,9 @@ mark.search-highlight { background: #fff176; color: inherit; border-radius: 2px;
     color: var(--text-primary, #333);
 }
 
+/* AF11 — Draggable settings modal */
+.settings-modal-dialog.was-dragged {
+    transform: none !important;
+    margin: 0 !important;
+}
+
