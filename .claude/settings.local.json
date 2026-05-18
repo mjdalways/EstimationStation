@@ -22,7 +22,11 @@
       "Bash(grep -n \"^function \" /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/room.js | tail -20)",
       "Bash(powershell.exe -Command 'Select-String -Path '\\\\''C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\\\\js\\\\vendor\\\\confetti.min.js'\\\\'' -Pattern '\\\\''zIndex'\\\\'' | Select-Object -First 1 | ForEach-Object { $_.Line.Substring\\([Math]::Max\\(0,$_.Matches[0].Index-30\\), 80\\) }')",
       "PowerShell($content = Get-Content 'C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\\\\js\\\\vendor\\\\confetti.min.js' -Raw; $m = [regex]::Match\\($content, 'zIndex.{0,40}'\\); $m.Value)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\" -Recurse -Filter \"*.js\" -o Name)"
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\" -Recurse -Filter \"*.js\" -o Name)",
+      "Bash(Select-String -Path \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\\\\js\\\\room.js\" -Pattern \"^}\")",
+      "Bash(Select-Object -Last 5)",
+      "Bash(Format-Table LineNumber, Line -AutoSize)",
+      "Bash(cd /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation && dotnet build --no-incremental -v quiet 2>&1 | tail -30)"
     ]
   }
 }

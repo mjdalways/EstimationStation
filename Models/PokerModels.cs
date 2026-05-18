@@ -18,6 +18,10 @@ public class Room
     public string? ShameParticipantId { get; set; }
     public string? Pin { get; set; }
     public bool RevealMajorityFirst { get; set; } = true;
+    // AD1 — Host tracking
+    public string? HostConnectionId { get; set; }
+    // AD2 — Settings lock: none | ask | hostonly | hidden
+    public string SettingsLockMode { get; set; } = "none";
 }
 
 public class Participant

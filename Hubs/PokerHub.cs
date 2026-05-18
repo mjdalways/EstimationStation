@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using EstimationStation.Models;
 using EstimationStation.Services;
+using System.Collections.Concurrent;
 
 namespace EstimationStation.Hubs;
 
@@ -8,6 +9,10 @@ public class PokerHub : Hub
 {
     private readonly RoomService _roomService;
     private readonly JiraService _jiraService;
+
+    // AD3 — Pending setting-change requests for "ask" lock mode
+    private static readonly ConcurrentDictionary<string, PendingSettingRequest> _pendingRequests = new();
+    private record PendingSettingRequest(string RoomName, string RequesterConnectionId, string RequesterName, string SettingKey, string ValueJson, DateTime CreatedAt);
 
     public PokerHub(RoomService roomService, JiraService jiraService)
     {
@@ -53,13 +58,21 @@ public class PokerHub : Hub
             room.Participants.RemoveAll(p => p.ConnectionId == Context.ConnectionId);
             room.Participants.Add(participant);
             room.LastActivity = DateTime.UtcNow;
+
+            // AD1 — Set host to first joiner; also reclaim if previous host disconnected
+            if (string.IsNullOrEmpty(room.HostConnectionId) ||
+                !room.Participants.Any(p => p.ConnectionId == room.HostConnectionId && p.ConnectionId != Context.ConnectionId))
+            {
+                if (string.IsNullOrEmpty(room.HostConnectionId))
+                    room.HostConnectionId = Context.ConnectionId;
+            }
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
         _roomService.SaveRoom(room);
 
         // Send full state to the joining participant
-        await Clients.Caller.SendAsync("RoomState", BuildRoomState(room));
+        await Clients.Caller.SendAsync("RoomState", BuildRoomState(room, Context.ConnectionId));
 
         // Notify others
         await Clients.OthersInGroup(roomName).SendAsync("ParticipantJoined", new
@@ -82,6 +95,8 @@ public class PokerHub : Hub
         if (room == null) return;
 
         string participantName = string.Empty;
+        string? newHostId = null;
+        bool wasHost = false;
         lock (room)
         {
             var participant = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
@@ -90,14 +105,26 @@ public class PokerHub : Hub
                 participantName = participant.Name;
                 room.Participants.Remove(participant);
             }
+            // AD1 — Transfer host if the host left
+            if (room.HostConnectionId == Context.ConnectionId && room.Participants.Any())
+            {
+                wasHost = true;
+                room.HostConnectionId = room.Participants.First().ConnectionId;
+                newHostId = room.HostConnectionId;
+            }
         }
 
         _roomService.RemoveConnection(Context.ConnectionId);
+        if (wasHost) _roomService.SaveRoom(room);
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomName);
 
         if (!string.IsNullOrEmpty(participantName))
         {
             await Clients.Group(roomName).SendAsync("ParticipantLeft", Context.ConnectionId, participantName);
+        }
+        if (newHostId != null)
+        {
+            await Clients.Group(roomName).SendAsync("HostChanged", newHostId);
         }
     }
 
@@ -432,6 +459,150 @@ public class PokerHub : Hub
         await Clients.Group(roomName).SendAsync("RevealOrderingToggled", enabled);
     }
 
+    // AD1 — Transfer host to another participant (host-only)
+    public async Task TransferHost(string targetConnectionId)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || room.HostConnectionId != Context.ConnectionId) return;
+        if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+        lock (room) { room.HostConnectionId = targetConnectionId; }
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("HostChanged", targetConnectionId);
+    }
+
+    // AD2 — Change settings lock mode (host-only)
+    public async Task SetSettingsLock(string mode)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || room.HostConnectionId != Context.ConnectionId) return;
+        var validModes = new[] { "none", "ask", "hostonly", "hidden" };
+        if (!validModes.Contains(mode)) return;
+        lock (room) { room.SettingsLockMode = mode; }
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("SettingsLockChanged", mode);
+    }
+
+    // AD3 — Non-host requests a setting change (requires host approval in "ask" mode)
+    public async Task RequestSettingChange(string settingKey, string valueJson)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || room.SettingsLockMode != "ask") return;
+        if (room.HostConnectionId == Context.ConnectionId) return; // host doesn't need to ask
+        if (string.IsNullOrEmpty(room.HostConnectionId)) return;
+
+        var requester = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (requester == null) return;
+
+        var requestId = Guid.NewGuid().ToString("N")[..8];
+        _pendingRequests[requestId] = new PendingSettingRequest(
+            roomName, Context.ConnectionId, requester.Name, settingKey, valueJson, DateTime.UtcNow);
+
+        await Clients.Client(room.HostConnectionId).SendAsync("SettingChangeRequested",
+            requestId, requester.Name, settingKey, valueJson);
+    }
+
+    // AD3 — Host approves or denies a pending setting change request
+    public async Task ApproveSettingChange(string requestId, bool approved)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || room.HostConnectionId != Context.ConnectionId) return;
+
+        if (!_pendingRequests.TryRemove(requestId, out var req)) return;
+        if (req.RoomName != roomName) return;
+
+        await Clients.Client(req.RequesterConnectionId).SendAsync("SettingChangeResolved", requestId, approved, req.SettingKey);
+
+        if (approved)
+            await ExecuteSettingChange(room, req.SettingKey, req.ValueJson);
+    }
+
+    private async Task ExecuteSettingChange(Room room, string settingKey, string valueJson)
+    {
+        switch (settingKey)
+        {
+            case "autoReveal":
+                if (bool.TryParse(valueJson, out var ar)) {
+                    lock (room) { room.AutoReveal = ar; }
+                    _roomService.SaveRoom(room);
+                    await Clients.Group(room.Name).SendAsync("AutoRevealToggled", ar);
+                }
+                break;
+            case "ghostMode":
+                if (bool.TryParse(valueJson, out var gm)) {
+                    lock (room) { room.GhostModeEnabled = gm; }
+                    _roomService.SaveRoom(room);
+                    await Clients.Group(room.Name).SendAsync("GhostModeToggled", gm, "");
+                }
+                break;
+            case "revealMajorityFirst":
+                if (bool.TryParse(valueJson, out var rmf)) {
+                    lock (room) { room.RevealMajorityFirst = rmf; }
+                    _roomService.SaveRoom(room);
+                    await Clients.Group(room.Name).SendAsync("RevealOrderingToggled", rmf);
+                }
+                break;
+            case "estimateSet":
+                var setName = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(valueJson)?["set"] ?? "fibonacci";
+                if (RoomService.EstimateSets.TryGetValue(setName, out var info)) {
+                    lock (room) { room.EstimateSet = setName; room.CustomEstimates = null; }
+                    _roomService.SaveRoom(room);
+                    await Clients.Group(room.Name).SendAsync("EstimateSetChanged", setName, info.Values);
+                }
+                break;
+        }
+    }
+
+    // AD5 — Private message to a single participant
+    public async Task SendPrivateMessage(string targetConnectionId, string message)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+        var sender = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (sender == null) return;
+        message = (message ?? "").Trim();
+        if (message.Length > 500) message = message[..500];
+        if (string.IsNullOrEmpty(message)) return;
+        await Clients.Client(targetConnectionId).SendAsync("PrivateMessageReceived", sender.Name, message, DateTime.UtcNow);
+    }
+
+    // AD6 — Private emoji reaction to a single participant
+    public async Task SendPrivateReaction(string targetConnectionId, string emoji)
+    {
+        if (string.IsNullOrWhiteSpace(emoji) || emoji.Length > 10) return;
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || !room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+        var sender = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (sender == null) return;
+        await Clients.Client(targetConnectionId).SendAsync("PrivateReactionReceived", sender.Name, emoji);
+    }
+
+    // AD7 — Private sound to a single participant
+    public async Task SendSoundToParticipant(string targetConnectionId, string soundId)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || !room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+        var sender = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (sender == null) return;
+        var validSounds = new[] { "fanfare", "drumroll", "bell", "airhorn" };
+        if (!validSounds.Contains(soundId)) return;
+        await Clients.Client(targetConnectionId).SendAsync("SoundTriggered", soundId, sender.Name);
+    }
+
     public async Task SetEstimateSet(string setName, string? customValues)
     {
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
@@ -737,7 +908,7 @@ public class PokerHub : Hub
         return farthest.Count == 1 ? farthest[0].participant.ConnectionId : null;
     }
 
-    private static object BuildRoomState(Room room)
+    private static object BuildRoomState(Room room, string requestingConnectionId)
     {
         string[] estimateValues;
         if (room.EstimateSet == "custom" && !string.IsNullOrEmpty(room.CustomEstimates))
@@ -765,6 +936,10 @@ public class PokerHub : Hub
             estimateSet = room.EstimateSet,
             estimateValues,
             customEstimates = room.CustomEstimates,
+            // AD1 — host info
+            isHost = room.HostConnectionId == requestingConnectionId,
+            hostConnectionId = room.HostConnectionId,
+            settingsLockMode = room.SettingsLockMode,
             participants = room.Participants.Select(p => new
             {
                 connectionId = p.ConnectionId,

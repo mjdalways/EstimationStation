@@ -39,7 +39,12 @@ let roomState = {
     revealMajorityFirst: true,  // N3: room-level; overridden by RoomState on join
     currentStoryId: null,
     estimateSet: 'fibonacci',
-    history: []   // full session: { story, votes, stats, voteOrder, flipCounts }
+    history: [],   // full session: { story, votes, stats, voteOrder, flipCounts }
+    // AD1 — Host tracking
+    isHost: false,
+    hostConnectionId: null,
+    // AD2 — Settings lock mode: none | ask | hostonly | hidden
+    settingsLockMode: 'none'
 };
 window.roomState = roomState;
 
@@ -81,6 +86,10 @@ function registerHandlers() {
         roomState.currentStoryId = state.currentStoryId;
         roomState.estimateSet = state.estimateSet;
         currentEstimateValues = state.estimateValues || currentEstimateValues;
+        // AD1 — host fields
+        roomState.isHost = state.isHost === true;
+        roomState.hostConnectionId = state.hostConnectionId || null;
+        roomState.settingsLockMode = state.settingsLockMode || 'none';
 
         document.getElementById('autoRevealCheck').checked = state.autoReveal;
         var rmfChk = document.getElementById('revealMajorityCheck');
@@ -103,6 +112,12 @@ function registerHandlers() {
         updateCurrentStoryDisplay();
         _updateGhostToggleBtn();
         _updateSprintDashboard();
+        // AD1 — Apply host/lock UI after render
+        _applyHostLockUI();
+        // AD5 — Show setup prompt if host just created a fresh room (sole participant)
+        if (state.isHost && state.participants && state.participants.length === 1) {
+            setTimeout(_showHostSetupPrompt, 800);
+        }
 
         if (state.votesRevealed) {
             const votes = {};
@@ -434,6 +449,44 @@ function registerHandlers() {
         const btn = document.getElementById('pinBtn');
         if (btn) btn.classList.toggle('btn-warning', hasPin);
     });
+
+    // AD1 — Host transferred
+    connection.on('HostChanged', (newHostId) => {
+        roomState.hostConnectionId = newHostId;
+        roomState.isHost = (newHostId === myConnectionId);
+        _applyHostLockUI();
+        if (roomState.isHost) _showToastAD('👑 You are now the room host', 'info');
+    });
+
+    // AD2 — Settings lock mode changed
+    connection.on('SettingsLockChanged', (mode) => {
+        roomState.settingsLockMode = mode;
+        var sel = document.getElementById('settingsLockSelect');
+        if (sel) sel.value = mode;
+        _applyHostLockUI();
+    });
+
+    // AD3 — Host receives a setting-change request from a non-host
+    connection.on('SettingChangeRequested', (requestId, requesterName, settingKey, valueJson) => {
+        var labelMap = { autoReveal:'Auto Reveal', ghostMode:'Ghost Mode', revealMajorityFirst:'Reveal Ordering', estimateSet:'Estimate Set' };
+        var label = labelMap[settingKey] || settingKey;
+        _showHostApprovalToast(requestId, requesterName, label);
+    });
+
+    // AD3 — Requester receives result of their request
+    connection.on('SettingChangeResolved', (requestId, approved, settingKey) => {
+        _showToastAD(approved ? '✅ Setting change approved by host' : '❌ Setting change denied by host', approved ? 'success' : 'danger');
+    });
+
+    // AD5 — Private message received
+    connection.on('PrivateMessageReceived', (senderName, message, timestamp) => {
+        _showPrivateMessageToast(senderName, message);
+    });
+
+    // AD6 — Private emoji reaction received
+    connection.on('PrivateReactionReceived', (senderName, emoji) => {
+        _reactionFloatFromBadge(null, emoji, senderName);
+    });
 }
 
 // ============================================================
@@ -499,6 +552,16 @@ function renderParticipants() {
             if (isMe)              avatarEl.classList.add('av-me');
             div.prepend(avatarEl);
         }
+
+        // AD1 — Host crown
+        if (p.connectionId === roomState.hostConnectionId) {
+            div.classList.add('is-host');
+        }
+
+        // AD6 — Right-click context menu
+        div.addEventListener('contextmenu', function(e) {
+            _showParticipantContextMenu(e, p.connectionId, p.name);
+        });
 
         container.appendChild(div);
 
@@ -898,7 +961,8 @@ async function revealVotes() {
 }
 
 async function toggleGhostMode() {
-    try { await connection.invoke('ToggleGhostMode', !roomState.ghostModeEnabled); } catch(e) { console.error(e); }
+    await _invokeRoomSetting('ghostMode', String(!roomState.ghostModeEnabled),
+        () => connection.invoke('ToggleGhostMode', !roomState.ghostModeEnabled));
 }
 
 function openPinModal(forJoin) {
@@ -1034,12 +1098,14 @@ async function deleteStory(storyId) {
 }
 
 async function toggleAutoReveal(enabled) {
-    try { await connection.invoke('ToggleAutoReveal', enabled); } catch(e) { console.error(e); }
+    await _invokeRoomSetting('autoReveal', String(enabled),
+        () => connection.invoke('ToggleAutoReveal', enabled));
 }
 
 // N3: room-level reveal ordering toggle
 async function toggleRevealOrdering(enabled) {
-    try { await connection.invoke('ToggleRevealOrdering', enabled); } catch(e) { console.error(e); }
+    await _invokeRoomSetting('revealMajorityFirst', String(enabled),
+        () => connection.invoke('ToggleRevealOrdering', enabled));
 }
 
 async function toggleObserver(enabled) {
@@ -2266,6 +2332,258 @@ function testSoundboard() {
     var saved = parseInt(localStorage.getItem('es_sidebarWidth'));
     if (saved >= MIN_W) applyWidth(saved);
 })();
+
+// ============================================================
+// AD — Host + Settings Lock + Participant Messaging
+// ============================================================
+
+// AD1/AD2 — Apply host-awareness and lock-mode UI
+function _applyHostLockUI() {
+    var lockMode = roomState.settingsLockMode;
+    var isHost = roomState.isHost;
+
+    // Host-only elements (lock selector)
+    document.querySelectorAll('[data-host-only]').forEach(function(el) {
+        el.style.display = isHost ? '' : 'none';
+    });
+
+    // Sync host lock selector value
+    var sel = document.getElementById('settingsLockSelect');
+    if (sel && sel.value !== lockMode) sel.value = lockMode;
+
+    // Room-setting containers: hide in 'hidden' mode; disable in 'hostonly' mode
+    document.querySelectorAll('[data-room-setting]').forEach(function(container) {
+        if (lockMode === 'hidden' && !isHost) {
+            container.style.display = 'none';
+            return;
+        }
+        container.style.display = '';
+        var canEdit = isHost || lockMode === 'none' || lockMode === 'ask';
+        // Apply disabled to any interactive child elements
+        container.querySelectorAll('input, select, button').forEach(function(ctrl) {
+            if (canEdit) { ctrl.removeAttribute('disabled'); }
+            else { ctrl.setAttribute('disabled', 'disabled'); }
+        });
+        // Also handle when the container itself is a button
+        if (container.tagName === 'BUTTON' || container.tagName === 'INPUT' || container.tagName === 'SELECT') {
+            if (canEdit) { container.removeAttribute('disabled'); }
+            else { container.setAttribute('disabled', 'disabled'); }
+        }
+        container.classList.toggle('room-setting-locked', !canEdit);
+    });
+
+    // Update host crown on participant badges
+    document.querySelectorAll('.participant-badge[data-connection-id]').forEach(function(badge) {
+        badge.classList.toggle('is-host', badge.dataset.connectionId === roomState.hostConnectionId);
+    });
+}
+
+// AD2 — Set settings lock mode (host-only, called from settings UI)
+async function setSettingsLock(mode) {
+    try { await connection.invoke('SetSettingsLock', mode); } catch(e) { console.error(e); }
+}
+
+// AD1 — Transfer host to another participant (host-only)
+async function transferHost(targetConnectionId) {
+    try { await connection.invoke('TransferHost', targetConnectionId); } catch(e) { console.error(e); }
+}
+
+// AD3 — Gate room-setting invocations through the lock mode
+async function _invokeRoomSetting(settingKey, valueJson, directInvokeFn) {
+    if (roomState.isHost || roomState.settingsLockMode === 'none') {
+        try { await directInvokeFn(); } catch(e) { console.error(e); }
+        return;
+    }
+    if (roomState.settingsLockMode === 'ask') {
+        try {
+            await connection.invoke('RequestSettingChange', settingKey, valueJson);
+            _showToastAD('⏳ Request sent to host for approval', 'info');
+        } catch(e) { console.error(e); }
+        return;
+    }
+    // hostonly / hidden — should be disabled in UI, but guard defensively
+    _showToastAD('🔒 Only the host can change room settings', 'warning');
+}
+
+// AD3 — Host approval toast (shown to host when a non-host requests a change)
+function _showHostApprovalToast(requestId, requesterName, settingLabel) {
+    var toast = document.createElement('div');
+    toast.className = 'host-approval-toast';
+    toast.dataset.requestId = requestId;
+    toast.innerHTML =
+        '<div style="margin-bottom:6px"><strong>' + escHtml(requesterName) + '</strong> wants to change <em>' + escHtml(settingLabel) + '</em></div>' +
+        '<div class="d-flex gap-2">' +
+        '<button class="btn btn-xs btn-success py-0" onclick="_approveSettingChange(\'' + requestId + '\',true)">✅ Approve</button>' +
+        '<button class="btn btn-xs btn-danger py-0" onclick="_approveSettingChange(\'' + requestId + '\',false)">❌ Deny</button>' +
+        '</div>';
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 30000);
+}
+async function _approveSettingChange(requestId, approved) {
+    try {
+        await connection.invoke('ApproveSettingChange', requestId, approved);
+        document.querySelectorAll('.host-approval-toast[data-request-id="' + requestId + '"]')
+            .forEach(function(t) { t.remove(); });
+    } catch(e) { console.error(e); }
+}
+
+// AD5 — Room creation setup prompt (shown to host when alone in room)
+function _showHostSetupPrompt() {
+    if (roomState.settingsLockMode && roomState.settingsLockMode !== 'none') return;
+    if (document.getElementById('host-setup-modal')) return; // already shown
+    var modal = document.createElement('div');
+    modal.id = 'host-setup-modal';
+    modal.className = 'host-setup-modal-backdrop';
+    modal.innerHTML =
+        '<div class="host-setup-modal-box">' +
+        '<div class="host-setup-title">👑 You\'re the host!</div>' +
+        '<p class="host-setup-desc">Choose how other participants can change room settings (estimate set, auto-reveal, ghost mode, etc.)</p>' +
+        '<div class="host-setup-options">' +
+        '<button class="host-setup-opt" onclick="_applyHostSetup(\'none\')">🔓 <strong>No Lock</strong><br><small>Anyone can change room settings</small></button>' +
+        '<button class="host-setup-opt" onclick="_applyHostSetup(\'ask\')">🙋 <strong>Ask First</strong><br><small>Changes need your approval</small></button>' +
+        '<button class="host-setup-opt" onclick="_applyHostSetup(\'hostonly\')">🔒 <strong>Host Only</strong><br><small>Others see settings but can\'t change</small></button>' +
+        '<button class="host-setup-opt" onclick="_applyHostSetup(\'hidden\')">🙈 <strong>Hidden</strong><br><small>Only you see room settings</small></button>' +
+        '</div>' +
+        '<button class="host-setup-skip" onclick="_applyHostSetup(\'none\')">Skip (No Lock)</button>' +
+        '</div>';
+    document.body.appendChild(modal);
+}
+async function _applyHostSetup(mode) {
+    var modal = document.getElementById('host-setup-modal');
+    if (modal) modal.remove();
+    await setSettingsLock(mode);
+}
+
+// AD6 — Participant right-click context menu
+function _showParticipantContextMenu(e, connectionId, name) {
+    e.preventDefault();
+    _closeParticipantCtxMenu();
+
+    var items = [];
+    if (roomState.isHost && connectionId !== myConnectionId) {
+        items.push({ label: '👑 Transfer Host', action: function() { transferHost(connectionId); } });
+        items.push({ type: 'sep' });
+    }
+    items.push({ label: '📨 Private Message', action: function() { _openPrivateMessageInput(connectionId, name); } });
+    items.push({ label: '😄 Send Emoji',      action: function() { _openEmojiSendPicker(connectionId, name); } });
+    items.push({ label: '🔊 Send Sound',      action: function() { _openSoundSendMenu(connectionId, name); } });
+
+    var menu = document.createElement('ul');
+    menu.id = 'participant-ctx-menu';
+    menu.className = 'participant-context-menu';
+    items.forEach(function(item) {
+        var li = document.createElement('li');
+        if (item.type === 'sep') {
+            li.className = 'ctx-sep';
+        } else {
+            li.textContent = item.label;
+            li.addEventListener('click', function() { _closeParticipantCtxMenu(); item.action(); });
+        }
+        menu.appendChild(li);
+    });
+    document.body.appendChild(menu);
+
+    // Position near cursor, keep in viewport
+    var mw = menu.offsetWidth, mh = menu.offsetHeight;
+    menu.style.left = Math.min(e.clientX, window.innerWidth - mw - 8) + 'px';
+    menu.style.top  = Math.min(e.clientY, window.innerHeight - mh - 8) + 'px';
+
+    setTimeout(function() {
+        document.addEventListener('click', _closeParticipantCtxMenu, { once: true });
+    }, 0);
+}
+function _closeParticipantCtxMenu() {
+    var m = document.getElementById('participant-ctx-menu');
+    if (m) m.remove();
+}
+
+// AD7 — Private message
+function _openPrivateMessageInput(connectionId, name) {
+    var msg = prompt('Private message to ' + name + ':');
+    if (msg && msg.trim()) {
+        connection.invoke('SendPrivateMessage', connectionId, msg.trim()).catch(console.error);
+    }
+}
+function _showPrivateMessageToast(senderName, message) {
+    var toast = document.createElement('div');
+    toast.className = 'private-msg-toast';
+    toast.innerHTML =
+        '<div class="pm-header">🔒 Private from <strong>' + escHtml(senderName) + '</strong></div>' +
+        '<div class="pm-body">' + escHtml(message) + '</div>' +
+        '<button class="pm-close" onclick="this.closest(\'.private-msg-toast\').remove()">✕</button>';
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 15000);
+}
+
+// AD8 — Send emoji privately
+function _openEmojiSendPicker(connectionId, name) {
+    _closeParticipantCtxMenu();
+    var palette = [];
+    try { palette = JSON.parse(localStorage.getItem('es_reactionPalette') || '[]'); } catch(e) {}
+    if (!palette.length) palette = ['👍','👏','🎉','😂','❤️','🔥','😮','💡','😄','🤣','😎','🥳','👀','💯','🙈'];
+
+    var menu = document.createElement('div');
+    menu.className = 'emoji-send-menu';
+    palette.forEach(function(em) {
+        var btn = document.createElement('button');
+        btn.className = 'emoji-send-btn';
+        btn.textContent = em;
+        btn.title = 'Send ' + em + ' to ' + name;
+        btn.addEventListener('click', function() {
+            menu.remove();
+            connection.invoke('SendPrivateReaction', connectionId, em).catch(console.error);
+        });
+        menu.appendChild(btn);
+    });
+    document.body.appendChild(menu);
+    // Position at centre-bottom of screen on mobile, or near mouse on desktop
+    menu.style.bottom = '80px';
+    menu.style.right = '20px';
+    setTimeout(function() {
+        document.addEventListener('click', function h() { menu.remove(); document.removeEventListener('click', h); }, { once: true });
+    }, 0);
+}
+
+// AD9 — Send sound privately
+function _openSoundSendMenu(connectionId, name) {
+    _closeParticipantCtxMenu();
+    var sounds = [
+        { id:'fanfare',  label:'🎺 Fanfare' },
+        { id:'drumroll', label:'🥁 Drumroll' },
+        { id:'bell',     label:'🔔 Bell' },
+        { id:'airhorn',  label:'📯 Airhorn' }
+    ];
+    var menu = document.createElement('div');
+    menu.className = 'sound-send-menu';
+    sounds.forEach(function(s) {
+        var btn = document.createElement('button');
+        btn.className = 'sound-send-btn';
+        btn.textContent = s.label;
+        btn.title = 'Send ' + s.label + ' sound to ' + name;
+        btn.addEventListener('click', function() {
+            menu.remove();
+            connection.invoke('SendSoundToParticipant', connectionId, s.id).catch(console.error);
+        });
+        menu.appendChild(btn);
+    });
+    document.body.appendChild(menu);
+    menu.style.position = 'fixed';
+    menu.style.bottom = '80px';
+    menu.style.right = '20px';
+    setTimeout(function() {
+        document.addEventListener('click', function h() { menu.remove(); document.removeEventListener('click', h); }, { once: true });
+    }, 0);
+}
+
+// AD — Simple toast helper (avoids dependency on external showToast)
+function _showToastAD(message, type) {
+    if (typeof showToast === 'function') { showToast(message, type); return; }
+    var t = document.createElement('div');
+    t.className = 'ad-toast ad-toast-' + (type || 'info');
+    t.textContent = message;
+    document.body.appendChild(t);
+    setTimeout(function() { if (t.parentNode) t.remove(); }, 4000);
+}
 
 // ============================================================
 // Init

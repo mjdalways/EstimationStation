@@ -173,19 +173,19 @@
             <button class="btn btn-secondary w-100 mb-2" id="hideBtn" onclick="hideVotes()" style="display:none;">🙈 Hide</button>
             <button class="btn btn-warning w-100 mb-2" onclick="resetVotes()">🔄 Reset</button>
             <button class="btn btn-outline-info w-100 mb-2" onclick="openDecider()">🎡 Decider</button>
-            <button class="btn btn-outline-secondary w-100 mb-2" id="ghostToggleBtn" onclick="toggleGhostMode()" title="Latecomers join as ghosts (watch only) when on">👻 Ghost: Off</button>
+            <button class="btn btn-outline-secondary w-100 mb-2" id="ghostToggleBtn" onclick="toggleGhostMode()" title="Latecomers join as ghosts (watch only) when on" data-room-setting="ghostMode">👻 Ghost: Off</button>
             <button id="pinBtn" class="btn btn-outline-secondary w-100 mb-2" onclick="openPinModal(false)" title="Set or clear room PIN">🔒 PIN</button>
         </div>
 
-        <div class="control-group">
+        <div class="control-group" id="room-settings-section">
             <h6 class="control-title">⚙️ Settings</h6>
-            <div class="form-check mb-2">
+            <div class="form-check mb-2" data-room-setting="autoReveal">
                 <input class="form-check-input" type="checkbox" id="autoRevealCheck" onchange="toggleAutoReveal(this.checked)" />
-                <label class="form-check-label" for="autoRevealCheck">Auto-reveal</label>
+                <label class="form-check-label" for="autoRevealCheck">Auto-reveal <span class="badge-room-setting" title="Shared with all room participants">👥</span></label>
             </div>
-            <div class="form-check mb-2">
+            <div class="form-check mb-2" data-room-setting="revealMajorityFirst">
                 <input class="form-check-input" type="checkbox" id="revealMajorityCheck" checked onchange="toggleRevealOrdering(this.checked)" title="Outlier voter revealed last with a dramatic pause" />
-                <label class="form-check-label" for="revealMajorityCheck" title="Outlier voter revealed last with a dramatic pause">Reveal majority first</label>
+                <label class="form-check-label" for="revealMajorityCheck" title="Outlier voter revealed last with a dramatic pause">Reveal majority first <span class="badge-room-setting" title="Shared with all room participants">👥</span></label>
             </div>
             <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="observerCheck" onchange="toggleObserver(this.checked)" />
@@ -195,10 +195,22 @@
                 <input class="form-check-input" type="checkbox" id="skipVoteCheck" onchange="toggleSkipVoteCard(this.checked)" />
                 <label class="form-check-label" for="skipVoteCheck">🚫 Skip card</label>
             </div>
+            <!-- AD2: Host-only settings lock selector -->
+            <div id="host-lock-section" data-host-only style="display:none;">
+                <hr class="my-2" />
+                <div class="mb-1 small fw-bold text-muted">🔒 Settings Lock</div>
+                <select class="form-select form-select-sm" onchange="setSettingsLock(this.value)" id="settingsLockSelect">
+                    <option value="none">🔓 No lock — anyone can change</option>
+                    <option value="ask">🙋 Ask first — host must approve</option>
+                    <option value="hostonly">🔒 Host only (disabled for others)</option>
+                    <option value="hidden">🙈 Host only (hidden from others)</option>
+                </select>
+                <div class="text-muted mt-1" style="font-size:0.68rem;">Only room-level settings (👥) are locked. Personal settings are always individual.</div>
+            </div>
         </div>
 
-        <div class="control-group">
-            <h6 class="control-title">🎯 Estimate Set</h6>
+        <div class="control-group" data-room-setting="estimateSet">
+            <h6 class="control-title">🎯 Estimate Set <span class="badge-room-setting" title="Shared with all room participants">👥</span></h6>
             <select id="estimateSetSelect" class="form-select form-select-sm mb-2" onchange="changeEstimateSet(this.value)">
                 <option value="fibonacci">Fibonacci</option>
                 <option value="modified-fibonacci">Modified Fibonacci</option>
