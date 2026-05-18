@@ -517,7 +517,7 @@ var SEA_ANIM_META = {
     _seaAprilShowers:     { name:'April Showers',       type:'particles', chars:['💧','💧','🌧'],                count:22, anim:'sea-rain',       durRange:[1.4,2.5],sizeRange:[0.5,1],   delaySpan:2200, enabled:true },
     _seaSunPeek:          { name:'Sun Peek',            type:'corner',    emoji:'☀️',  side:'random', size:'9rem',   holdMs:4000, wave:false, enabled:true },
     // SUMMER
-    _seaSummerSun:        { name:'Summer Sun',          type:'alias',     target:'_seaSunPeek', enabled:true },
+    _seaSummerSun:        { name:'Summer Sun',          type:'corner',    emoji:'🌞', side:'random', size:'9rem', holdMs:4000, wave:false, enabled:true },
     _seaBeachBallBounce:  { name:'Beach Ball Bounce',   type:'runner',    emoji:'🏐',     dir:'lr', size:'3rem',   dur:4.8, motionStyle:'bounce', bottomAnchor:true, enabled:true },
     _seaWaveWash:         { name:'Wave Wash',           type:'custom',    emoji:'🌊', count:25, size:'3rem', dur:3.5, enabled:true },
     _seaSunglassesSlide:  { name:'Sunglasses Slide',    type:'runner',    emoji:'😎',     dir:'lr', size:'9rem',   dur:1.8, motionStyle:'none',              enabled:true },
@@ -542,7 +542,7 @@ var SEA_ANIM_META = {
     _seaTurkeyRun:        { name:'Turkey Run',          type:'runner',    emoji:'🦃',     dir:'rl', size:'3rem',   dur:3.5, motionStyle:'run',    bottomAnchor:true, enabled:true },
     _seaPieCooling:       { name:'Pie Cooling',         type:'custom',    emoji:'🥧', size:'4.5rem', dur:4.5, enabled:true },
     _seaCornucopia:       { name:'Cornucopia',          type:'corner',    emoji:'🌽🍎🥕🍊', side:'random', size:'2.5rem', holdMs:4000, wave:false, enabled:true },
-    _seaThanksgivingLeaves:{ name:'Thanksgiving Leaves',type:'alias',     target:'_seaLeavesSwirl', enabled:true },
+    _seaThanksgivingLeaves:{ name:'Thanksgiving Leaves', type:'particles', chars:['🍁','🍂','🍃','🍂'], count:14, anim:'sea-leaf-fall', durRange:[4,7], sizeRange:[0.9,2], delaySpan:2500, enabled:true },
     _seaPilgrimHatFloat:  { name:'Pilgrim Hat Float',   type:'popup',     emoji:'🎩', size:'4.5rem', holdMs:4800, enabled:true },
     _seaHarvestWagon:     { name:'Harvest Wagon',       type:'runner',    emoji:'🌾🌾🌾', dir:'lr', size:'2rem',   dur:5.5, motionStyle:'wobble', bottomAnchor:true, enabled:true },
     _seaAppleRoll:        { name:'Apple Roll',          type:'runner',    emoji:'🍎',     dir:'rl', size:'3rem',   dur:4.0, motionStyle:'spin',   bottomAnchor:true, enabled:true },
@@ -550,7 +550,7 @@ var SEA_ANIM_META = {
     _seaFeastTable:       { name:'Feast Table',         type:'custom',    text:'🍽️🍗🥧🌽🍎', size:'2.2rem', dur:5.5, enabled:true },
     _seaHayBale:          { name:'Hay Bale',            type:'runner',    emoji:'🌾',     dir:'lr', size:'3rem',   dur:5.0, motionStyle:'wobble', bottomAnchor:true, enabled:true },
     // DEEP WINTER
-    _seaDeepWinterSnow:   { name:'Deep Winter Snow',    type:'alias',     target:'_seaSnowfall', enabled:true },
+    _seaDeepWinterSnow:   { name:'Deep Winter Snow',    type:'particles', chars:['❄','❅','❆','✦'],  count:22, anim:'sea-snowfall',  durRange:[5,9],   sizeRange:[0.7,1.8], delaySpan:2500, enabled:true },
     _seaFrostCreep:       { name:'Frost Creep',         type:'corner',    emoji:'🧊',  side:'random', size:'5rem',   holdMs:4200, wave:false, enabled:true },
     _seaBlizzard:         { name:'Blizzard',            type:'particles', chars:['❄','❅','❆','✦'],      count:30, anim:'sea-snowfall',   durRange:[4,8],   sizeRange:[0.5,1.5], delaySpan:1200, enabled:true },
     // LUNAR NEW YEAR
@@ -579,7 +579,7 @@ var SEA_ANIM_META = {
     _seaHoliSplash:       { name:'Holi Splash',         type:'popup',     emoji:'🎨', size:'8rem',   holdMs:1800, enabled:true },
     _seaColorRain:        { name:'Color Rain',          type:'particles', chars:['🔴','🟡','🟢','🔵','🟣','🟠'], count:24, anim:'sea-snowfall',   durRange:[3,6],   sizeRange:[0.7,1.5], delaySpan:1500, enabled:true },
     // HANAMI
-    _seaHanamiBlossoms:   { name:'Hanami Blossoms',     type:'alias',     target:'_seaCherryBlossom', enabled:true },
+    _seaHanamiBlossoms:   { name:'Hanami Blossoms',     type:'particles', chars:['🌸','🌸','🌺','🌼'], count:16, anim:'sea-petal-fall', durRange:[4,7], sizeRange:[0.7,1.6], delaySpan:3000, enabled:true },
     _seaPetalDrift:       { name:'Petal Drift',         type:'particles', chars:['🌸','🌺','🌼','🌷'],          count:20, anim:'sea-petal-fall', durRange:[5,9],   sizeRange:[0.6,1.4], delaySpan:3000, enabled:true },
     _seaBlossomTree:      { name:'Blossom Tree',        type:'corner',    emoji:'🌸',  side:'random', size:'6rem',   holdMs:4500, wave:true,  enabled:true },
     // APRIL FOOLS
@@ -637,13 +637,13 @@ var SEA_ANIM_META = {
     _seaDadBalloons:      { name:'Dad Balloons',        type:'particles', chars:['🎈','⭐','🎉','🏆'],           count:14, anim:'sea-float-up',   durRange:[2,4],   sizeRange:[1,2],     delaySpan:2000, enabled:true },
     _seaDadPopup:         { name:'Dad Popup',           type:'popup',     emoji:'🎩', size:'8rem',   holdMs:2200, enabled:true },
     // OCEAN WEEK
-    _seaSharkSwim:        { name:'Shark Swim',          type:'alias',     target:'_seaSharkFin', enabled:true },
+    _seaSharkSwim:        { name:'Shark Swim',          type:'runner',    emoji:'🦈', dir:'lr', size:'3.5rem', dur:5.5, wave:false, flipX:true, enabled:true },
     _seaFishSchool:       { name:'Fish School',         type:'runner',    emoji:'🐠🐟🐡',dir:'lr', size:'2.5rem', dur:6,   wave:true,  flipX:false, enabled:true },
     _seaOceanParticles:   { name:'Ocean Particles',     type:'particles', chars:['🐠','🌊','🐙','🦑'],           count:14, anim:'sea-float-up',   durRange:[3,5],   sizeRange:[1,2],     delaySpan:2000, enabled:true },
     // SOLSTICE
     _seaBigSun:           { name:'Big Sun',             type:'popup',     emoji:'☀️', size:'11rem',  holdMs:3500, enabled:true },
     _seaSunRays:          { name:'Sun Rays',            type:'particles', chars:['✨','🌟','⭐'],               count:18, anim:'sea-snowfall',   durRange:[3,6],   sizeRange:[0.6,1.4], delaySpan:1000, enabled:true },
-    _seaSolsticeGlow:     { name:'Solstice Glow',       type:'custom',    enabled:true }, // wrapper — delegates to _seaSunPeek
+    _seaSolsticeGlow:     { name:'Solstice Glow',       type:'corner',    emoji:'☀️', side:'random', size:'9rem', holdMs:4000, wave:false, enabled:true },
     // INDEPENDENCE DAY
     _seaFlagParade:       { name:'Flag Parade',         type:'runner',    emoji:_SEA_US_FLAG + '🎆', dir:'lr', size:'3rem',   dur:5,   wave:true,  flipX:false, enabled:true },
     _seaFireworks4th:     { name:'Fireworks',           type:'particles', chars:['★','✦','⭐'],                 count:22, anim:'sea-float-up',   durRange:[2,4],   sizeRange:[0.9,1.9], delaySpan:1500, enabled:true },
@@ -713,7 +713,7 @@ var SEA_ANIM_META = {
     _seaShoppingBag:      { name:'Shopping Bag',        type:'particles', chars:['🎁','🛍️','🎀'],               count:14, anim:'sea-petal-fall', durRange:[3,6],   sizeRange:[0.8,1.8], delaySpan:2000, enabled:true },
     _seaBoxingPopup:      { name:'Boxing Day Popup',    type:'popup',     emoji:'🎁', size:'8rem',   holdMs:2400, enabled:true },
     // WINTER SOLSTICE
-    _seaWinterSnowfall:   { name:'Winter Snowfall',     type:'alias',     target:'_seaSnowfall', enabled:true },
+    _seaWinterSnowfall:   { name:'Winter Snowfall',     type:'particles', chars:['❄','❅','❆','🌟'], count:22, anim:'sea-snowfall',  durRange:[5,9],   sizeRange:[0.7,1.8], delaySpan:2500, enabled:true },
     _seaNightSky:         { name:'Night Sky',           type:'popup',     emoji:'🌌', size:'9rem',   holdMs:3200, enabled:true },
     _seaSolsticeSnowman:  { name:'Solstice Snowman',    type:'corner',    emoji:'☃️',  side:'random', size:'5rem',   holdMs:4000, wave:true,  enabled:true },
     // END OF YEAR
@@ -1275,10 +1275,7 @@ function _seaSunPeek() {
 // SUMMER (June–August)
 // ══════════════════════════════════════════════════════════
 
-function _seaSummerSun() {
-    if (_seaGetAnimCfg('_seaSummerSun', 'summer').enabled === false) return;
-    _seaSunPeek();
-}
+function _seaSummerSun()        { _seaCornerFn('_seaSummerSun',        'summer'); }
 
 function _seaBeachBallBounce() {
     if (_seaGetAnimCfg('_seaBeachBallBounce', 'summer').enabled === false) return;
@@ -1504,10 +1501,7 @@ function _seaPieCooling() {
 
 function _seaCornucopia()      { _seaCornerFn('_seaCornucopia',      'thanksgiving'); }
 
-function _seaThanksgivingLeaves() {
-    if (_seaGetAnimCfg('_seaThanksgivingLeaves', 'thanksgiving').enabled === false) return;
-    _seaLeavesSwirl();
-}
+function _seaThanksgivingLeaves() { _seaParticlesFn('_seaThanksgivingLeaves', 'thanksgiving'); }
 
 function _seaPilgrimHatFloat() {
     var cfg = _seaGetAnimCfg('_seaPilgrimHatFloat', 'thanksgiving');
@@ -1569,10 +1563,7 @@ function _seaHayBale() {
 // ══════════════════════════════════════════════════════════
 // DEEP WINTER (Jan 11–31)
 // ══════════════════════════════════════════════════════════
-function _seaDeepWinterSnow() {
-    if (_seaGetAnimCfg('_seaDeepWinterSnow', 'deepwinter').enabled === false) return;
-    _seaSnowfall();
-}
+function _seaDeepWinterSnow()   { _seaParticlesFn('_seaDeepWinterSnow',   'deepwinter'); }
 function _seaFrostCreep()       { _seaCornerFn('_seaFrostCreep',    'deepwinter'); }
 function _seaBlizzard()         { _seaParticlesFn('_seaBlizzard',   'deepwinter'); }
 
@@ -1628,10 +1619,7 @@ function _seaColorRain()        { _seaParticlesFn('_seaColorRain',  'holi'); }
 // ══════════════════════════════════════════════════════════
 // HANAMI (Mar 20–Apr 10)
 // ══════════════════════════════════════════════════════════
-function _seaHanamiBlossoms() {
-    if (_seaGetAnimCfg('_seaHanamiBlossoms', 'hanami').enabled === false) return;
-    _seaCherryBlossom();
-}
+function _seaHanamiBlossoms()   { _seaParticlesFn('_seaHanamiBlossoms',   'hanami'); }
 function _seaPetalDrift()       { _seaParticlesFn('_seaPetalDrift', 'hanami'); }
 function _seaBlossomTree()      { _seaCornerFn('_seaBlossomTree',   'hanami'); }
 
@@ -1761,10 +1749,7 @@ function _seaDadPopup()         { _seaPopupFn('_seaDadPopup',        'fathersday
 // ══════════════════════════════════════════════════════════
 // OCEAN WEEK (Jun 8–15)
 // ══════════════════════════════════════════════════════════
-function _seaSharkSwim() {
-    if (_seaGetAnimCfg('_seaSharkSwim', 'oceanweek').enabled === false) return;
-    _seaSharkFin();
-}
+function _seaSharkSwim()        { _seaRunnerFn('_seaSharkSwim',        'oceanweek', 85, 8); }
 function _seaFishSchool()       { _seaRunnerFn('_seaFishSchool',     'oceanweek', 60, 20); }
 function _seaOceanParticles()   { _seaParticlesFn('_seaOceanParticles','oceanweek'); }
 
@@ -1773,10 +1758,7 @@ function _seaOceanParticles()   { _seaParticlesFn('_seaOceanParticles','oceanwee
 // ══════════════════════════════════════════════════════════
 function _seaBigSun()           { _seaPopupFn('_seaBigSun',          'solstice'); }
 function _seaSunRays()          { _seaParticlesFn('_seaSunRays',     'solstice'); }
-function _seaSolsticeGlow() {
-    if (_seaGetAnimCfg('_seaSolsticeGlow', 'solstice').enabled === false) return;
-    _seaSummerSun();
-}
+function _seaSolsticeGlow()     { _seaCornerFn('_seaSolsticeGlow',     'solstice'); }
 
 // ══════════════════════════════════════════════════════════
 // INDEPENDENCE DAY (Jul 4) — USA + British tea joke
@@ -1900,10 +1882,7 @@ function _seaBoxingPopup()      { _seaPopupFn('_seaBoxingPopup',     'boxingday'
 // ══════════════════════════════════════════════════════════
 // WINTER SOLSTICE (Dec 21)
 // ══════════════════════════════════════════════════════════
-function _seaWinterSnowfall() {
-    if (_seaGetAnimCfg('_seaWinterSnowfall', 'wintersolstice').enabled === false) return;
-    _seaSnowfall();
-}
+function _seaWinterSnowfall()   { _seaParticlesFn('_seaWinterSnowfall',   'wintersolstice'); }
 function _seaNightSky()         { _seaPopupFn('_seaNightSky',        'wintersolstice'); }
 function _seaSolsticeSnowman()  { _seaCornerFn('_seaSolsticeSnowman','wintersolstice'); }
 
@@ -2051,24 +2030,6 @@ function _seaBuildAnimRow(fnName, c) {
             + '<option value="right"' + (c.side === 'right' ? ' selected' : '') + '>Right</option>'
             + '<option value="random"' + (!c.side || c.side === 'random' ? ' selected' : '') + '>Random</option></select>'
             + testBtn + '</div>';
-    } else if (c.type === 'alias') {
-        var tgtMeta = SEA_ANIM_META[c.target] || {};
-        var tgtSafe = (c.target || '').replace(/[^a-zA-Z0-9]/g, '_');
-        var tgtName = '<strong>' + _escHtml(tgtMeta.name || c.target) + '</strong>';
-        // AF4: Detect whether target is in the currently-open season panel
-        var tgtSeason = null;
-        Object.keys(SEA_ANIMS || {}).forEach(function(sk) {
-            if ((SEA_ANIMS[sk] || []).some(function(fn) { return fn.name === c.target; })) tgtSeason = sk;
-        });
-        if (tgtSeason === _seaConfigSeasonKey) {
-            // Same-season — safe scroll link with null guard
-            var js = "var el=document.getElementById('scfg_en_" + tgtSafe + "');if(el)el.closest('.sea-cfg-row').scrollIntoView({behavior:'smooth'});return false;";
-            row += '<div class="small text-muted">↪ Alias of <a href="#" onclick="' + js + '" class="text-decoration-none">' + tgtName + '</a> — configure via that animation. ' + testBtn + '</div>';
-        } else {
-            // Cross-season — show which season to open instead (null ref would crash)
-            var seaLabel = tgtSeason ? (' (' + tgtSeason + ')') : '';
-            row += '<div class="small text-muted">↪ Alias of ' + tgtName + seaLabel + ' — open that season\'s ⚙ config to customize. ' + testBtn + '</div>';
-        }
     } else {
         // custom — field-presence based renderer
         if (fnName === '_seaStarWarsCrawl') {
@@ -2160,9 +2121,7 @@ function saveSeasonConfig() {
         var meta = SEA_ANIM_META[fnName] || {};
         var enEl = document.getElementById('scfg_en_' + safe);
         var o = { enabled: enEl ? !!enEl.checked : true };
-        if (meta.type === 'alias') {
-            // alias — only save enabled state, target handles its own config
-        } else if (meta.type === 'runner') {
+        if (meta.type === 'runner') {
             o.emoji = document.getElementById('scfg_emoji_' + safe).value;
             o.dir   = document.getElementById('scfg_dir_' + safe).value;
             o.size  = document.getElementById('scfg_size_' + safe).value;

@@ -124,6 +124,9 @@ function registerHandlers() {
             state.participants.forEach(p => { if (p.vote) votes[p.connectionId] = p.vote; });
             showStats(votes);
         }
+
+        // AC1: Start timer for any story already active when user joins/reconnects
+        acStartStoryTimer(state.currentStoryId || null);
     });
 
     connection.on('ParticipantJoined', (p) => {
@@ -1450,6 +1453,14 @@ function _promptSoundPreferenceOnce() {
 var _acTimerStart = null;
 var _acLastStoryId = null;
 
+// AG3: Hook called by saveTimerClockSettings (site.js) to access room-internal timer vars
+function _acOnTimerEnabled(showTimerEl) {
+    if (showTimerEl && showTimerEl.checked && _acLastStoryId && !_acTimerStart) {
+        _acTimerStart = Date.now();
+    }
+}
+window._acOnTimerEnabled = _acOnTimerEnabled;
+
 // AC2: one persistent tick interval drives both timer and clock
 function loadTimerClockSettings() {
     setInterval(_acTick, 1000);
@@ -1475,13 +1486,7 @@ function _addPanelCloseButtons() {
                 if (typeof toggleKbShortcuts === 'function') toggleKbShortcuts(false);
             }
         },
-        {
-            id: 'session-tc-bar',
-            hide: function() {
-                // Session-only hide — resets on reload; use Settings to permanently disable
-                sessionStorage.setItem('es_hideTCBar', '1');
-            }
-        }
+        // session-tc-bar × button is baked directly into Index.cshtml HTML (panel-close-btn static)
     ];
     panels.forEach(function(p) {
         var panel = document.getElementById(p.id);
@@ -1516,50 +1521,9 @@ function acStartStoryTimer(storyId) {
     _acTick();  // immediate refresh; persistent interval handles subsequent ticks
 }
 
-// AC3: save timer/clock settings from Other tab form
-function saveTimerClockSettings() {
-    var showTimerEl = document.getElementById('tc-show-timer');
-    var showClockEl = document.getElementById('tc-show-clock');
-    var tzEl       = document.getElementById('tc-timezone');
-    var modeEl     = document.querySelector('input[name="tc-mode"]:checked');
-    var colorEl    = document.getElementById('tc-color');
-    var fsEl       = document.getElementById('tc-font-size');
-    var faceEl     = document.getElementById('tc-face');
-    var hourEl     = document.getElementById('tc-hour-color');
-    var minEl      = document.getElementById('tc-min-color');
-    var secEl      = document.getElementById('tc-sec-color');
-
-    if (showTimerEl) localStorage.setItem('es_showTimer', showTimerEl.checked ? '1' : '0');
-    if (showClockEl) localStorage.setItem('es_showClock', showClockEl.checked ? '1' : '0');
-    if (tzEl)        localStorage.setItem('es_clockTimezone', tzEl.value);
-    // AF8: Clear session-hide if user explicitly re-enables clock or timer
-    if ((showClockEl && showClockEl.checked) || (showTimerEl && showTimerEl.checked)) {
-        sessionStorage.removeItem('es_hideTCBar');
-    }
-
-    var styleData = {
-        mode:      modeEl    ? modeEl.value              : 'digital',
-        color:     colorEl   ? colorEl.value             : '#6c757d',
-        fontSize:  fsEl      ? parseInt(fsEl.value, 10)  : 13,
-        face:      faceEl    ? faceEl.value              : 'minimal',
-        hourColor: hourEl    ? hourEl.value              : '#212529',
-        minColor:  minEl     ? minEl.value               : '#495057',
-        secColor:  secEl     ? secEl.value               : '#dc3545'
-    };
-    localStorage.setItem('es_clockStyle', JSON.stringify(styleData));
-    _acTick();
-    var prev = document.getElementById('tc-clock-preview');
-    if (prev) _acRenderClock(prev);
-}
-window.saveTimerClockSettings = saveTimerClockSettings;
-
-function _tcToggleMode(mode) {
-    var digital = document.getElementById('tc-digital-opts');
-    var analog  = document.getElementById('tc-analog-opts');
-    if (digital) digital.style.display = (mode === 'digital') ? '' : 'none';
-    if (analog)  analog.style.display  = (mode === 'analog')  ? '' : 'none';
-}
-window._tcToggleMode = _tcToggleMode;
+// AG1+AG2: saveTimerClockSettings and _tcToggleMode moved to site.js so they are
+// available on all pages (not just the Room page). _acOnTimerEnabled below exposes
+// the room-internal timer-start logic as a hook for site.js to call.
 
 function _acTick() {
     var bar = document.getElementById('session-tc-bar');
@@ -1613,9 +1577,14 @@ function _acRenderClock(clockEl) {
     var now = new Date();
 
     if (mode === 'analog') {
+        var sz = styleData.analogSize || 52;
         var existing = clockEl.querySelector('svg');
         if (!existing) {
-            clockEl.innerHTML = _acAnalogSvgTemplate();
+            clockEl.innerHTML = _acAnalogSvgTemplate(sz);
+        } else {
+            // Update size if it changed
+            existing.setAttribute('width', sz);
+            existing.setAttribute('height', sz);
         }
         _acUpdateAnalogHands(clockEl, now, tz, styleData);
         clockEl.style.display = '';
@@ -1643,9 +1612,10 @@ function _acRenderClock(clockEl) {
     clockEl.style.display = '';
 }
 
-function _acAnalogSvgTemplate() {
+function _acAnalogSvgTemplate(sz) {
     // AF7: Use class instead of id to allow multiple analog clocks without duplicate HTML IDs
-    return '<svg class="ac-analog" width="52" height="52" viewBox="0 0 100 100">'
+    var s = sz || 52;
+    return '<svg class="ac-analog" width="' + s + '" height="' + s + '" viewBox="0 0 100 100">'
         + '<circle class="ac-face" cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>'
         + '<line class="ac-hour" x1="50" y1="50" x2="50" y2="28" stroke="#212529" stroke-width="5" stroke-linecap="round"/>'
         + '<line class="ac-min"  x1="50" y1="50" x2="50" y2="16" stroke="#495057" stroke-width="3" stroke-linecap="round"/>'
@@ -1680,9 +1650,33 @@ function _acUpdateAnalogHands(container, now, tz, styleData) {
     setRot('ac-sec',  sDeg);
     var face = svg.querySelector('.ac-face');
     var face_style = styleData.face || 'minimal';
+    var NS = 'http://www.w3.org/2000/svg';
     if (face) {
-        face.setAttribute('fill', face_style === 'filled' ? 'var(--bg3,#f8f9fa)' : 'none');
-        face.setAttribute('stroke', face_style === 'minimal' ? 'none' : 'currentColor');
+        if (face_style === 'filled') {
+            face.setAttribute('fill', '#fff');
+            face.setAttribute('stroke', 'currentColor');
+            face.setAttribute('stroke-width', '3');
+        } else if (face_style === 'classic') {
+            face.setAttribute('fill', 'none');
+            face.setAttribute('stroke', 'currentColor');
+            face.setAttribute('stroke-width', '2');
+        } else { // minimal
+            face.setAttribute('fill', 'none');
+            face.setAttribute('stroke', 'none');
+        }
+    }
+    // Add/refresh cardinal tick marks for classic and filled (removed for minimal)
+    svg.querySelectorAll('.ac-tick').forEach(function(t) { t.parentNode.removeChild(t); });
+    if (face_style !== 'minimal') {
+        [[50,6],[94,50],[50,94],[6,50]].forEach(function(pt) {
+            var tick = document.createElementNS(NS, 'circle');
+            tick.setAttribute('class', 'ac-tick');
+            tick.setAttribute('cx', pt[0]);
+            tick.setAttribute('cy', pt[1]);
+            tick.setAttribute('r', face_style === 'filled' ? '4' : '3');
+            tick.setAttribute('fill', 'currentColor');
+            svg.insertBefore(tick, svg.firstChild);
+        });
     }
     var hour = svg.querySelector('.ac-hour'); if (hour && styleData.hourColor) hour.setAttribute('stroke', styleData.hourColor);
     var minH = svg.querySelector('.ac-min');  if (minH && styleData.minColor)  minH.setAttribute('stroke', styleData.minColor);
@@ -1816,6 +1810,8 @@ function _populateRoomOtherSettings() {
     if (rEnEl) rEnEl.checked = _reactionEnabled;
     var rPalEl = document.getElementById('reaction-palette-input');
     if (rPalEl) rPalEl.value = _reactionPalette.join(' ');
+    // AG4: update reaction preview whenever the modal opens
+    if (typeof _renderReactionPreview === 'function') _renderReactionPreview();
 
     // AC4: populate timer/clock form
     var showTimerEl = document.getElementById('tc-show-timer');
@@ -1844,6 +1840,8 @@ function _populateRoomOtherSettings() {
     if (minEl) minEl.value = styleData.minColor || '#495057';
     var secEl = document.getElementById('tc-sec-color');
     if (secEl) secEl.value = styleData.secColor || '#dc3545';
+    var analogSizeEl = document.getElementById('tc-analog-size');
+    if (analogSizeEl) analogSizeEl.value = styleData.analogSize || 52;
     var prev = document.getElementById('tc-clock-preview');
     if (prev) _acRenderClock(prev);
 }

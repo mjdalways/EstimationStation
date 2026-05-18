@@ -1443,3 +1443,69 @@ function setVcbSolidColor(color) {
 document.addEventListener('DOMContentLoaded', applyCardBackDesign);
 document.addEventListener('DOMContentLoaded', applyVoteCardBackDesign);
 
+// ============================================================
+// AG1 — Timer/Clock Settings (moved from room.js so they work on all pages)
+// ============================================================
+function saveTimerClockSettings() {
+    var showTimerEl  = document.getElementById('tc-show-timer');
+    var showClockEl  = document.getElementById('tc-show-clock');
+    var tzEl         = document.getElementById('tc-timezone');
+    var modeEl       = document.querySelector('input[name="tc-mode"]:checked');
+    var colorEl      = document.getElementById('tc-color');
+    var fsEl         = document.getElementById('tc-font-size');
+    var faceEl       = document.getElementById('tc-face');
+    var hourEl       = document.getElementById('tc-hour-color');
+    var minEl        = document.getElementById('tc-min-color');
+    var secEl        = document.getElementById('tc-sec-color');
+    var analogSizeEl = document.getElementById('tc-analog-size');
+
+    if (showTimerEl) localStorage.setItem('es_showTimer', showTimerEl.checked ? '1' : '0');
+    if (showClockEl) localStorage.setItem('es_showClock', showClockEl.checked ? '1' : '0');
+    if (tzEl)        localStorage.setItem('es_clockTimezone', tzEl.value);
+    // AF8: Clear session-hide if user explicitly re-enables clock or timer
+    if ((showClockEl && showClockEl.checked) || (showTimerEl && showTimerEl.checked)) {
+        sessionStorage.removeItem('es_hideTCBar');
+    }
+    // AG3: delegate room-internal timer-start logic to room.js hook (no-op on non-room pages)
+    if (typeof _acOnTimerEnabled === 'function') _acOnTimerEnabled(showTimerEl);
+
+    var styleData = {
+        mode:       modeEl       ? modeEl.value                      : 'digital',
+        color:      colorEl      ? colorEl.value                     : '#6c757d',
+        fontSize:   fsEl         ? parseInt(fsEl.value, 10)          : 13,
+        face:       faceEl       ? faceEl.value                      : 'minimal',
+        hourColor:  hourEl       ? hourEl.value                      : '#212529',
+        minColor:   minEl        ? minEl.value                       : '#495057',
+        secColor:   secEl        ? secEl.value                       : '#dc3545',
+        analogSize: analogSizeEl ? (parseInt(analogSizeEl.value, 10) || 52) : 52
+    };
+    localStorage.setItem('es_clockStyle', JSON.stringify(styleData));
+    if (typeof _acTick === 'function') _acTick();
+    var prev = document.getElementById('tc-clock-preview');
+    if (prev && typeof _acRenderClock === 'function') _acRenderClock(prev);
+}
+window.saveTimerClockSettings = saveTimerClockSettings;
+
+// AG2 — Clock mode toggle (moved from room.js so it works on all pages)
+function _tcToggleMode(mode) {
+    var digital = document.getElementById('tc-digital-opts');
+    var analog  = document.getElementById('tc-analog-opts');
+    if (digital) digital.style.display = (mode === 'digital') ? '' : 'none';
+    if (analog)  analog.style.display  = (mode === 'analog')  ? '' : 'none';
+}
+window._tcToggleMode = _tcToggleMode;
+
+// AG4 — Reaction palette live preview
+function _renderReactionPreview() {
+    var input = document.getElementById('reaction-palette-input');
+    var row   = document.getElementById('reaction-preview-row');
+    if (!input || !row) return;
+    var emojis = input.value.trim().split(/\s+/).filter(Boolean).slice(0, 8);
+    row.innerHTML = emojis.length
+        ? emojis.map(function(e) {
+            return '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:1.1rem;line-height:1.6;pointer-events:none;">' + e + '</button>';
+          }).join('')
+        : '<span class="text-muted small">No emojis configured — using defaults</span>';
+}
+window._renderReactionPreview = _renderReactionPreview;
+

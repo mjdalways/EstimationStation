@@ -1461,6 +1461,18 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/18/2026 (83)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 Settings Safety + Reaction Preview (Group AG) — Fixed <code>ReferenceError: saveTimerClockSettings is not defined</code> when opening Settings from non-room pages: clock/timer save functions moved to site.js and now available on all pages. Added live emoji reaction bar preview in Settings → Other so you can see exactly which emojis will appear in the reaction bar before saving.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (82)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 Clock/Timer Fixes — Count-up timer now starts correctly when joining a room that already has an active story. Enabling the timer while a story is running starts counting immediately. × button on clock/timer bar is now in the HTML (not JS-injected) and reliably hides the bar. Digital color/size options now correctly hide when Analog mode is selected (Bootstrap <code>d-flex !important</code> conflict fixed). Emoji picker completely overhauled: new Seasonal and People categories, all emojis used across every seasonal animation are now available.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (81)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 Clock + Season Fixes — Alias animations replaced with independent configurable functions (Deep Winter Snow and Snowfall, Thanksgiving Leaves and Leaves Swirl etc. are now separate with own settings). Analog clock: Classic face shows ring + cardinal dots, Filled shows opaque white face + larger dots. Analog clock size now configurable (30–120px). Emoji picker Animals category expanded with 🦇🐇🕷️🦌🦃 and more.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/18/2026 (80)</strong></p>
                         <ul class="mb-2">
                             <li>🔧 Fixes (Group AF) — Season config aliases no longer crash when the target animation is in a different season. Custom animation emoji inputs now show the emoji picker on focus. The 🧪 test button for custom animations uses the current unsaved field values (no need to save first). Analog clock duplicate SVG IDs fixed — two clocks can now render simultaneously (story bar + settings preview).</li>
@@ -1947,8 +1959,9 @@
                                 <input type="text" id="reaction-palette-input" class="form-control"
                                        style="font-size:1rem;" placeholder="👍 👏 🎉 😂 ❤️ 🔥 😮 💡"
                                        data-picker-target
-                                       oninput="if(typeof saveReactionSettings==='function') saveReactionSettings()">
+                                       oninput="if(typeof saveReactionSettings==='function') saveReactionSettings(); if(typeof _renderReactionPreview==='function') _renderReactionPreview();">
                             </div>
+                            <div id="reaction-preview-row" class="mt-2 d-flex flex-wrap gap-1" style="min-height:26px;" title="Preview of your reaction bar"></div>
                             <p class="small text-muted mt-1 mb-0">Click a reaction during estimation to broadcast it — floats up from your participant badge. Rate-limited to 1 per 2 seconds.</p>
                         </div>
 
@@ -2021,13 +2034,14 @@
                             <label class="me-3"><input type="radio" name="tc-mode" value="digital" onchange="saveTimerClockSettings();_tcToggleMode('digital')"> Digital</label>
                             <label><input type="radio" name="tc-mode" value="analog" onchange="saveTimerClockSettings();_tcToggleMode('analog')"> Analog</label>
                         </div>
-                        <div id="tc-digital-opts" class="mb-3 d-flex flex-wrap gap-3 align-items-center small">
+                        <div id="tc-digital-opts" class="mb-3 flex-wrap gap-3 align-items-center small" style="display:flex;">
                             <label>Color <input type="color" id="tc-color" value="#6c757d" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                             <label>Size <input type="number" id="tc-font-size" value="13" min="10" max="22" style="width:50px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()">px</label>
                         </div>
                         <div id="tc-analog-opts" class="mb-3 small" style="display:none;">
                             <div class="d-flex flex-wrap gap-3 align-items-center mb-2">
                                 <label>Face <select id="tc-face" class="form-select form-select-sm d-inline-block" style="width:100px;" onchange="saveTimerClockSettings()"><option value="minimal">Minimal</option><option value="classic">Classic</option><option value="filled">Filled</option></select></label>
+                                <label>Size <input type="number" id="tc-analog-size" value="52" min="30" max="120" style="width:55px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()">px</label>
                                 <label>Hour <input type="color" id="tc-hour-color" value="#212529" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                                 <label>Min <input type="color" id="tc-min-color" value="#495057" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                                 <label>Sec <input type="color" id="tc-sec-color" value="#dc3545" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
