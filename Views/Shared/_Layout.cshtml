@@ -380,10 +380,10 @@
                                 </div>
 
                                 <!-- Events colors section -->
-                                <div class="ct-section mb-2">
-                                    <button class="ct-section-toggle w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#sec-ct-events">
-                                        🎉 Events
-                                    </button>
+                                <div class="mb-2">
+                                    <div class="ct-section-header" onclick="ctToggleSection('sec-ct-events', this)">
+                                        <span>🎉 Events</span><em class="ct-section-chevron">▾</em>
+                                    </div>
                                     <div id="sec-ct-events" class="ct-section-body">
                                         <div class="ct-swatch-row">
                                             <div class="ct-swatch-item"><input type="color" id="ct-lava-color-primary" value="#ff4500" oninput="updateThemePreview()" /><span>🌋 Lava</span></div>
@@ -403,14 +403,14 @@
                                 <div id="ct-live-preview">
                                     <div class="ct-preview-navbar" id="pv-navbar"><span>🃏</span><span id="pv-brand" style="font-size:0.75rem;font-weight:700;">EstStation</span></div>
                                     <div class="ct-preview-body" id="pv-body">
-                                        <div class="d-flex flex-column gap-1">
-                                            <div class="ct-preview-card" id="pv-card-normal">5</div>
-                                            <div class="ct-preview-card" id="pv-card-selected">8</div>
-                                        </div>
-                                        <div class="ct-preview-participants">
-                                            <div class="ct-preview-badge" id="pv-badge-default">Alice <span>?</span></div>
-                                            <div class="ct-preview-badge" id="pv-badge-voted">Bob <span>✓</span></div>
-                                            <div class="ct-preview-badge" id="pv-badge-me">You <span>8</span></div>
+                                        <!-- AH12/AI6: Real compact poker-card and participant-badge specimens -->
+                                        <div class="d-flex gap-1 align-items-flex-end">
+                                            <div class="poker-card" style="cursor:default;transform:none;" title="Unselected vote card">5</div>
+                                            <div class="poker-card selected" style="transform:none;" title="Selected vote card">8</div>
+                                            <div class="d-flex flex-column gap-1 ms-1">
+                                                <div class="participant-badge" title="Participant — waiting">Alice <span class="vote-waiting">?</span></div>
+                                                <div class="participant-badge voted" title="Participant — voted">Bob <span class="vote-hidden">✓</span></div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="px-2 pb-2">
@@ -775,9 +775,9 @@
 
 
                         <!-- Confetti -->
-                        <div class="settings-section-header">
-                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-confetti" role="button">🎊 Confetti ▾</span>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testConfetti)">🧪 Test</button>
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#sec-confetti">
+                            🎊 Confetti <span class="settings-section-chevron">▾</span>
+                            <button type="button" class="btn btn-outline-secondary ms-2" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="event.stopPropagation();runTest(testConfetti)">🧪 Test</button>
                         </div>
                         <div class="collapse show" id="sec-confetti">
                         <div class="row g-2 mb-3">
@@ -828,9 +828,9 @@
                         </div><!-- end sec-confetti -->
 
                         <!-- Fireworks -->
-                        <div class="settings-section-header">
-                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-fireworks" role="button">🎆 Fireworks ▾</span>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testFireworks)">🧪 Test</button>
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#sec-fireworks">
+                            🎆 Fireworks <span class="settings-section-chevron">▾</span>
+                            <button type="button" class="btn btn-outline-secondary ms-2" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="event.stopPropagation();runTest(testFireworks)">🧪 Test</button>
                         </div>
                         <div class="collapse" id="sec-fireworks">
                         <div class="row g-2 mb-3">
@@ -870,9 +870,9 @@
                         </div><!-- end sec-fireworks -->
 
                         <!-- Balloons -->
-                        <div class="settings-section-header">
-                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-balloons" role="button">🎈 Balloons ▾</span>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testBalloons)">🧪 Test</button>
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#sec-balloons">
+                            🎈 Balloons <span class="settings-section-chevron">▾</span>
+                            <button type="button" class="btn btn-outline-secondary ms-2" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="event.stopPropagation();runTest(testBalloons)">🧪 Test</button>
                         </div>
                         <div class="collapse" id="sec-balloons">
                         <div class="row g-2 mb-3">
@@ -892,9 +892,9 @@
                         </div><!-- end sec-balloons -->
 
                         <!-- Discussion Timer -->
-                        <div class="settings-section-header">
-                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-discussion" role="button">☕ Discussion Timer ▾</span>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testDiscussionTimer)">🧪 Test</button>
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#sec-discussion">
+                            ☕ Discussion Timer <span class="settings-section-chevron">▾</span>
+                            <button type="button" class="btn btn-outline-secondary ms-2" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="event.stopPropagation();runTest(testDiscussionTimer)">🧪 Test</button>
                         </div>
                         <div class="collapse" id="sec-discussion">
                         <div class="form-check form-switch mb-2">
@@ -912,9 +912,9 @@
                         </div><!-- end sec-discussion -->
 
                         <!-- Shame Spotlight -->
-                        <div class="settings-section-header">
-                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-shame" role="button">🎯 Shame Spotlight ▾</span>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testShame)">🧪 Test</button>
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#sec-shame">
+                            🎯 Shame Spotlight <span class="settings-section-chevron">▾</span>
+                            <button type="button" class="btn btn-outline-secondary ms-2" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="event.stopPropagation();runTest(testShame)">🧪 Test</button>
                         </div>
                         <div class="collapse" id="sec-shame">
                         <div class="form-check form-switch mb-2">
@@ -939,9 +939,9 @@
                         </div><!-- end sec-shame -->
 
                         <!-- Lone Wolf Counter-Spell -->
-                        <div class="settings-section-header">
-                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-counterspell" role="button">🪄 Lone Wolf Counter-Spell ▾</span>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testCounterSpell)">🧪 Test</button>
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#sec-counterspell">
+                            🪄 Lone Wolf Counter-Spell <span class="settings-section-chevron">▾</span>
+                            <button type="button" class="btn btn-outline-secondary ms-2" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="event.stopPropagation();runTest(testCounterSpell)">🧪 Test</button>
                         </div>
                         <div class="collapse" id="sec-counterspell">
                         <div class="form-check form-switch mb-2">
@@ -977,9 +977,9 @@
                         <p class="small text-muted mb-2">Canvas spinner that randomly picks a participant. Button in the Controls panel in-room.</p>
 
                         <!-- Avatar Battle -->
-                        <div class="settings-section-header">
-                            <span class="flex-grow-1" data-bs-toggle="collapse" data-bs-target="#sec-battle" role="button">⚔️ Avatar Battle ▾</span>
-                            <button type="button" class="btn btn-outline-secondary" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="runTest(testBattle)">🧪 Test</button>
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#sec-battle">
+                            ⚔️ Avatar Battle <span class="settings-section-chevron">▾</span>
+                            <button type="button" class="btn btn-outline-secondary ms-2" style="font-size:0.68rem;padding:1px 7px;line-height:1.5;" onclick="event.stopPropagation();runTest(testBattle)">🧪 Test</button>
                         </div>
                         <div class="collapse" id="sec-battle">
                         <div class="form-check form-switch mb-2">
@@ -1357,42 +1357,27 @@
                                 <label class="form-label fw-semibold">Avatar</label>
                                 <div id="avatar-preview-wrap" class="mb-2"></div>
 
-                                <!-- Source radios -->
-                                <div class="mb-2 d-flex flex-wrap gap-2">
-                                    <div class="form-check form-check-inline me-0">
-                                        <input class="form-check-input" type="radio" name="avatar-source" id="avatar-src-initials" value="initials" checked onchange="onAvatarSourceChange()" />
-                                        <label class="form-check-label" for="avatar-src-initials">Initials</label>
-                                    </div>
-                                    <div class="form-check form-check-inline me-0">
-                                        <input class="form-check-input" type="radio" name="avatar-source" id="avatar-src-dicebear" value="dicebear" onchange="onAvatarSourceChange()" />
-                                        <label class="form-check-label" for="avatar-src-dicebear">DiceBear</label>
-                                    </div>
-                                    <div class="form-check form-check-inline me-0">
-                                        <input class="form-check-input" type="radio" name="avatar-source" id="avatar-src-robohash" value="robohash" onchange="onAvatarSourceChange()" />
-                                        <label class="form-check-label" for="avatar-src-robohash">RoboHash</label>
-                                    </div>
-                                    <div class="form-check form-check-inline me-0">
-                                        <input class="form-check-input" type="radio" name="avatar-source" id="avatar-src-unavatar" value="unavatar" onchange="onAvatarSourceChange()" />
-                                        <label class="form-check-label" for="avatar-src-unavatar">Social</label>
-                                    </div>
-                                    <div class="form-check form-check-inline me-0">
-                                        <input class="form-check-input" type="radio" name="avatar-source" id="avatar-src-upload" value="upload" onchange="onAvatarSourceChange()" />
-                                        <label class="form-check-label" for="avatar-src-upload">Upload</label>
-                                    </div>
+                                <!-- Source selection — btn-check group for clear selected/unselected contrast -->
+                                <div class="btn-group btn-group-sm flex-wrap mb-2" role="group" aria-label="Avatar source">
+                                    <input type="radio" class="btn-check" name="avatar-source" id="avatar-src-initials" value="initials" checked onchange="onAvatarSourceChange()" autocomplete="off" />
+                                    <label class="btn btn-outline-secondary" for="avatar-src-initials">Initials</label>
+
+                                    <input type="radio" class="btn-check" name="avatar-source" id="avatar-src-dicebear" value="dicebear" onchange="onAvatarSourceChange()" autocomplete="off" />
+                                    <label class="btn btn-outline-secondary" for="avatar-src-dicebear">DiceBear</label>
+
+                                    <input type="radio" class="btn-check" name="avatar-source" id="avatar-src-robohash" value="robohash" onchange="onAvatarSourceChange()" autocomplete="off" />
+                                    <label class="btn btn-outline-secondary" for="avatar-src-robohash">RoboHash</label>
+
+                                    <input type="radio" class="btn-check" name="avatar-source" id="avatar-src-unavatar" value="unavatar" onchange="onAvatarSourceChange()" autocomplete="off" />
+                                    <label class="btn btn-outline-secondary" for="avatar-src-unavatar">Social</label>
+
+                                    <input type="radio" class="btn-check" name="avatar-source" id="avatar-src-upload" value="upload" onchange="onAvatarSourceChange()" autocomplete="off" />
+                                    <label class="btn btn-outline-secondary" for="avatar-src-upload">Upload</label>
                                 </div>
 
                                 <!-- DiceBear style grid -->
                                 <div id="avatar-dicebear-panel" class="mb-2" style="display:none;">
                                     <div class="avatar-style-grid" id="avatar-dicebear-grid"></div>
-                                    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                                        <div class="form-check form-check-inline mb-0">
-                                            <input class="form-check-input" type="checkbox" id="avatar-dicebear-bg-enable" onchange="updateAvatarPreview()" />
-                                            <label class="form-check-label small" for="avatar-dicebear-bg-enable">Background color</label>
-                                        </div>
-                                        <input type="color" id="avatar-dicebear-bg" value="#6366f1"
-                                               class="form-control form-control-color form-control-sm" style="width:36px;height:26px;"
-                                               oninput="updateAvatarPreview()" title="Pick background color" />
-                                    </div>
                                 </div>
 
                                 <!-- RoboHash set buttons -->
@@ -1431,6 +1416,18 @@
                                     </div>
                                 </div>
 
+                                <!-- AH11: Avatar background — shared across all sources -->
+                                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                                    <div class="form-check form-check-inline mb-0">
+                                        <input class="form-check-input" type="checkbox" id="avatar-bg-enable" onchange="updateAvatarPreview()" />
+                                        <label class="form-check-label small" for="avatar-bg-enable">Background color</label>
+                                    </div>
+                                    <input type="color" id="avatar-bg-color" value="#6366f1"
+                                           class="form-control form-control-color form-control-sm" style="width:36px;height:26px;"
+                                           oninput="updateAvatarPreview()" title="Pick avatar background color" />
+                                    <span class="text-muted small">(circle color for Initials; wrapper bg for RoboHash/Social)</span>
+                                </div>
+
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-primary btn-sm" onclick="saveAvatarFromForm()">Save Avatar</button>
                                     <button class="btn btn-outline-secondary btn-sm" onclick="resetAvatarSettings()">Reset</button>
@@ -1461,6 +1458,14 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/18/2026 (85)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 Bug Sweep Round 2 (Group AI) — Fixed: analog clock now renders in the settings preview on non-room pages (previously showed placeholder text); "Events" section in Theme tab now matches the styled uppercase header pattern of other sections; timer and clock × close buttons each appear immediately next to their segment (no longer both stacked at the far right); "↩ Change" on vote card hover changed to ↺ (correct circular arrow). Changed: avatar background color is now encoded in the avatar data string so it's visible to all participants (not just the preview); Initials circle color is now controlled by the Background color picker; RoboHash/Social avatars show a colored background ring when a bg color is set; avatar source selector (Initials/DiceBear/RoboHash/Social/Upload) converted to a button group for clear active/inactive visual contrast; Theme live preview now shows compact card and badge specimens without overflowing.</li>
+                        </ul>
+                        <p class="mb-2"><strong>5/18/2026 (84)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 Bug Sweep + UI Polish (Group AH) — Fixed: animation 🧪 test buttons now use current unsaved field values; clock bar × hides properly (Bootstrap d-flex conflict resolved); clock preview now shows digital time on home page; Events tab collapsible headers now match same ▾ chevron style as Other tab; "↩ Change" hint now correctly shows on selected vote card (not participant badge); vote card now flips briefly when selected. Changed: emoji/chars inputs are unified with maxlength 25 and an input-group 😊 picker button; settings fields no longer split across lines; timer and clock each have their own separate × close button; reactions panel has a × close button (session-only); avatar background color now available for all avatar sources (Initials, RoboHash, Social, Upload); real participant badge + vote card specimens added to Theme tab live preview so colours update instantly; DiceBear style tiles are now clearly dimmed when unselected with accent glow on selected.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/18/2026 (83)</strong></p>
                         <ul class="mb-2">
                             <li>🔧 Settings Safety + Reaction Preview (Group AG) — Fixed <code>ReferenceError: saveTimerClockSettings is not defined</code> when opening Settings from non-room pages: clock/timer save functions moved to site.js and now available on all pages. Added live emoji reaction bar preview in Settings → Other so you can see exactly which emojis will appear in the reaction bar before saving.</li>

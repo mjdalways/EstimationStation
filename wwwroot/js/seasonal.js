@@ -762,7 +762,9 @@ function _seaParticlesFn(fnName, seasonKey) {
     var m = _seaGetSeasonMults(seasonKey);
     var count = Math.max(1, Math.round((c.count || 12) * m.intensity));
     var dr = c.durRange || [2, 4];
+    // AH7: support unified emoji string (new) or legacy chars array
     var chars = c.chars;
+    if (!chars && c.emoji) chars = [...c.emoji].filter(function(s) { return s.trim(); });
     if (fnName === '_seaFireworks4th' && chars && chars.length === 3 && chars[0] === '★') {
         chars = ['<span style="color:#cc0000;">★</span>', '<span style="color:#ffffff;text-shadow:0 0 2px #aaa;">★</span>',
                  '<span style="color:#002868;">★</span>', '<span style="color:#cc0000;">✦</span>', '<span style="color:#002868;">✦</span>'];
@@ -1992,63 +1994,72 @@ function openSeasonConfig(seasonKey, label) {
 
 function _seaBuildAnimRow(fnName, c) {
     var safe = fnName.replace(/[^a-zA-Z0-9]/g, '_');
-    var testBtn     = ' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="testSeasonAnim(\'' + fnName + '\')" title="Test animation">🧪</button>';
-    var liveTestBtn = ' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="_seaTestAnimLive(\'' + fnName + '\')" title="Test with current values">🧪</button>';
+    // AH1: All types now use liveTestBtn so unsaved DOM values are picked up during test
+    var liveTestBtn = ' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" onclick="_seaTestAnimLive(\'' + fnName + '\')" title="Test with current values">🧪</button>';
     var row = '<div class="sea-cfg-row mb-2 p-2 border rounded"><div class="d-flex align-items-center gap-2 mb-1">'
         + '<input type="checkbox" id="scfg_en_' + safe + '"' + (c.enabled !== false ? ' checked' : '') + '>'
         + '<strong class="small">' + (c.name || fnName) + '</strong>'
         + '<span class="badge bg-secondary ms-auto" style="font-size:0.65rem;">' + (c.type || 'custom') + '</span>'
         + '</div>';
+    // AH7: helper — emoji input wrapped in input-group so _epAutoAttach appends 😊 button inside it
+    function emojiInputGroup(id, val) {
+        return '<div class="input-group input-group-sm" style="width:130px;display:inline-flex;vertical-align:middle;">'
+            + '<input type="text" id="' + id + '" data-picker-target="' + id + '" maxlength="25" value="' + _escHtml(val) + '" class="form-control form-control-sm">'
+            + '</div>';
+    }
     if (c.type === 'runner') {
         var ms = c.motionStyle || (c.wave === true ? 'wave' : (c.wave === false ? 'none' : 'wave'));
         var msOpts = ['none','wave','bounce','hop','spin','run','wobble','zigzag'].map(function(o) {
             return '<option value="' + o + '"' + (ms === o ? ' selected' : '') + '>' + o + '</option>';
         }).join('');
+        // AH8: each label+input is atomic nowrap unit
         row += '<div class="d-flex flex-wrap gap-2 align-items-center" style="font-size:0.78rem;">'
-            + 'Emoji <input type="text" id="scfg_emoji_' + safe + '" data-picker-target="scfg_emoji_' + safe + '" value="' + (c.emoji || '') + '" style="width:90px;font-size:0.85rem;" class="form-control form-control-sm d-inline-block">'
-            + ' Dir <select id="scfg_dir_' + safe + '" class="form-select form-select-sm d-inline-block" style="width:70px"><option value="lr"' + (c.dir === 'lr' ? ' selected' : '') + '>LR</option><option value="rl"' + (c.dir === 'rl' ? ' selected' : '') + '>RL</option></select>'
-            + ' Size <input type="text" id="scfg_size_' + safe + '" value="' + (c.size || '3rem') + '" style="width:65px" class="form-control form-control-sm d-inline-block">'
-            + ' Dur <input type="number" id="scfg_dur_' + safe + '" value="' + (c.dur || 5) + '" min="0.5" max="20" step="0.5" style="width:60px" class="form-control form-control-sm d-inline-block">s'
-            + ' <label class="small"><input type="checkbox" id="scfg_flipx_' + safe + '"' + (c.flipX ? ' checked' : '') + '> Flip</label>'
-            + ' Motion <select id="scfg_ms_' + safe + '" class="form-select form-select-sm d-inline-block" style="width:90px">' + msOpts + '</select>'
-            + testBtn + '</div>';
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Emoji ' + emojiInputGroup('scfg_emoji_' + safe, c.emoji || '') + '</label>'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Dir <select id="scfg_dir_' + safe + '" class="form-select form-select-sm d-inline-block" style="width:70px"><option value="lr"' + (c.dir === 'lr' ? ' selected' : '') + '>LR</option><option value="rl"' + (c.dir === 'rl' ? ' selected' : '') + '>RL</option></select></label>'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Size <input type="text" id="scfg_size_' + safe + '" value="' + (c.size || '3rem') + '" style="width:65px" class="form-control form-control-sm d-inline-block"></label>'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Dur <input type="number" id="scfg_dur_' + safe + '" value="' + (c.dur || 5) + '" min="0.5" max="20" step="0.5" style="width:60px" class="form-control form-control-sm d-inline-block"> s</label>'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;"><input type="checkbox" id="scfg_flipx_' + safe + '"' + (c.flipX ? ' checked' : '') + '> Flip</label>'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Motion <select id="scfg_ms_' + safe + '" class="form-select form-select-sm d-inline-block" style="width:90px">' + msOpts + '</select></label>'
+            + liveTestBtn + '</div>';
     } else if (c.type === 'particles') {
+        // AH7: unified emoji string field (was chars array); split via [...str] at read time
+        var emojiVal = c.emoji !== undefined ? c.emoji : (c.chars ? c.chars.join('') : '');
         row += '<div class="d-flex flex-wrap gap-2 align-items-center" style="font-size:0.78rem;">'
-            + 'Chars <input type="text" id="scfg_chars_' + safe + '" value="' + ((c.chars || []).join(', ')) + '" style="width:180px" class="form-control form-control-sm d-inline-block" placeholder="emoji, emoji, ...">'
-            + ' Count <input type="number" id="scfg_count_' + safe + '" value="' + (c.count || 15) + '" min="1" max="100" style="width:60px" class="form-control form-control-sm d-inline-block">'
-            + testBtn + '</div>';
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Emoji ' + emojiInputGroup('scfg_emoji_' + safe, emojiVal) + '</label>'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Count <input type="number" id="scfg_count_' + safe + '" value="' + (c.count || 15) + '" min="1" max="100" style="width:60px" class="form-control form-control-sm d-inline-block"></label>'
+            + liveTestBtn + '</div>';
     } else if (c.type === 'popup') {
         row += '<div class="d-flex flex-wrap gap-2 align-items-center" style="font-size:0.78rem;">'
-            + 'Emoji <input type="text" id="scfg_emoji_' + safe + '" data-picker-target="scfg_emoji_' + safe + '" value="' + (c.emoji || '') + '" style="width:90px" class="form-control form-control-sm d-inline-block">'
-            + ' Size <input type="text" id="scfg_size_' + safe + '" value="' + (c.size || '7rem') + '" style="width:65px" class="form-control form-control-sm d-inline-block">'
-            + testBtn + '</div>';
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Emoji ' + emojiInputGroup('scfg_emoji_' + safe, c.emoji || '') + '</label>'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Size <input type="text" id="scfg_size_' + safe + '" value="' + (c.size || '7rem') + '" style="width:65px" class="form-control form-control-sm d-inline-block"></label>'
+            + liveTestBtn + '</div>';
     } else if (c.type === 'corner') {
         row += '<div class="d-flex flex-wrap gap-2 align-items-center" style="font-size:0.78rem;">'
-            + 'Emoji <input type="text" id="scfg_emoji_' + safe + '" data-picker-target="scfg_emoji_' + safe + '" value="' + (c.emoji || '') + '" style="width:90px" class="form-control form-control-sm d-inline-block">'
-            + ' Side <select id="scfg_side_' + safe + '" class="form-select form-select-sm d-inline-block" style="width:90px">'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Emoji ' + emojiInputGroup('scfg_emoji_' + safe, c.emoji || '') + '</label>'
+            + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Side <select id="scfg_side_' + safe + '" class="form-select form-select-sm d-inline-block" style="width:90px">'
             + '<option value="left"' + (c.side === 'left' ? ' selected' : '') + '>Left</option>'
             + '<option value="right"' + (c.side === 'right' ? ' selected' : '') + '>Right</option>'
-            + '<option value="random"' + (!c.side || c.side === 'random' ? ' selected' : '') + '>Random</option></select>'
-            + testBtn + '</div>';
+            + '<option value="random"' + (!c.side || c.side === 'random' ? ' selected' : '') + '>Random</option></select></label>'
+            + liveTestBtn + '</div>';
     } else {
         // custom — field-presence based renderer
         if (fnName === '_seaStarWarsCrawl') {
             row += '<div class="mt-1" style="font-size:0.78rem;">'
                 + 'Text <textarea id="scfg_crawlText_' + safe + '" rows="3" style="width:100%;font-size:0.75rem;" class="form-control form-control-sm">' + _escHtml(c.crawlText || '') + '</textarea>'
-                + ' Color <input type="color" id="scfg_crawlColor_' + safe + '" value="' + (c.crawlColor || '#ffe81f') + '">'
-                + testBtn + '</div>';
+                + '<div class="mt-1 d-flex align-items-center gap-2"><label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Color <input type="color" id="scfg_crawlColor_' + safe + '" value="' + (c.crawlColor || '#ffe81f') + '" style="width:34px;height:24px" class="form-control form-control-sm d-inline-block p-0 border-0"></label>'
+                + liveTestBtn + '</div></div>';
         } else {
             var meta = SEA_ANIM_META[fnName] || {};
             var fields = '';
-            if (meta.emoji   !== undefined) fields += ' Emoji <input type="text" id="scfg_emoji_'   + safe + '" data-picker-target="scfg_emoji_' + safe + '" value="' + _escHtml(c.emoji   !== undefined ? c.emoji   : meta.emoji)   + '" style="width:70px;font-size:0.85rem;" class="form-control form-control-sm d-inline-block">';
-            if (meta.size    !== undefined) fields += ' Size <input type="text" id="scfg_size_'     + safe + '" value="' + _escHtml(c.size    !== undefined ? c.size    : meta.size)    + '" style="width:65px" class="form-control form-control-sm d-inline-block" placeholder="2rem">';
-            if (meta.count   !== undefined) fields += ' Count <input type="number" id="scfg_count_' + safe + '" value="' + (c.count   !== undefined ? c.count   : meta.count)   + '" min="1" max="50" style="width:55px" class="form-control form-control-sm d-inline-block">';
-            if (meta.dur     !== undefined) fields += ' Dur <input type="number" id="scfg_dur_'     + safe + '" value="' + (c.dur     !== undefined ? c.dur     : meta.dur)     + '" min="0.5" max="20" step="0.5" style="width:60px" class="form-control form-control-sm d-inline-block">s';
-            if (meta.color   !== undefined) fields += ' Color <input type="color" id="scfg_color_'  + safe + '" value="' + _cssColorToHex(c.color   !== undefined ? c.color   : meta.color)   + '" style="width:34px;height:24px" class="form-control form-control-sm d-inline-block p-0 border-0">';
-            if (meta.bgColor !== undefined) fields += ' BG <input type="color" id="scfg_bgColor_'   + safe + '" value="' + _cssColorToHex(c.bgColor !== undefined ? c.bgColor : meta.bgColor) + '" style="width:34px;height:24px" class="form-control form-control-sm d-inline-block p-0 border-0">';
-            if (meta.text    !== undefined) fields += '<br>Text <input type="text" id="scfg_text_'  + safe + '" value="' + _escHtml(c.text    !== undefined ? c.text    : meta.text)    + '" style="width:200px;max-width:100%" class="form-control form-control-sm d-inline-block">';
+            // AH7: emoji field uses input-group; AH8: each field is nowrap label
+            if (meta.emoji   !== undefined) fields += '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Emoji ' + emojiInputGroup('scfg_emoji_' + safe, c.emoji !== undefined ? c.emoji : meta.emoji) + '</label>';
+            if (meta.size    !== undefined) fields += '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Size <input type="text" id="scfg_size_' + safe + '" value="' + _escHtml(c.size !== undefined ? c.size : meta.size) + '" style="width:65px" class="form-control form-control-sm d-inline-block" placeholder="2rem"></label>';
+            if (meta.count   !== undefined) fields += '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Count <input type="number" id="scfg_count_' + safe + '" value="' + (c.count !== undefined ? c.count : meta.count) + '" min="1" max="50" style="width:55px" class="form-control form-control-sm d-inline-block"></label>';
+            if (meta.dur     !== undefined) fields += '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Dur <input type="number" id="scfg_dur_' + safe + '" value="' + (c.dur !== undefined ? c.dur : meta.dur) + '" min="0.5" max="20" step="0.5" style="width:60px" class="form-control form-control-sm d-inline-block"> s</label>';
+            if (meta.color   !== undefined) fields += '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Color <input type="color" id="scfg_color_' + safe + '" value="' + _cssColorToHex(c.color !== undefined ? c.color : meta.color) + '" style="width:34px;height:24px" class="form-control form-control-sm d-inline-block p-0 border-0"></label>';
+            if (meta.bgColor !== undefined) fields += '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">BG <input type="color" id="scfg_bgColor_' + safe + '" value="' + _cssColorToHex(c.bgColor !== undefined ? c.bgColor : meta.bgColor) + '" style="width:34px;height:24px" class="form-control form-control-sm d-inline-block p-0 border-0"></label>';
+            if (meta.text    !== undefined) fields += '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0 w-100" style="white-space:nowrap;">Text <input type="text" id="scfg_text_' + safe + '" value="' + _escHtml(c.text !== undefined ? c.text : meta.text) + '" style="width:200px;max-width:calc(100% - 3rem)" class="form-control form-control-sm d-inline-block"></label>';
             if (fields) {
-                // AF6: Use liveTestBtn so unsaved DOM values are used during preview
                 row += '<div class="d-flex flex-wrap gap-1 align-items-center mt-1" style="font-size:0.78rem;">' + fields + liveTestBtn + '</div>';
             } else {
                 row += '<div class="small text-muted">Wrapper animation — enable/disable only.' + liveTestBtn + '</div>';
@@ -2086,7 +2097,7 @@ function testSeasonAnim(fnName) {
     if (typeof fn === 'function') fn();
 }
 
-// AF6 — Test using current unsaved DOM field values (custom animations only)
+// AH1/AF6 — Test using current unsaved DOM field values (all animation types)
 function _seaTestAnimLive(fnName) {
     var key = _seaConfigSeasonKey;
     if (!key) { testSeasonAnim(fnName); return; }
@@ -2096,8 +2107,10 @@ function _seaTestAnimLive(fnName) {
     var allCfg = {};
     try { allCfg = JSON.parse(localStorage.getItem('sea_cfg_' + key) || '{}'); } catch(e) {}
     var o = Object.assign({}, allCfg[fnName] || {});
-    // Override with current DOM values (unsaved)
+    // Override with current DOM values (unsaved) — all field types
     function rf(id) { var el = document.getElementById(id); return el ? el.value : undefined; }
+    function rcb(id) { var el = document.getElementById(id); return el ? el.checked : undefined; }
+    // Shared fields (custom type)
     if (meta.emoji   !== undefined) { var v = rf('scfg_emoji_'   + safe); if (v !== undefined) o.emoji   = v; }
     if (meta.size    !== undefined) { var v = rf('scfg_size_'    + safe); if (v !== undefined) o.size    = v; }
     if (meta.count   !== undefined) { var v = rf('scfg_count_'   + safe); if (v !== undefined) o.count   = parseInt(v) || meta.count; }
@@ -2105,6 +2118,27 @@ function _seaTestAnimLive(fnName) {
     if (meta.color   !== undefined) { var v = rf('scfg_color_'   + safe); if (v !== undefined) o.color   = v; }
     if (meta.bgColor !== undefined) { var v = rf('scfg_bgColor_' + safe); if (v !== undefined) o.bgColor = v; }
     if (meta.text    !== undefined) { var v = rf('scfg_text_'    + safe); if (v !== undefined) o.text    = v; }
+    // AH1: runner/popup/corner/particles type fields
+    if (meta.type === 'runner') {
+        var v; v = rf('scfg_emoji_' + safe); if (v !== undefined) o.emoji = v;
+        v = rf('scfg_dir_'   + safe); if (v !== undefined) o.dir   = v;
+        v = rf('scfg_size_'  + safe); if (v !== undefined) o.size  = v;
+        v = rf('scfg_dur_'   + safe); if (v !== undefined) o.dur   = parseFloat(v) || 5;
+        v = rf('scfg_ms_'    + safe); if (v !== undefined) o.motionStyle = v;
+        var cb = rcb('scfg_flipx_' + safe); if (cb !== undefined) o.flipX = cb;
+    } else if (meta.type === 'particles') {
+        var v = rf('scfg_emoji_' + safe); if (v !== undefined) o.emoji = v;
+        v = rf('scfg_count_' + safe); if (v !== undefined) o.count = parseInt(v) || 15;
+    } else if (meta.type === 'popup') {
+        var v = rf('scfg_emoji_' + safe); if (v !== undefined) o.emoji = v;
+        v = rf('scfg_size_'  + safe); if (v !== undefined) o.size  = v;
+    } else if (meta.type === 'corner') {
+        var v = rf('scfg_emoji_' + safe); if (v !== undefined) o.emoji = v;
+        v = rf('scfg_side_'  + safe); if (v !== undefined) o.side  = v;
+    } else if (meta.type === 'custom' && fnName === '_seaStarWarsCrawl') {
+        var v = rf('scfg_crawlText_' + safe);  if (v !== undefined) o.crawlText  = v;
+        v = rf('scfg_crawlColor_' + safe); if (v !== undefined) o.crawlColor = v;
+    }
     // Temporarily write merged config, run animation, restore original
     allCfg[fnName] = o;
     localStorage.setItem('sea_cfg_' + key, JSON.stringify(allCfg));
@@ -2130,7 +2164,9 @@ function saveSeasonConfig() {
             var msEl = document.getElementById('scfg_ms_' + safe);
             o.motionStyle = msEl ? msEl.value : (meta.motionStyle || 'wave');
         } else if (meta.type === 'particles') {
-            o.chars = document.getElementById('scfg_chars_' + safe).value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+            // AH7: stored as unified emoji string; split via [...str] at runtime
+            var emojiEl = document.getElementById('scfg_emoji_' + safe);
+            if (emojiEl) o.emoji = emojiEl.value;
             o.count = parseInt(document.getElementById('scfg_count_' + safe).value) || meta.count;
         } else if (meta.type === 'popup') {
             o.emoji = document.getElementById('scfg_emoji_' + safe).value;

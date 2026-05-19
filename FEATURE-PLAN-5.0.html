@@ -915,7 +915,61 @@
     <li><b>AE11c — Clock checkbox covered:</b> When the analog clock renders in <code>#stc-clock</code> inside the story bar, the toggle switch in the Other tab settings may be visually obscured. Investigate layout clash. <em>File: _Layout.cshtml / site.css</em></li>
     <li><b>AE11d — Extended clock settings (AE8):</b> Font family (digital), 12h/24h toggle, number style (analog: digits/roman/ticks/none), clock background color — deferred from Group AE plan. <em>File: room.js, _Layout.cshtml</em></li>
     <li><b>AE11e — Timer style settings (AE9):</b> <code>es_timerStyle</code> for color, fontSize, fontFamily on count-up timer. <em>File: room.js, _Layout.cshtml</em></li>
-    <li><b>AE11f — Events tab header bug:</b> Awaiting screenshot from user. <em>Blocked</em></li>
+    <li><b>AE11f — Events tab header bug:</b> ✅ Fixed in Group AH — Events tab headers now use the same outer-div collapse pattern with animated ▾ chevron.</li>
+  </ul>
+</div>
+
+<div class="group-card hard" id="group-ai">
+  <h3>Group AI — 🕐 Custom Clock Face <span class="new-tag">new</span></h3>
+  <span class="tag">Hard</span><span class="tag">room.js · site.css · _Layout.cshtml</span>
+  <p style="margin:8px 0 4px;">Deferred from Group AH. Deep customisation of the clock appearance beyond current colour/size options.</p>
+  <h4 style="margin-top:14px;">AI1 — Clock Background</h4>
+  <ul>
+    <li>Add <code>bgColor</code> field to <code>es_clockStyle</code> with colour picker (+ "none/transparent" option)</li>
+    <li>Applied to the <code>#stc-clock</code> span container and preview element</li>
+  </ul>
+  <h4 style="margin-top:14px;">AI2 — Custom Hands (analog)</h4>
+  <ul>
+    <li>Hand style (solid / dashed / arrow), thickness (1–6px), length (50–100% of radius) per hand</li>
+    <li>Stored in <code>es_clockStyle.hands</code> object; rendered via SVG <code>&lt;line&gt;</code> attributes in <code>_acAnalogSvgTemplate</code></li>
+  </ul>
+  <h4 style="margin-top:14px;">AI3 — Number Style (analog)</h4>
+  <ul>
+    <li>Options: Arabic digits / Roman numerals / tick marks only / none</li>
+    <li>Stored in <code>es_clockStyle.numberStyle</code>; rendered as SVG text or lines</li>
+  </ul>
+  <h4 style="margin-top:14px;">AI4 — Font Family + 12h/24h (digital)</h4>
+  <ul>
+    <li>Font family select (monospace subset); 12h/24h checkbox — from AE8</li>
+    <li>Stored in <code>es_clockStyle.fontFamily</code> and <code>es_clockStyle.h24</code></li>
+  </ul>
+</div>
+
+<div class="group-card hard" id="group-aj">
+  <h3>Group AJ — 🃏 Additional Card Animations <span class="new-tag">new</span></h3>
+  <span class="tag">Hard</span><span class="tag">room.js · site.css</span>
+  <p style="margin:8px 0 4px;">Deferred from Group AH. Additional reveal animations for vote cards beyond the current flip.</p>
+  <ul>
+    <li><b>Explode</b> — card shatters into pieces flying off-screen</li>
+    <li><b>Tardis</b> — card spins and scales to a tiny dot, then re-expands showing the number</li>
+    <li><b>Hide</b> — card slides under the table (down off-screen) then slides back up with number</li>
+    <li><b>Run-Away</b> — card sprints off to the side, then bounces back with number revealed</li>
+    <li><b>Fly-Away</b> — card flies off and returns from above with number</li>
+  </ul>
+  <p>All implemented as CSS keyframe animations applied via a class on <code>.poker-card</code> at reveal time. Speed setting shared with existing flip animation.</p>
+</div>
+
+<div class="group-card" id="group-ak">
+  <h3>Group AK — 🔧 UX Deferred from AH <span class="new-tag">new</span></h3>
+  <span class="tag">Medium</span><span class="tag">Various</span>
+  <p style="margin:8px 0 4px;">Items deferred from Group AH that did not fit in the batch.</p>
+  <ul>
+    <li><b>AK1 — Controls Panel:</b> Make the controls panel (Reveal/Reset/etc.) draggable, or collapsible with a ▸ arrow toggle (like the chat panel). File: Index.cshtml, room.js, site.css</li>
+    <li><b>AK2 — Stories drag indicator:</b> Stories panel items should show a ⠿ drag handle cursor so users know they are reorderable. File: Index.cshtml or site.css</li>
+    <li><b>AK3 — Normal/Compact preview in view settings:</b> Add small live thumbnail in the View settings tab showing how Normal vs Compact card layout looks. File: _Layout.cshtml</li>
+    <li><b>AK4 — Flip speed setting:</b> Add a speed slider for card flip animation (also applies to AI/AJ animations). Stored in <code>es_flipDuration</code>. File: room.js, site.css, _Layout.cshtml</li>
+    <li><b>AK5 — Gradient card backgrounds:</b> Allow gradient stops in card background colour fields (CSS linear-gradient string). UI needs a gradient builder or raw CSS input. File: site.css, _Layout.cshtml, room.js</li>
+    <li><b>AK6 — Timer style settings (AE9):</b> <code>es_timerStyle</code> for color, fontSize, fontFamily on count-up timer. File: room.js, _Layout.cshtml</li>
   </ul>
 </div>
 

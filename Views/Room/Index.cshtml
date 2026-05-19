@@ -73,11 +73,17 @@
                     <span id="timerIcon">⏱️</span> <span id="timerValue">0</span>s
                 </div>
                 <!-- AC: Session Timer + Clock — inline right side -->
-                <div id="session-tc-bar" class="ms-auto d-flex align-items-center gap-2" style="display:none;">
-                    <span id="stc-timer" class="stc-segment" title="Time on current story"></span>
-                    <span class="stc-sep" id="stc-sep">·</span>
-                    <span id="stc-clock" class="stc-segment"></span>
-                    <button class="panel-close-btn" title="Hide until reload — use Settings to permanently disable" onclick="sessionStorage.setItem('es_hideTCBar','1');_acTick();" aria-label="Close">&times;</button>
+                <!-- AH2: removed d-flex class; AH9: separate × per segment; AI3: each segment wrapped in stc-pair -->
+                <div id="session-tc-bar" class="ms-auto align-items-center gap-2" style="display:none;">
+                    <span class="stc-pair" id="stc-timer-wrap" style="display:none;">
+                        <span id="stc-timer" class="stc-segment" title="Time on current story"></span>
+                        <button class="stc-close-btn" id="stc-timer-close" title="Hide timer until reload" onclick="sessionStorage.setItem('es_hideTimer','1');_acTick();" aria-label="Close timer">&times;</button>
+                    </span>
+                    <span class="stc-sep" id="stc-sep" style="display:none;">·</span>
+                    <span class="stc-pair" id="stc-clock-wrap" style="display:none;">
+                        <span id="stc-clock" class="stc-segment"></span>
+                        <button class="stc-close-btn" id="stc-clock-close" title="Hide clock until reload" onclick="sessionStorage.setItem('es_hideClock','1');_acTick();" aria-label="Close clock">&times;</button>
+                    </span>
                 </div>
             </div>
         </div>

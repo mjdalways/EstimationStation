@@ -1326,10 +1326,23 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.5rem;
 }
 .ct-preview-body {
-  padding: 0.6rem 0.75rem;
+  padding: 0.4rem 0.6rem;
   display: flex;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.35rem;
   align-items: flex-start;
+}
+/* AI6: compact vote card specimens in live preview */
+#ct-live-preview .poker-card {
+  font-size: 0.65rem !important;
+  width: 26px !important;
+  min-height: 34px !important;
+  padding: 2px 3px !important;
+  border-radius: 3px !important;
+}
+#ct-live-preview .participant-badge {
+  font-size: 0.62rem !important;
+  padding: 1px 5px !important;
 }
 .ct-preview-card {
   width: 40px;
@@ -1468,16 +1481,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* X1 — Flip on vote: reuses poker-flip keyframe (already defined) */
-/* X2 — Change vote hint overlay on local user's voted badge */
-.show-change-hint .participant-badge.voted.me { cursor: pointer; }
-.show-change-hint .participant-badge.voted.me:not(.chicken-overlay):hover::after {
-    content: '↩ Change';
+/* X2 — AH5: Change vote hint moved from participant badge to selected voting card */
+.show-change-hint .poker-card.selected { position: relative; cursor: pointer; }
+.show-change-hint .poker-card.selected:hover::after {
+    content: '↺ Change';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     background: rgba(0, 0, 0, 0.45);
     color: #fff;
-    font-size: 0.62rem;
+    font-size: 0.72rem;
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -1510,6 +1523,16 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 0.4;
     font-size: 0.7rem;
 }
+/* AI3: each timer/clock segment wrapped with its own × button */
+.stc-pair { display: inline-flex; align-items: center; gap: 2px; }
+.stc-close-btn {
+    background: none; border: none;
+    font-size: 0.78rem; line-height: 1; padding: 0 2px;
+    color: var(--text-muted, #6c757d); cursor: pointer;
+    opacity: 0.5; border-radius: 3px;
+    transition: opacity 0.15s, background 0.15s; flex-shrink: 0;
+}
+.stc-close-btn:hover { opacity: 1; background: rgba(0,0,0,0.07); }
 .ac-analog {
     display: inline-block;
     vertical-align: middle;
@@ -1838,8 +1861,11 @@ body.presentation-mode #currentStoryDisplay {
 .settings-section-header:hover {
   background: color-mix(in srgb, var(--accent, #5b8dee) 18%, transparent);
 }
-/* Animate the ▾ character via last-char trick: rotate the entire span when collapsed */
-.settings-section-header span[data-bs-toggle="collapse"] { transition: none; }
+/* AH4 — chevron rotation when outer div collapses (standardised pattern) */
+.settings-section-chevron { transition: transform 0.2s; display: inline-block; margin-left: auto; }
+.settings-section-header.collapsed .settings-section-chevron { transform: rotate(-90deg); }
+/* Legacy inner-span pattern: dim only (no rotation) */
+.settings-section-header span[data-bs-toggle="collapse"] { transition: none; flex-grow: 1; }
 .settings-section-header span[data-bs-toggle="collapse"].collapsed { opacity: 0.75; }
 .just-changed { outline: 2px solid var(--accent, #5b8dee); outline-offset: 4px; transition: outline 0.5s; }
 /* Fix #6 — search result highlight */
@@ -2144,5 +2170,26 @@ mark.search-highlight { background: #fff176; color: inherit; border-radius: 2px;
 .settings-modal-dialog.was-dragged {
     transform: none !important;
     margin: 0 !important;
+}
+
+/* AH13 — Avatar DiceBear style tiles: dimmed unselected, accent glow on selected */
+.avatar-style-option {
+    border: 2px solid var(--border, #dee2e6);
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s, border-color 0.15s, box-shadow 0.15s;
+    padding: 4px;
+    text-align: center;
+}
+.avatar-style-option.selected, .avatar-style-option:hover {
+    border-color: var(--accent, #5b8dee);
+    opacity: 1;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #5b8dee) 30%, transparent);
+}
+.avatar-style-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+    gap: 6px;
 }
 

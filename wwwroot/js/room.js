@@ -948,6 +948,14 @@ async function castVote(val) {
     const wasSelected = selectedVote === val;
     selectedVote = wasSelected ? null : val;
     renderCards();
+    // AH6: brief flip animation on the newly selected card
+    if (selectedVote !== null) {
+        var selCard = document.querySelector('.poker-card.selected');
+        if (selCard) {
+            selCard.classList.add('card-flipping');
+            setTimeout(function() { selCard.classList.remove('card-flipping'); }, 700);
+        }
+    }
     if (selectedVote !== null) _qPlayVoteTick();  // Q1
 
     try {
@@ -1529,42 +1537,49 @@ function _acTick() {
     var bar = document.getElementById('session-tc-bar');
     if (!bar) return;
 
-    // AF8: Session-hide — × button hides for this session only; resets on reload
-    if (sessionStorage.getItem('es_hideTCBar') === '1') { bar.style.display = 'none'; return; }
-
     var showTimer = localStorage.getItem('es_showTimer') !== '0';
     var showClock = localStorage.getItem('es_showClock') !== '0';
-    var hasStory = !!_acLastStoryId;
+    var hasStory  = !!_acLastStoryId;
 
-    // Only show the bar if something will be visible: clock enabled OR (timer enabled AND story active)
-    var timerWillShow = showTimer && hasStory && !!_acTimerStart;
-    if (!timerWillShow && !showClock) { bar.style.display = 'none'; return; }
-    bar.style.display = '';
+    // AH9: per-segment session-hide (separate × for timer and clock)
+    var sessionHideTimer = sessionStorage.getItem('es_hideTimer') === '1';
+    var sessionHideClock = sessionStorage.getItem('es_hideClock') === '1';
 
-    // Timer segment
+    var timerActive  = showTimer && hasStory && !!_acTimerStart && !sessionHideTimer;
+    var clockActive  = showClock && !sessionHideClock;
+
+    // Hide whole bar if nothing will show
+    if (!timerActive && !clockActive) { bar.style.display = 'none'; return; }
+    // AH2: use explicit 'flex' — inline style overrides, no d-flex class needed
+    bar.style.display = 'flex';
+
+    // Timer segment (AI3: controlled via stc-timer-wrap container)
     var timerEl = document.getElementById('stc-timer');
+    var timerWrap = document.getElementById('stc-timer-wrap');
     if (timerEl) {
-        if (showTimer && hasStory && _acTimerStart) {
+        if (timerActive) {
             var elapsed = Math.floor((Date.now() - _acTimerStart) / 1000);
             var m = Math.floor(elapsed / 60), s = elapsed % 60;
             timerEl.textContent = '⏱ ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-            timerEl.style.display = '';
+            if (timerWrap) timerWrap.style.display = '';
         } else {
-            timerEl.style.display = 'none';
+            if (timerWrap) timerWrap.style.display = 'none';
         }
     }
 
-    // Separator
+    // Separator — only show when both visible
     var sep = document.getElementById('stc-sep');
-    if (sep) sep.style.display = (showTimer && hasStory && showClock) ? '' : 'none';
+    if (sep) sep.style.display = (timerActive && clockActive) ? '' : 'none';
 
-    // Clock segment
+    // Clock segment (AI3: controlled via stc-clock-wrap container)
     var clockEl = document.getElementById('stc-clock');
+    var clockWrap = document.getElementById('stc-clock-wrap');
     if (clockEl) {
-        if (showClock) {
+        if (clockActive) {
             _acRenderClock(clockEl);
+            if (clockWrap) clockWrap.style.display = '';
         } else {
-            clockEl.style.display = 'none';
+            if (clockWrap) clockWrap.style.display = 'none';
         }
     }
 }
@@ -1865,6 +1880,8 @@ function saveReactionSettings() {
     if (rEnEl) {
         _reactionEnabled = rEnEl.checked;
         localStorage.setItem('es_reactionEnabled', String(_reactionEnabled));
+        // AH10: clear session-hide when user explicitly re-enables reactions
+        if (_reactionEnabled) sessionStorage.removeItem('es_hideReactions');
     }
     var rPalEl = document.getElementById('reaction-palette-input');
     if (rPalEl) {
@@ -1880,8 +1897,25 @@ function initReactionPanel() {
     var panel = document.getElementById('reactionPanel');
     if (!panel) return;
     panel.innerHTML = '';
-    panel.style.display = _reactionEnabled ? '' : 'none';
-    if (!_reactionEnabled) return;
+    // AH10: respect session-hide flag
+    if (!_reactionEnabled || sessionStorage.getItem('es_hideReactions') === '1') {
+        panel.style.display = 'none';
+        return;
+    }
+    panel.style.display = '';
+    // AH10: close button (session-only hide)
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'panel-close-btn';
+    closeBtn.title = 'Hide until reload';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = function(e) {
+        e.stopPropagation();
+        sessionStorage.setItem('es_hideReactions', '1');
+        panel.style.display = 'none';
+    };
+    panel.style.position = 'relative';
+    panel.appendChild(closeBtn);
     _reactionPalette.forEach(function(emoji) {
         var btn = document.createElement('button');
         btn.type = 'button';

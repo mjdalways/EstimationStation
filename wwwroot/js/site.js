@@ -126,11 +126,13 @@ function openSettingsModal(tab) {
 
     _settingsSaved = false; // reset the save flag for this session
 
-    // AF9: Start live preview tick so clock preview animates while modal is open
+    // AF9 / AH3: Start live preview tick so clock preview animates while modal is open
     if (window._clockPreviewInterval) clearInterval(window._clockPreviewInterval);
     window._clockPreviewInterval = setInterval(function() {
         var prev = document.getElementById('tc-clock-preview');
-        if (prev && typeof _acRenderClock === 'function') _acRenderClock(prev);
+        if (!prev) return;
+        if (typeof _acRenderClock === 'function') _acRenderClock(prev);
+        else _acRenderClockBasic(prev);
     }, 1000);
     // Stop ticking when modal closes (re-registered each open)
     modalEl.addEventListener('hidden.bs.modal', function() {
@@ -1462,10 +1464,9 @@ function saveTimerClockSettings() {
     if (showTimerEl) localStorage.setItem('es_showTimer', showTimerEl.checked ? '1' : '0');
     if (showClockEl) localStorage.setItem('es_showClock', showClockEl.checked ? '1' : '0');
     if (tzEl)        localStorage.setItem('es_clockTimezone', tzEl.value);
-    // AF8: Clear session-hide if user explicitly re-enables clock or timer
-    if ((showClockEl && showClockEl.checked) || (showTimerEl && showTimerEl.checked)) {
-        sessionStorage.removeItem('es_hideTCBar');
-    }
+    // AH9: Clear per-segment session-hide when user explicitly re-enables
+    if (showTimerEl && showTimerEl.checked) sessionStorage.removeItem('es_hideTimer');
+    if (showClockEl && showClockEl.checked) sessionStorage.removeItem('es_hideClock');
     // AG3: delegate room-internal timer-start logic to room.js hook (no-op on non-room pages)
     if (typeof _acOnTimerEnabled === 'function') _acOnTimerEnabled(showTimerEl);
 
@@ -1482,7 +1483,10 @@ function saveTimerClockSettings() {
     localStorage.setItem('es_clockStyle', JSON.stringify(styleData));
     if (typeof _acTick === 'function') _acTick();
     var prev = document.getElementById('tc-clock-preview');
-    if (prev && typeof _acRenderClock === 'function') _acRenderClock(prev);
+    if (prev) {
+        if (typeof _acRenderClock === 'function') _acRenderClock(prev);
+        else _acRenderClockBasic(prev);
+    }
 }
 window.saveTimerClockSettings = saveTimerClockSettings;
 
@@ -1508,4 +1512,51 @@ function _renderReactionPreview() {
         : '<span class="text-muted small">No emojis configured — using defaults</span>';
 }
 window._renderReactionPreview = _renderReactionPreview;
+
+// AH3 — Minimal digital-only clock renderer for pages where room.js is not loaded.
+// Used as fallback in the settings modal clock preview when _acRenderClock is unavailable.
+function _acRenderClockBasic(el) {
+    if (!el) return;
+    var styleData = {};
+    try { styleData = JSON.parse(localStorage.getItem('es_clockStyle') || '{}'); } catch(e) {}
+    var mode = styleData.mode || 'digital';
+    var tz   = localStorage.getItem('es_clockTimezone') || '';
+
+    if (mode === 'analog') {
+        // AI1: render analog SVG inline — no room.js dependency, pure math + SVG template
+        var svgTpl = '<svg class="ac-analog" width="52" height="52" viewBox="0 0 100 100">'
+            + '<circle class="ac-face" cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2"/>'
+            + '<line class="ac-hour" x1="50" y1="50" x2="50" y2="28" stroke="#212529" stroke-width="5" stroke-linecap="round"/>'
+            + '<line class="ac-min"  x1="50" y1="50" x2="50" y2="16" stroke="#495057" stroke-width="3" stroke-linecap="round"/>'
+            + '<line class="ac-sec"  x1="50" y1="55" x2="50" y2="12" stroke="#dc3545" stroke-width="1.5" stroke-linecap="round"/>'
+            + '<circle cx="50" cy="50" r="2.5" fill="currentColor"/>'
+            + '</svg>';
+        el.innerHTML = svgTpl;
+        var tzDate;
+        try { tzDate = tz ? new Date(new Date().toLocaleString('en-US', { timeZone: tz })) : new Date(); }
+        catch(e) { tzDate = new Date(); }
+        var s2 = tzDate.getSeconds(), m2 = tzDate.getMinutes(), h2 = tzDate.getHours() % 12;
+        var svg = el.querySelector('.ac-analog');
+        if (svg) {
+            var setRot = function(cls, deg) {
+                var ln = svg.querySelector(cls); if (ln) ln.setAttribute('transform', 'rotate(' + deg + ',50,50)');
+            };
+            setRot('.ac-hour', h2 * 30 + m2 * 0.5);
+            setRot('.ac-min',  m2 * 6  + s2 * 0.1);
+            setRot('.ac-sec',  s2 * 6);
+        }
+        return;
+    }
+
+    var color  = styleData.color || '#6c757d';
+    var fs     = (styleData.fontSize || 13) + 'px';
+    var h24    = styleData.h24 !== false; // default 24h
+    var now    = new Date();
+    var opts   = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !h24 };
+    if (tz) opts.timeZone = tz;
+    var timeStr = '';
+    try { timeStr = now.toLocaleTimeString([], opts); } catch(e) { timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !h24 }); }
+    el.innerHTML = '<span style="color:' + color + ';font-size:' + fs + ';font-family:monospace;white-space:nowrap;">🕐 ' + timeStr + '</span>';
+}
+window._acRenderClockBasic = _acRenderClockBasic;
 

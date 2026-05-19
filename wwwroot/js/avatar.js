@@ -16,12 +16,18 @@ function avatarDataToUrl(avatarData, size) {
         return dbUrl;
     }
     if (provider === 'robohash') {
-        return 'https://robohash.org/' + encodeURIComponent(p2) + '?set=set' + (p1 || '1') + '&size=' + size + 'x' + size;
+        // AI5: strip |bg:RRGGBB suffix before building URL (applied as CSS bg in renderAvatar)
+        var bgIdx = p2.indexOf('|bg:');
+        var rSeed = bgIdx >= 0 ? p2.substring(0, bgIdx) : p2;
+        return 'https://robohash.org/' + encodeURIComponent(rSeed) + '?set=set' + (p1 || '1') + '&size=' + size + 'x' + size;
     }
     if (provider === 'unavatar') {
-        var svc = p1, handle = p2;
-        if (svc && handle) return 'https://unavatar.io/' + encodeURIComponent(svc) + '/' + encodeURIComponent(handle);
-        return 'https://unavatar.io/' + encodeURIComponent(svc || handle);
+        // AI5: strip |bg:RRGGBB suffix
+        var bgIdx2 = p2.indexOf('|bg:');
+        var uHandle = bgIdx2 >= 0 ? p2.substring(0, bgIdx2) : p2;
+        var svc = p1;
+        if (svc && uHandle) return 'https://unavatar.io/' + encodeURIComponent(svc) + '/' + encodeURIComponent(uHandle);
+        return 'https://unavatar.io/' + encodeURIComponent(svc || uHandle);
     }
     return null;
 }
@@ -33,6 +39,12 @@ function renderAvatar(avatarData, name, size) {
     var wrapper = document.createElement('div');
     wrapper.className = 'avatar-wrapper';
     wrapper.style.setProperty('--av-size', size + 'px');
+
+    // AI5: extract |bg:RRGGBB wrapper background for image-based sources
+    if (avatarData && avatarData.indexOf('|bg:') >= 0) {
+        var bgHex = avatarData.split('|bg:')[1];
+        if (bgHex) { wrapper.style.background = '#' + bgHex; wrapper.style.borderRadius = '50%'; }
+    }
 
     var url = avatarDataToUrl(avatarData, size);
     if (url) {
@@ -52,10 +64,14 @@ function renderAvatar(avatarData, name, size) {
         return wrapper;
     }
 
-    if (!avatarData || avatarData === 'initials') {
+    // AI5: initials with optional |RRGGBB color suffix
+    if (!avatarData || avatarData === 'initials' || avatarData.startsWith('initials')) {
+        var bgCol = (avatarData && avatarData.indexOf('|') >= 0)
+            ? '#' + avatarData.split('|')[1]
+            : colorFromName(name);
         var el = document.createElement('div');
         el.className = 'av-initials';
-        el.style.background = colorFromName(name);
+        el.style.background = bgCol;
         el.textContent = getInitials(name);
         wrapper.appendChild(el);
     } else if (avatarData.startsWith('data:')) {
@@ -142,16 +158,27 @@ function saveAvatarSettings(s) {
 }
 
 function buildAvatarData(s) {
-    if (!s || s.source === 'initials') return null;
     var defaultName = (typeof ROOM_CONFIG !== 'undefined' ? ROOM_CONFIG.playerName : '') || (localStorage.getItem('es_playerName') || '');
-    var seed = s.seed || defaultName;
+    var seed = (s && s.seed) || defaultName;
+    var bg = s && s.avatarBgColor ? s.avatarBgColor : '';
+    if (!s || s.source === 'initials') {
+        // AI5: encode bg color so other participants render the chosen circle color
+        return bg ? 'initials|' + bg : null;
+    }
     if (s.source === 'dicebear') {
         var dbBase = 'dicebear:' + (s.dicebearStyle || 'bottts') + ':' + seed;
-        return s.dicebearBgColor ? dbBase + '|' + s.dicebearBgColor : dbBase;
+        var dbBg = s.dicebearBgColor || bg;
+        return dbBg ? dbBase + '|' + dbBg : dbBase;
     }
-    if (s.source === 'robohash') return 'robohash:' + (s.robohashSet    || '1')       + ':' + seed;
-    if (s.source === 'unavatar') return 'unavatar:' + (s.unavatarService || 'github')  + ':' + (s.unavatarHandle || '');
-    if (s.source === 'upload')   return s.uploadDataUri || null;
+    if (s.source === 'robohash') {
+        var rBase = 'robohash:' + (s.robohashSet || '1') + ':' + seed;
+        return bg ? rBase + '|bg:' + bg : rBase;
+    }
+    if (s.source === 'unavatar') {
+        var uBase = 'unavatar:' + (s.unavatarService || 'github') + ':' + (s.unavatarHandle || '');
+        return bg ? uBase + '|bg:' + bg : uBase;
+    }
+    if (s.source === 'upload') return s.uploadDataUri || null;
     return null;
 }
 
@@ -164,26 +191,31 @@ function _getFormSource() {
 
 function _buildAvatarDataFromForm() {
     var source = _getFormSource();
-    if (source === 'initials') return null;
     var defaultName = (typeof ROOM_CONFIG !== 'undefined' ? ROOM_CONFIG.playerName : '') || (localStorage.getItem('es_playerName') || '');
     var seedEl = document.getElementById('avatar-seed');
     var seed = (seedEl ? seedEl.value.trim() : '') || defaultName;
+    // AI5: read shared bg color for all sources
+    var bgEnableEl = document.getElementById('avatar-bg-enable');
+    var bgColorEl  = document.getElementById('avatar-bg-color');
+    var bg = (bgEnableEl && bgEnableEl.checked && bgColorEl) ? bgColorEl.value.replace('#', '') : '';
+    if (source === 'initials') {
+        return bg ? 'initials|' + bg : null;
+    }
     if (source === 'dicebear') {
         var activeStyleEl = document.querySelector('#avatar-dicebear-grid .avatar-style-option.selected');
-        var bgEnableEl = document.getElementById('avatar-dicebear-bg-enable');
-        var bgColorEl  = document.getElementById('avatar-dicebear-bg');
-        var bgColor = (bgEnableEl && bgEnableEl.checked && bgColorEl) ? bgColorEl.value.replace('#', '') : '';
         var dbBase = 'dicebear:' + (activeStyleEl ? activeStyleEl.dataset.styleId : 'bottts') + ':' + seed;
-        return bgColor ? dbBase + '|' + bgColor : dbBase;
+        return bg ? dbBase + '|' + bg : dbBase;
     }
     if (source === 'robohash') {
         var activeSetEl = document.querySelector('#avatar-robohash-grid .avatar-style-option.selected');
-        return 'robohash:' + (activeSetEl ? activeSetEl.dataset.setId : '1') + ':' + seed;
+        var rBase = 'robohash:' + (activeSetEl ? activeSetEl.dataset.setId : '1') + ':' + seed;
+        return bg ? rBase + '|bg:' + bg : rBase;
     }
     if (source === 'unavatar') {
         var svcEl = document.getElementById('avatar-unavatar-service');
         var handleEl = document.getElementById('avatar-unavatar-handle');
-        return 'unavatar:' + (svcEl ? svcEl.value : 'github') + ':' + (handleEl ? handleEl.value.trim() : '');
+        var uBase = 'unavatar:' + (svcEl ? svcEl.value : 'github') + ':' + (handleEl ? handleEl.value.trim() : '');
+        return bg ? uBase + '|bg:' + bg : uBase;
     }
     if (source === 'upload') {
         return getAvatarSettings().uploadDataUri || null;
@@ -274,10 +306,13 @@ function populateAvatarTab() {
     renderDiceBearGrid(s.dicebearStyle || 'bottts');
     renderRoboHashGrid(s.robohashSet || '1');
 
-    var bgEnableEl = document.getElementById('avatar-dicebear-bg-enable');
-    var bgColorEl  = document.getElementById('avatar-dicebear-bg');
-    if (bgEnableEl) bgEnableEl.checked = !!s.dicebearBgColor;
-    if (bgColorEl)  bgColorEl.value = s.dicebearBgColor ? '#' + s.dicebearBgColor : '#6366f1';
+    // AH11: shared bg color control (replaces dicebear-only controls)
+    var bgEnableEl = document.getElementById('avatar-bg-enable');
+    var bgColorEl  = document.getElementById('avatar-bg-color');
+    // Migrate legacy dicebearBgColor → avatarBgColor on first load
+    var storedBg = s.avatarBgColor || s.dicebearBgColor || '';
+    if (bgEnableEl) bgEnableEl.checked = !!storedBg;
+    if (bgColorEl)  bgColorEl.value = storedBg ? '#' + storedBg : '#6366f1';
 
     var svcEl = document.getElementById('avatar-unavatar-service');
     if (svcEl) svcEl.value = s.unavatarService || 'github';
@@ -290,6 +325,8 @@ function populateAvatarTab() {
 function updateAvatarPreview() {
     var wrap = document.getElementById('avatar-preview-wrap');
     if (!wrap) return;
+    // AI5: _buildAvatarDataFromForm now includes bg color in the data string;
+    // renderAvatar applies it directly — no manual CSS override needed here
     var avatarData = _buildAvatarDataFromForm();
     var name = (typeof ROOM_CONFIG !== 'undefined' ? ROOM_CONFIG.playerName : '') || (localStorage.getItem('es_playerName') || 'Me');
     wrap.innerHTML = '';
@@ -301,12 +338,15 @@ function saveAvatarFromForm() {
     var seedEl = document.getElementById('avatar-seed');
     var s = Object.assign({}, getAvatarSettings(), { source: source, seed: seedEl ? seedEl.value.trim() : '' });
 
+    // AH11: save shared bg color for all sources
+    var bgEnableEl = document.getElementById('avatar-bg-enable');
+    var bgColorEl  = document.getElementById('avatar-bg-color');
+    s.avatarBgColor = (bgEnableEl && bgEnableEl.checked && bgColorEl) ? bgColorEl.value.replace('#', '') : '';
+    // Keep legacy dicebearBgColor in sync for backward compat
     if (source === 'dicebear') {
         var activeStyleEl = document.querySelector('#avatar-dicebear-grid .avatar-style-option.selected');
         s.dicebearStyle = activeStyleEl ? activeStyleEl.dataset.styleId : 'bottts';
-        var bgEnableEl = document.getElementById('avatar-dicebear-bg-enable');
-        var bgColorEl  = document.getElementById('avatar-dicebear-bg');
-        s.dicebearBgColor = (bgEnableEl && bgEnableEl.checked && bgColorEl) ? bgColorEl.value.replace('#', '') : '';
+        s.dicebearBgColor = s.avatarBgColor;
     }
     if (source === 'robohash') {
         var activeSetEl = document.querySelector('#avatar-robohash-grid .avatar-style-option.selected');
