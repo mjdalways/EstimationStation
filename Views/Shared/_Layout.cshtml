@@ -1168,12 +1168,27 @@
                         </div>
 
                         <!-- Master mute -->
-                        <div class="d-flex align-items-center gap-3 p-2 border rounded mb-3 bg-body-secondary">
+                        <div class="d-flex align-items-center gap-3 p-2 border rounded mb-2 bg-body-secondary">
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" id="audio-all-off" onchange="saveAllSoundsOff(this.checked)">
                                 <label class="form-check-label fw-semibold small" for="audio-all-off">🔇 Mute all sounds</label>
                             </div>
                             <span class="text-muted small ms-auto">Overrides all settings below</span>
+                        </div>
+
+                        <!-- N5: On-join sound prompt default -->
+                        <div class="d-flex align-items-center gap-2 p-2 border rounded mb-3 flex-wrap">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="sound-default-enable" onchange="onSoundDefaultEnableChange()" />
+                                <label class="form-check-label small" for="sound-default-enable">🔔 Always use on join:</label>
+                            </div>
+                            <select id="sound-default-select" class="form-select form-select-sm ms-1" style="width:auto;display:none;" onchange="onSoundDefaultSelectChange()">
+                                <option value="all">🔊 All sounds</option>
+                                <option value="local">🎵 My sounds only</option>
+                                <option value="broadcast">📻 Received only</option>
+                                <option value="none">🔇 No sounds</option>
+                            </select>
+                            <span id="sound-default-off-hint" class="text-muted small ms-1">prompt will appear on each join</span>
                         </div>
 
                         <!-- N4: Ambient Audio (collapsible) -->
@@ -1459,6 +1474,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/19/2026 (87)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 Sound prompt default + UI fixes — Added "Always use this option" toggle to the on-join sound preference prompt; when checked your choice is saved and the prompt is skipped in future (Audio tab shows the saved default with a Clear button). Fixed "↺ Change" overlay on selected vote cards — was rendering upside-down due to a CSS transform conflict; now correctly right-side-up. Theme live preview cards widened to match actual card aspect ratio; participant badges moved to their own row below cards. Avatar "Background color" toggle is now a visible switch instead of a faint checkbox.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/19/2026 (86)</strong></p>
                         <ul class="mb-2">
                             <li>🔧 UI Polish — Theme live preview: vote cards now match actual card proportions (correct aspect ratio, wider). Participant badges now appear in their own row below the vote cards. Avatar "Background color" toggle converted from a faint checkbox to a visible toggle switch.</li>
@@ -2222,6 +2241,10 @@
                         <button class="btn btn-outline-secondary text-start" onclick="confirmSoundChoice('local')"><b>🎵 My sounds only</b> — local triggers, no received broadcasts</button>
                         <button class="btn btn-outline-secondary text-start" onclick="confirmSoundChoice('broadcast')"><b>📻 Received only</b> — hear others' sounds, not your own</button>
                         <button class="btn btn-outline-danger text-start" onclick="confirmSoundChoice('none')"><b>🔇 No sounds</b> — mute all for this session</button>
+                    </div>
+                    <div class="form-check form-switch mt-3 pt-2 border-top">
+                        <input class="form-check-input" type="checkbox" role="switch" id="sound-choice-always" />
+                        <label class="form-check-label small text-muted" for="sound-choice-always">Always use this option (skip prompt in future)</label>
                     </div>
                 </div>
             </div>

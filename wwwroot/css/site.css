@@ -1498,6 +1498,7 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: center;
     pointer-events: none;
     z-index: 2;
+    transform: none !important;
 }
 
 /* AC/AE6 — Session Timer & Clock (now inline in current-story-bar) */

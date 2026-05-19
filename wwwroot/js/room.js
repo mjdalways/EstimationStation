@@ -1451,6 +1451,12 @@ function _promptSoundPreferenceOnce() {
     }
     if (!anyOn) return;
     sessionStorage.setItem('es_soundAsked', '1');
+    // If user saved a default choice, apply it silently without showing the modal
+    var defaultChoice = localStorage.getItem('es_soundDefaultChoice');
+    if (defaultChoice && typeof _applySoundChoice === 'function') {
+        _applySoundChoice(defaultChoice);
+        return;
+    }
     var modalEl = document.getElementById('soundConfirmModal');
     if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
 }

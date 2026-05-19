@@ -116,6 +116,7 @@ function openSettingsModal(tab) {
     applyVoteCardBackDesign();
     if (typeof _epAutoAttach === 'function') _epAutoAttach();
     if (typeof _populateRoomOtherSettings === 'function') _populateRoomOtherSettings();
+    _updateSoundDefaultLabel();
     var ct = document.getElementById('show-confidence-toggle');
     if (ct) ct.checked = localStorage.getItem('es_showConfidence') !== '0';
     // X1/X2: voting animation toggles
@@ -365,20 +366,73 @@ function importAllSettings() {
 }
 
 // ── N5: Sound confirmation choice handler ───────────────────
-function confirmSoundChoice(choice) {
-    var modalEl = document.getElementById('soundConfirmModal');
-    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+function _applySoundChoice(choice) {
     if (choice === 'none') {
-        localStorage.setItem('audio-all-off','true');
+        localStorage.setItem('audio-all-off', 'true');
         var el = document.getElementById('audio-all-off'); if (el) el.checked = true;
     } else if (choice === 'local') {
         localStorage.setItem('es_soundReceive', JSON.stringify({ receiveEnabled: false, showSubtitle: false }));
     } else if (choice === 'broadcast') {
         localStorage.setItem('es_soundReceive', JSON.stringify({ receiveEnabled: true, showSubtitle: true }));
-        localStorage.setItem('audio-all-off','false');
+        localStorage.setItem('audio-all-off', 'false');
     }
     // 'all' = keep current settings unchanged
 }
+
+function confirmSoundChoice(choice) {
+    var modalEl = document.getElementById('soundConfirmModal');
+    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    var alwaysEl = document.getElementById('sound-choice-always');
+    if (alwaysEl && alwaysEl.checked) {
+        localStorage.setItem('es_soundDefaultChoice', choice);
+        _updateSoundDefaultLabel();
+    }
+    _applySoundChoice(choice);
+}
+
+function _updateSoundDefaultLabel() {
+    var choice = localStorage.getItem('es_soundDefaultChoice');
+    var toggle = document.getElementById('sound-default-enable');
+    var select = document.getElementById('sound-default-select');
+    var hint   = document.getElementById('sound-default-off-hint');
+    var hasDefault = !!choice;
+    if (toggle) toggle.checked = hasDefault;
+    if (select) {
+        select.style.display = hasDefault ? '' : 'none';
+        if (hasDefault && choice) select.value = choice;
+    }
+    if (hint) hint.style.display = hasDefault ? 'none' : '';
+}
+window._updateSoundDefaultLabel = _updateSoundDefaultLabel;
+
+function onSoundDefaultEnableChange() {
+    var toggle = document.getElementById('sound-default-enable');
+    var select = document.getElementById('sound-default-select');
+    var hint   = document.getElementById('sound-default-off-hint');
+    if (toggle && toggle.checked) {
+        var choice = (select && select.value) || 'all';
+        localStorage.setItem('es_soundDefaultChoice', choice);
+        if (select) select.style.display = '';
+        if (hint) hint.style.display = 'none';
+    } else {
+        localStorage.removeItem('es_soundDefaultChoice');
+        if (select) select.style.display = 'none';
+        if (hint) hint.style.display = '';
+    }
+}
+window.onSoundDefaultEnableChange = onSoundDefaultEnableChange;
+
+function onSoundDefaultSelectChange() {
+    var select = document.getElementById('sound-default-select');
+    if (select) localStorage.setItem('es_soundDefaultChoice', select.value);
+}
+window.onSoundDefaultSelectChange = onSoundDefaultSelectChange;
+
+function clearSoundDefault() {
+    localStorage.removeItem('es_soundDefaultChoice');
+    _updateSoundDefaultLabel();
+}
+window.clearSoundDefault = clearSoundDefault;
 
 function populateThemeTab() {
     const currentTheme = localStorage.getItem('es_theme') || 'classic';
