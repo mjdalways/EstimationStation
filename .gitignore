@@ -51,3 +51,7 @@ TestResults/
 
 # Room persistence storage
 /rooms/
+
+# My files
+OLD_IGNORE/
+impl/
