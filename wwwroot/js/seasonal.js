@@ -458,6 +458,13 @@ function _seaParticles(chars, count, animName, durRange, sizeRange, delaySpan) {
 
 var _SEA_US_FLAG = '<img src="https://flagcdn.com/us.svg" width="1em" height="0.75em" alt="" style="vertical-align:middle;">';
 
+// Generic flag image builder — constructs an <img> tag from a cfg.flagUrl value.
+// All flag-based animations use this; users can override the URL per animation in the season config panel.
+function _seaFlagHtml(cfg) {
+    if (!cfg || !cfg.flagUrl) return '';
+    return '<img src="' + cfg.flagUrl + '" alt="flag" style="width:1em;height:0.75em;vertical-align:middle;flex-shrink:0;">';
+}
+
 var SEA_ANIM_META = {
     // HALLOWEEN
     _seaGhostJumpscare:   { name:'Ghost Jumpscare',    type:'popup',     emoji:'👻', size:'10rem',  holdMs:1600, enabled:true },
@@ -613,8 +620,8 @@ var SEA_ANIM_META = {
     _seaMlkDoves:         { name:'MLK Doves',           type:'particles', chars:['🕊️','✊','🌟','✨'],           count:16, anim:'sea-float-up',   durRange:[2,4],   sizeRange:[0.8,1.8], delaySpan:2000, enabled:true },
     _seaMlkPopup:         { name:'MLK Popup',           type:'popup',     emoji:'✊', size:'8rem',   holdMs:2200, enabled:true },
     // PRESIDENTS' DAY
-    _seaPresParade:       { name:'Presidents Parade',   type:'runner',    emoji:'🎩' + _SEA_US_FLAG, dir:'lr', size:'3rem',   dur:5,   wave:true,  flipX:false, enabled:true },
-    _seaPresStars:        { name:'Presidents Stars',    type:'particles', chars:['⭐','🌟','✨',_SEA_US_FLAG],  count:18, anim:'sea-snowfall',   durRange:[3,6],   sizeRange:[0.6,1.4], delaySpan:1500, enabled:true },
+    _seaPresParade:       { name:'Presidents Parade',   type:'runner',    emoji:'🎩', flagUrl:'https://flagcdn.com/us.svg', dir:'lr', size:'3rem',   dur:5,   wave:true,  flipX:false, enabled:true },
+    _seaPresStars:        { name:'Presidents Stars',    type:'particles', emoji:'⭐🌟✨', flagUrl:'https://flagcdn.com/us.svg', count:18, anim:'sea-snowfall',   durRange:[3,6],   sizeRange:[0.6,1.4], delaySpan:1500, enabled:true },
     _seaPresPopup:        { name:'Presidents Popup',    type:'popup',     emoji:'🏛️', size:'8rem',   holdMs:2400, enabled:true },
     // MOTHERING SUNDAY
     _seaMotheringFlowers: { name:'Mothering Flowers',   type:'particles', chars:['💐','🌸','🌼','🌺','💛'],     count:18, anim:'sea-petal-fall', durRange:[3,5],   sizeRange:[0.8,1.6], delaySpan:2500, enabled:true },
@@ -625,8 +632,8 @@ var SEA_ANIM_META = {
     _seaMomHeart:         { name:'Mom Heart',           type:'particles', chars:['❤️','💕','💖','🌸'],           count:16, anim:'sea-float-up',   durRange:[2,4],   sizeRange:[1,2],     delaySpan:2000, enabled:true },
     _seaMomPopup:         { name:'Mom Popup',           type:'popup',     emoji:'💐', size:'8rem',   holdMs:2400, enabled:true },
     // MEMORIAL DAY
-    _seaMemPoppies:       { name:'Memorial Poppies',    type:'particles', chars:['🌺','🎖️','⭐',_SEA_US_FLAG],  count:16, anim:'sea-petal-fall', durRange:[3,5],   sizeRange:[0.8,1.6], delaySpan:2000, enabled:true },
-    _seaMemFlag:          { name:'Memorial Flag',       type:'runner',    emoji:_SEA_US_FLAG,  dir:'lr', size:'3.5rem', dur:4,   wave:false, flipX:false, enabled:true },
+    _seaMemPoppies:       { name:'Memorial Poppies',    type:'particles', emoji:'🌺🎖️⭐', flagUrl:'https://flagcdn.com/us.svg', count:16, anim:'sea-petal-fall', durRange:[3,5],   sizeRange:[0.8,1.6], delaySpan:2000, enabled:true },
+    _seaMemFlag:          { name:'Memorial Flag',       type:'runner',    emoji:'', flagUrl:'https://flagcdn.com/us.svg', dir:'lr', size:'3.5rem', dur:4,   wave:false, flipX:false, enabled:true },
     _seaMemPopup:         { name:'Memorial Popup',      type:'popup',     emoji:'🎖️', size:'8rem',   holdMs:2200, enabled:true },
     // JUNETEENTH
     _seaJuneteenthParade: { name:'Juneteenth Parade',   type:'runner',    emoji:'🕊️✊', dir:'lr', size:'3rem',   dur:4.5, wave:true,  flipX:false, enabled:true },
@@ -645,10 +652,10 @@ var SEA_ANIM_META = {
     _seaSunRays:          { name:'Sun Rays',            type:'particles', chars:['✨','🌟','⭐'],               count:18, anim:'sea-snowfall',   durRange:[3,6],   sizeRange:[0.6,1.4], delaySpan:1000, enabled:true },
     _seaSolsticeGlow:     { name:'Solstice Glow',       type:'corner',    emoji:'☀️', side:'random', size:'9rem', holdMs:4000, wave:false, enabled:true },
     // INDEPENDENCE DAY
-    _seaFlagParade:       { name:'Flag Parade',         type:'runner',    emoji:_SEA_US_FLAG + '🎆', dir:'lr', size:'3rem',   dur:5,   wave:true,  flipX:false, enabled:true },
+    _seaFlagParade:       { name:'Flag Parade',         type:'runner',    emoji:'🎆', flagUrl:'https://flagcdn.com/us.svg', flagFirst:true, dir:'lr', size:'3rem',   dur:5,   wave:true,  flipX:false, enabled:true },
     _seaFireworks4th:     { name:'Fireworks',           type:'particles', chars:['★','✦','⭐'],                 count:22, anim:'sea-float-up',   durRange:[2,4],   sizeRange:[0.9,1.9], delaySpan:1500, enabled:true },
     _seaEagleSoar:        { name:'Eagle Soar',          type:'runner',    emoji:'🦅',   dir:'lr', size:'3.5rem', dur:4,   wave:false, flipX:false, enabled:true },
-    _seaFlagPop:          { name:'Flag Popup',          type:'popup',     emoji:_SEA_US_FLAG, size:'8rem',   holdMs:2200, enabled:true },
+    _seaFlagPop:          { name:'Flag Popup',          type:'popup',     emoji:'', flagUrl:'https://flagcdn.com/us.svg', size:'8rem',   holdMs:2200, enabled:true },
     _seaTeapotRun:        { name:'Teapot Run',          type:'runner',    emoji:'🫖☕', dir:'lr', size:'3rem',   dur:4.5, wave:true,  flipX:false, enabled:true },
     _seaTeacupParticles:  { name:'Teacup Particles',    type:'particles', chars:['🍵','☕','🫖'],               count:12, anim:'sea-float-up',   durRange:[2,4],   sizeRange:[1,2],     delaySpan:1500, enabled:true },
     _seaTeaPopup:         { name:'Tea Popup',           type:'popup',     emoji:'☕', size:'8rem',   holdMs:2200, enabled:true },
@@ -693,8 +700,8 @@ var SEA_ANIM_META = {
     _seaCandleFlight:     { name:'Candle Flight',       type:'runner',    emoji:'🕯️',   dir:'lr', size:'3rem',   dur:5,   wave:true,  flipX:false, enabled:true },
     _seaDayDeadPop:       { name:'Day of Dead Popup',   type:'popup',     emoji:'💀', size:'7rem',   holdMs:2400, enabled:true },
     // VETERANS DAY
-    _seaVetFlag:          { name:'Vet Flag',            type:'runner',    emoji:_SEA_US_FLAG + '🎖️', dir:'lr', size:'3rem',   dur:4.5, wave:true,  flipX:false, enabled:true },
-    _seaVetMedals:        { name:'Vet Medals',          type:'particles', chars:['🎖️','⭐','🌟',_SEA_US_FLAG],  count:16, anim:'sea-float-up',   durRange:[2,4],   sizeRange:[0.8,1.8], delaySpan:2000, enabled:true },
+    _seaVetFlag:          { name:'Vet Flag',            type:'runner',    emoji:'🎖️', flagUrl:'https://flagcdn.com/us.svg', flagFirst:true, dir:'lr', size:'3rem',   dur:4.5, wave:true,  flipX:false, enabled:true },
+    _seaVetMedals:        { name:'Vet Medals',          type:'particles', emoji:'🎖️⭐🌟', flagUrl:'https://flagcdn.com/us.svg', count:16, anim:'sea-float-up',   durRange:[2,4],   sizeRange:[0.8,1.8], delaySpan:2000, enabled:true },
     _seaVetPopup:         { name:'Vet Popup',           type:'popup',     emoji:'🎖️', size:'8rem',   holdMs:2200, enabled:true },
     // BONFIRE NIGHT
     _seaBonfireFireworks: { name:'Bonfire Fireworks',   type:'runner',    emoji:'🎆',   dir:'lr', size:'4rem',   dur:3.5, wave:false, flipX:false, enabled:true },
@@ -753,8 +760,11 @@ function _seaRunnerFn(fnName, seasonKey, baseTop, topRange) {
     var top = c.bottomAnchor ? null : ((baseTop || 10) + Math.random() * (topRange || 30));
     var dur = (c.dur || 5) * m.speed;
     var ms = c.motionStyle || (c.wave !== false ? 'wave' : 'none');
-    if (c.dir === 'rl') _seaRL(c.emoji, top, c.size, dur, ms, c.flipX);
-    else _seaLR(c.emoji, top, c.size, dur, ms, c.flipX);
+    // AE11a: combine emoji + flag image (flagFirst controls order)
+    var flagHtml = _seaFlagHtml(c);
+    var content = c.flagFirst ? flagHtml + (c.emoji || '') : (c.emoji || '') + flagHtml;
+    if (c.dir === 'rl') _seaRL(content, top, c.size, dur, ms, c.flipX);
+    else _seaLR(content, top, c.size, dur, ms, c.flipX);
 }
 function _seaParticlesFn(fnName, seasonKey) {
     var c = _seaGetAnimCfg(fnName, seasonKey);
@@ -769,12 +779,18 @@ function _seaParticlesFn(fnName, seasonKey) {
         chars = ['<span style="color:#cc0000;">★</span>', '<span style="color:#ffffff;text-shadow:0 0 2px #aaa;">★</span>',
                  '<span style="color:#002868;">★</span>', '<span style="color:#cc0000;">✦</span>', '<span style="color:#002868;">✦</span>'];
     }
+    // AE11a: append flag image as an additional particle type when flagUrl is set
+    var flagHtml = _seaFlagHtml(c);
+    if (flagHtml) chars = (chars || []).concat([flagHtml]);
     _seaParticles(chars, count, c.anim || 'sea-float-up', [dr[0] * m.speed, dr[1] * m.speed], c.sizeRange || [1, 2], c.delaySpan || 2000);
 }
 function _seaPopupFn(fnName, seasonKey) {
     var c = _seaGetAnimCfg(fnName, seasonKey);
     if (c.enabled === false) return;
-    _seaPopup(c.emoji, c.size, c.holdMs);
+    // AE11a: combine emoji + flag image (flagFirst controls order)
+    var flagHtml = _seaFlagHtml(c);
+    var content = c.flagFirst ? flagHtml + (c.emoji || '') : (c.emoji || '') + flagHtml;
+    _seaPopup(content || c.emoji, c.size, c.holdMs);
 }
 function _seaCornerFn(fnName, seasonKey) {
     var c = _seaGetAnimCfg(fnName, seasonKey);
@@ -2007,6 +2023,17 @@ function _seaBuildAnimRow(fnName, c) {
             + '<input type="text" id="' + id + '" data-picker-target="' + id + '" maxlength="25" value="' + _escHtml(val) + '" class="form-control form-control-sm">'
             + '</div>';
     }
+    // AE11a: flag URL input — rendered for any animation type that declares flagUrl in meta
+    function flagUrlInput(fnName2, cfg) {
+        var animMeta = SEA_ANIM_META[fnName2] || {};
+        if (animMeta.flagUrl === undefined) return '';
+        var safeId = fnName2.replace(/[^a-zA-Z0-9]/g, '_');
+        var val = cfg.flagUrl || animMeta.flagUrl;
+        return '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">🏳 Flag URL '
+            + '<input type="url" id="scfg_flagUrl_' + safeId + '" value="' + _escHtml(val) + '"'
+            + ' placeholder="https://flagcdn.com/us.svg" style="width:190px;"'
+            + ' class="form-control form-control-sm"></label>';
+    }
     if (c.type === 'runner') {
         var ms = c.motionStyle || (c.wave === true ? 'wave' : (c.wave === false ? 'none' : 'wave'));
         var msOpts = ['none','wave','bounce','hop','spin','run','wobble','zigzag'].map(function(o) {
@@ -2015,6 +2042,7 @@ function _seaBuildAnimRow(fnName, c) {
         // AH8: each label+input is atomic nowrap unit
         row += '<div class="d-flex flex-wrap gap-2 align-items-center" style="font-size:0.78rem;">'
             + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Emoji ' + emojiInputGroup('scfg_emoji_' + safe, c.emoji || '') + '</label>'
+            + flagUrlInput(fnName, c)
             + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Dir <select id="scfg_dir_' + safe + '" class="form-select form-select-sm d-inline-block" style="width:70px"><option value="lr"' + (c.dir === 'lr' ? ' selected' : '') + '>LR</option><option value="rl"' + (c.dir === 'rl' ? ' selected' : '') + '>RL</option></select></label>'
             + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Size <input type="text" id="scfg_size_' + safe + '" value="' + (c.size || '3rem') + '" style="width:65px" class="form-control form-control-sm d-inline-block"></label>'
             + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Dur <input type="number" id="scfg_dur_' + safe + '" value="' + (c.dur || 5) + '" min="0.5" max="20" step="0.5" style="width:60px" class="form-control form-control-sm d-inline-block"> s</label>'
@@ -2026,11 +2054,13 @@ function _seaBuildAnimRow(fnName, c) {
         var emojiVal = c.emoji !== undefined ? c.emoji : (c.chars ? c.chars.join('') : '');
         row += '<div class="d-flex flex-wrap gap-2 align-items-center" style="font-size:0.78rem;">'
             + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Emoji ' + emojiInputGroup('scfg_emoji_' + safe, emojiVal) + '</label>'
+            + flagUrlInput(fnName, c)
             + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Count <input type="number" id="scfg_count_' + safe + '" value="' + (c.count || 15) + '" min="1" max="100" style="width:60px" class="form-control form-control-sm d-inline-block"></label>'
             + liveTestBtn + '</div>';
     } else if (c.type === 'popup') {
         row += '<div class="d-flex flex-wrap gap-2 align-items-center" style="font-size:0.78rem;">'
             + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Emoji ' + emojiInputGroup('scfg_emoji_' + safe, c.emoji || '') + '</label>'
+            + flagUrlInput(fnName, c)
             + '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;">Size <input type="text" id="scfg_size_' + safe + '" value="' + (c.size || '7rem') + '" style="width:65px" class="form-control form-control-sm d-inline-block"></label>'
             + liveTestBtn + '</div>';
     } else if (c.type === 'corner') {
@@ -2126,12 +2156,18 @@ function _seaTestAnimLive(fnName) {
         v = rf('scfg_dur_'   + safe); if (v !== undefined) o.dur   = parseFloat(v) || 5;
         v = rf('scfg_ms_'    + safe); if (v !== undefined) o.motionStyle = v;
         var cb = rcb('scfg_flipx_' + safe); if (cb !== undefined) o.flipX = cb;
+        // AE11a: read flagUrl from live field if present; fall back to meta default so empty field never silences the flag
+        if (meta.flagUrl !== undefined) { v = rf('scfg_flagUrl_' + safe); if (v !== undefined) o.flagUrl = v || meta.flagUrl; }
     } else if (meta.type === 'particles') {
         var v = rf('scfg_emoji_' + safe); if (v !== undefined) o.emoji = v;
         v = rf('scfg_count_' + safe); if (v !== undefined) o.count = parseInt(v) || 15;
+        // AE11a: read flagUrl from live field if present; fall back to meta default so empty field never silences the flag
+        if (meta.flagUrl !== undefined) { v = rf('scfg_flagUrl_' + safe); if (v !== undefined) o.flagUrl = v || meta.flagUrl; }
     } else if (meta.type === 'popup') {
         var v = rf('scfg_emoji_' + safe); if (v !== undefined) o.emoji = v;
         v = rf('scfg_size_'  + safe); if (v !== undefined) o.size  = v;
+        // AE11a: read flagUrl from live field if present; fall back to meta default so empty field never silences the flag
+        if (meta.flagUrl !== undefined) { v = rf('scfg_flagUrl_' + safe); if (v !== undefined) o.flagUrl = v || meta.flagUrl; }
     } else if (meta.type === 'corner') {
         var v = rf('scfg_emoji_' + safe); if (v !== undefined) o.emoji = v;
         v = rf('scfg_side_'  + safe); if (v !== undefined) o.side  = v;
@@ -2140,6 +2176,8 @@ function _seaTestAnimLive(fnName) {
         v = rf('scfg_crawlColor_' + safe); if (v !== undefined) o.crawlColor = v;
     }
     // Temporarily write merged config, run animation, restore original
+    // AE11a: always force enabled for test — test button should work even when animation is disabled
+    o.enabled = true;
     allCfg[fnName] = o;
     localStorage.setItem('sea_cfg_' + key, JSON.stringify(allCfg));
     var fn = window[fnName];
@@ -2163,14 +2201,20 @@ function saveSeasonConfig() {
             o.flipX = document.getElementById('scfg_flipx_' + safe).checked;
             var msEl = document.getElementById('scfg_ms_' + safe);
             o.motionStyle = msEl ? msEl.value : (meta.motionStyle || 'wave');
+            // AE11a: save flagUrl if this animation has one
+            if (meta.flagUrl !== undefined) { var fuEl = document.getElementById('scfg_flagUrl_' + safe); if (fuEl) o.flagUrl = fuEl.value.trim() || meta.flagUrl; }
         } else if (meta.type === 'particles') {
             // AH7: stored as unified emoji string; split via [...str] at runtime
             var emojiEl = document.getElementById('scfg_emoji_' + safe);
             if (emojiEl) o.emoji = emojiEl.value;
             o.count = parseInt(document.getElementById('scfg_count_' + safe).value) || meta.count;
+            // AE11a: save flagUrl if this animation has one
+            if (meta.flagUrl !== undefined) { var fuEl = document.getElementById('scfg_flagUrl_' + safe); if (fuEl) o.flagUrl = fuEl.value.trim() || meta.flagUrl; }
         } else if (meta.type === 'popup') {
             o.emoji = document.getElementById('scfg_emoji_' + safe).value;
             o.size  = document.getElementById('scfg_size_' + safe).value;
+            // AE11a: save flagUrl if this animation has one
+            if (meta.flagUrl !== undefined) { var fuEl = document.getElementById('scfg_flagUrl_' + safe); if (fuEl) o.flagUrl = fuEl.value.trim() || meta.flagUrl; }
         } else if (meta.type === 'corner') {
             o.emoji = document.getElementById('scfg_emoji_' + safe).value;
             o.side  = document.getElementById('scfg_side_' + safe).value;
