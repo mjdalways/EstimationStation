@@ -454,31 +454,37 @@
                         </div>
 
                         <!-- W3: Live Preview -->
-                        <div class="p-3 mb-3" style="background:var(--bg3,#f8f9fa);border-radius:10px;border:1px solid var(--border,#dee2e6);">
+                        <div class="p-3 mb-3" style="background:var(--bg3,#f8f9fa);border-radius:10px;border:1px solid var(--border,#dee2e6);height:205px;overflow:visible;">
                             <div class="text-muted small mb-2 fw-bold">Live Preview</div>
-                            <div class="d-flex gap-3 align-items-flex-start flex-wrap">
+                            <div class="d-flex gap-3 align-items-start" style="flex-wrap:nowrap;">
                                 <div>
                                     <div class="text-muted small mb-1">Unselected</div>
-                                    <div class="poker-card" id="live-preview-vote-card" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;">5</div>
+                                    <div class="poker-card" id="live-preview-vote-card" style="pointer-events:none;transform:none;">5</div>
                                 </div>
                                 <div>
                                     <div class="text-muted small mb-1">Selected</div>
-                                    <div class="poker-card selected" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;">5</div>
+                                    <div class="poker-card selected" style="pointer-events:none;transform:none;">5</div>
                                 </div>
-                                <div>
-                                    <div class="text-muted small mb-1">Participant</div>
-                                    <div class="participant-badge" id="live-preview-badge" style="pointer-events:none;display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--panel-border,#dee2e6);">
-                                        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent,#5b8dee);display:flex;align-items:center;justify-content:center;font-size:0.8rem;color:#fff;">A</div>
-                                        <span style="font-size:var(--card-font-size,0.8rem);">Alex</span>
-                                        <span style="opacity:0.5;">✓</span>
+                                <div id="preview-participants-container" class="d-flex gap-2">
+                                    <div style="width:90px;">
+                                        <div class="text-muted small mb-1">Participant</div>
+                                        <div class="participant-badge" id="live-preview-badge" style="pointer-events:none;">
+                                            <div class="avatar-wrapper" style="--av-size:32px;">
+                                                <div class="av-initials" style="background:var(--accent,#5b8dee);">A</div>
+                                            </div>
+                                            <span class="participant-name">Alex</span>
+                                            <span class="vote-waiting">?</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div>
-                                    <div class="text-muted small mb-1">Revealed</div>
-                                    <div class="participant-badge" id="live-preview-revealed" style="pointer-events:none;display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.7rem;border-radius:8px;border:1px solid var(--card-voted,#198754);">
-                                        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent,#5b8dee);display:flex;align-items:center;justify-content:center;font-size:0.8rem;color:#fff;">A</div>
-                                        <span style="font-size:var(--card-font-size,0.8rem);">Alex</span>
-                                        <span style="font-weight:700;font-size:var(--card-font-size,0.8rem);">5</span>
+                                    <div style="width:90px;">
+                                        <div class="text-muted small mb-1">Revealed</div>
+                                        <div class="participant-badge voted" id="live-preview-revealed" style="pointer-events:none;">
+                                            <div class="avatar-wrapper av-voted" style="--av-size:32px;">
+                                                <div class="av-initials" style="background:var(--accent,#5b8dee);">A</div>
+                                            </div>
+                                            <span class="participant-name">Alex</span>
+                                            <span class="participant-vote">5</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -495,7 +501,7 @@
                         <div class="mb-3">
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="compact-mode-toggle"
-                                    onchange="localStorage.setItem('es_compactMode',this.checked?'1':'0'); var c=document.getElementById('participantsContainer'); if(c) { c.classList.toggle('compact',this.checked); c.classList.add('just-changed'); setTimeout(function(){c.classList.remove('just-changed');},600); }" />
+                                    onchange="localStorage.setItem('es_compactMode',this.checked?'1':'0'); applyCompactMode();" />
                                 <label class="form-check-label" for="compact-mode-toggle">Compact participant cards</label>
                             </div>
                             <div class="d-flex gap-2 p-2" style="background:rgba(128,128,128,0.08);border-radius:6px;max-width:260px;">
@@ -1474,6 +1480,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>5/19/2026 (89)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 Five Bug Fixes — (1) Compact participant cards toggle in Settings now also updates the Participant/Revealed specimens in the live preview (previously only changed the room behind the modal). (2) Runner animation Flip checkbox now works for all motion styles (wave, bounce, hop, etc.) — was previously cancelled by CSS animation transform conflict. (3) Clicking a 🧪 Test button while settings is open no longer causes participant cards to float above the modal. (4) Emoji reaction button rate limit reduced from 2 s → 0.8 s so buttons no longer silently block every-other press at a normal click pace. (5) Compact toggle now calls applyCompactMode() so the live room stays in sync without redundant DOM manipulation.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/19/2026 (88)</strong></p>
                         <ul class="mb-2">
                             <li>⌨️ Keyboard shortcut discoverability — Legend chips redesigned: each shortcut now shows as a two-section key chip (shortcut key on left, vote value on right) instead of plain text pairs. Vote card tooltips now include the keyboard shortcut (e.g. "Vote: 5 — press 3"). Reveal and Reset buttons show inline kbd hints (Space, R). Add Story input placeholder updated to "Add story… (N to focus)". Controls panel gains a ⛶ Full Screen button (F shortcut) and an ⌨️ Shortcuts Help button that opens the keyboard shortcuts reference.</li>

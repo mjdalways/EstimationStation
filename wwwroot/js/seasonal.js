@@ -391,9 +391,18 @@ function _seaLR(emoji, topPct, size, dur, motionStyle, flipX) {
     if (ms !== 'none') {
         var inner = document.createElement('div');
         inner.style.cssText = 'font-size:' + (size||'2.5rem') + ';display:inline-block;' +
-            'animation:' + _motionStyleAnim(ms) + ' ' + _motionStyleDur(ms) + ';' + (flipX ? 'transform:scaleX(-1);' : '');
-        if (typeof emoji === 'string') inner.innerHTML = emoji;
-        else inner.appendChild(emoji);
+            'animation:' + _motionStyleAnim(ms) + ' ' + _motionStyleDur(ms) + ';';
+        // Flip on child span so the animation's transform doesn't override scaleX(-1)
+        if (typeof emoji === 'string') {
+            inner.innerHTML = flipX ? '<span style="display:inline-block;transform:scaleX(-1);">' + emoji + '</span>' : emoji;
+        } else {
+            if (flipX) {
+                var flipper = document.createElement('span');
+                flipper.style.cssText = 'display:inline-block;transform:scaleX(-1);';
+                flipper.appendChild(emoji);
+                inner.appendChild(flipper);
+            } else { inner.appendChild(emoji); }
+        }
         wrap.appendChild(inner);
     } else {
         if (typeof emoji === 'string') {
@@ -412,9 +421,18 @@ function _seaRL(emoji, topPct, size, dur, motionStyle, flipX) {
     if (ms !== 'none') {
         var inner = document.createElement('div');
         inner.style.cssText = 'font-size:' + (size||'2.5rem') + ';display:inline-block;' +
-            'animation:' + _motionStyleAnim(ms) + ' ' + _motionStyleDur(ms) + ';' + (flipX ? 'transform:scaleX(-1);' : '');
-        if (typeof emoji === 'string') inner.innerHTML = emoji;
-        else inner.appendChild(emoji);
+            'animation:' + _motionStyleAnim(ms) + ' ' + _motionStyleDur(ms) + ';';
+        // Flip on child span so the animation's transform doesn't override scaleX(-1)
+        if (typeof emoji === 'string') {
+            inner.innerHTML = flipX ? '<span style="display:inline-block;transform:scaleX(-1);">' + emoji + '</span>' : emoji;
+        } else {
+            if (flipX) {
+                var flipper = document.createElement('span');
+                flipper.style.cssText = 'display:inline-block;transform:scaleX(-1);';
+                flipper.appendChild(emoji);
+                inner.appendChild(flipper);
+            } else { inner.appendChild(emoji); }
+        }
         wrap.appendChild(inner);
     } else {
         if (typeof emoji === 'string') {

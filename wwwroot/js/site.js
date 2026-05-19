@@ -582,6 +582,9 @@ function applyCompactMode() {
     if (container) container.classList.toggle('compact', compact);
     var cb = document.getElementById('compact-mode-toggle');
     if (cb) cb.checked = compact;
+    // Update settings live-preview container (shares CSS rules with #participantsContainer)
+    var previewContainer = document.getElementById('preview-participants-container');
+    if (previewContainer) previewContainer.classList.toggle('compact', compact);
 }
 
 function applyCardFontSize() {

@@ -27,7 +27,8 @@
       "Bash(Select-Object -Last 5)",
       "Bash(Format-Table LineNumber, Line -AutoSize)",
       "Bash(cd /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation && dotnet build --no-incremental -v quiet 2>&1 | tail -30)",
-      "Bash(findstr /r /s \"av-initials\" \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\")"
+      "Bash(findstr /r /s \"av-initials\" \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\")",
+      "Bash(findstr /R \"z-index\" wwwroot\\\\css\\\\site.css)"
     ]
   }
 }
