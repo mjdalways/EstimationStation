@@ -1334,11 +1334,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 /* AI6: compact vote card specimens in live preview */
 #ct-live-preview .poker-card {
-  font-size: 0.65rem !important;
-  width: 26px !important;
-  min-height: 34px !important;
-  padding: 2px 3px !important;
-  border-radius: 3px !important;
+  font-size: 0.75rem !important;
+  width: 40px !important;
+  height: 56px !important;
+  min-height: unset !important;
+  padding: 2px 4px !important;
+  border-radius: 4px !important;
 }
 #ct-live-preview .participant-badge {
   font-size: 0.62rem !important;

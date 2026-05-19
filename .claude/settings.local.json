@@ -26,7 +26,8 @@
       "Bash(Select-String -Path \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\\\\js\\\\room.js\" -Pattern \"^}\")",
       "Bash(Select-Object -Last 5)",
       "Bash(Format-Table LineNumber, Line -AutoSize)",
-      "Bash(cd /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation && dotnet build --no-incremental -v quiet 2>&1 | tail -30)"
+      "Bash(cd /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation && dotnet build --no-incremental -v quiet 2>&1 | tail -30)",
+      "Bash(findstr /r /s \"av-initials\" \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\")"
     ]
   }
 }

@@ -989,16 +989,31 @@ function updateThemePreview() {
 
     // Apply font across preview
     const preview = document.getElementById('ct-live-preview');
-    if (preview) preview.style.fontFamily = font;
+    if (preview) {
+        preview.style.fontFamily = font;
+        // AH12/AI6: real .poker-card and .participant-badge specimens use CSS vars —
+        // set them on the preview container so they cascade to all descendant elements
+        const sp = (v, val) => preview.style.setProperty(v, val);
+        sp('--card-bg',           cardBg);
+        sp('--card-border',       cardBorder);
+        sp('--panel-border',      cardBorder);
+        sp('--card-selected',     cardSelected);
+        sp('--card-selected-text',cardSelText);
+        sp('--card-voted',        cardVoted);
+        sp('--card-hover',        cardBg);
+        sp('--accent',            accent);
+        sp('--bg-primary',        bgPrimary);
+        sp('--bg-secondary',      bgSecondary);
+        sp('--bg2',               bgSecondary);
+        sp('--text-primary',      textPrimary);
+        sp('--text-secondary',    textPrimary);
+        sp('--card-border-width', bw);
+        sp('--border-radius',     rad);
+    }
 
     set('pv-navbar',       { backgroundColor: navbarBg, color: navbarText });
     set('pv-brand',        { color: navbarText });
     set('pv-body',         { backgroundColor: bgPrimary });
-    set('pv-card-normal',  { backgroundColor: cardBg, border: `${bw} solid ${cardBorder}`, borderRadius: rad, color: textPrimary });
-    set('pv-card-selected',{ backgroundColor: cardSelected, border: `${bw} solid ${cardSelected}`, borderRadius: rad, color: cardSelText });
-    set('pv-badge-default',{ backgroundColor: cardBg, border: `${bw} solid ${cardBorder}`, borderRadius: rad, color: textPrimary });
-    set('pv-badge-voted',  { backgroundColor: cardBg, border: `${bw} solid ${cardVoted}`, borderRadius: rad, color: textPrimary });
-    set('pv-badge-me',     { backgroundColor: cardBg, border: `${bw} solid ${accent}`, borderRadius: rad, color: textPrimary });
     set('pv-btn-reveal',   { backgroundColor: btnReveal, color: '#fff', borderRadius: rad });
     set('pv-btn-reset',    { backgroundColor: btnReset, color: '#212529', borderRadius: rad });
     set('pv-chat',         { backgroundColor: chatBg });
