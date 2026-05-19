@@ -502,12 +502,20 @@ function renderCards() {
     const meIsGhost = roomState.participants.some(p => p.connectionId === connection?.connectionId && p.isGhost);
     const cantVote = isObserver || meIsGhost;
     const values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
-    values.forEach(val => {
+    values.forEach((val, idx) => {
         const card = document.createElement('div');
         card.className = 'poker-card' + (selectedVote === val ? ' selected' : '') + (cantVote ? ' disabled' : '');
         card.setAttribute('data-value', val);
         card.textContent = val;
-        card.title = meIsGhost ? '👻 Ghosts cannot vote' : `Vote: ${val}`;
+        // AK: include keyboard shortcut in hover tooltip
+        let shortcutHint = '';
+        if (!cantVote) {
+            if (idx < 9)         shortcutHint = ` — press ${idx + 1}`;
+            else if (val === '☕') shortcutHint = ' — press C or 0';
+            else if (val === '?') shortcutHint = ' — press Q';
+            else if (val === '🚫') shortcutHint = ' — press −';
+        }
+        card.title = meIsGhost ? '👻 Ghosts cannot vote' : `Vote: ${val}${shortcutHint}`;
         if (!cantVote) {
             card.onclick = () => castVote(val);
         }
@@ -1813,14 +1821,16 @@ function _updateKeyboardLegend() {
     if (!_kbShortcutsEnabled) { legend.style.display = 'none'; return; }
     var values = skipVoteEnabled ? [...currentEstimateValues, '🚫'] : currentEstimateValues;
     var parts = [];
+    // AK: each entry = 3D keycap + plain value label beside it
     values.forEach(function(v, i) {
-        if (i < 9) parts.push('<kbd>' + (i + 1) + '</kbd> ' + escHtml(v));
+        if (i < 9) parts.push('<span class="kb-entry"><span class="kb-key">' + (i + 1) + '</span><span class="kb-val">' + escHtml(v) + '</span></span>');
     });
-    if (values.includes('☕')) parts.push('<kbd>C</kbd> ☕');
-    if (values.includes('?'))  parts.push('<kbd>Q</kbd> ?');
-    if (values.includes('🚫')) parts.push('<kbd>−</kbd> 🚫');
-    parts.push('<kbd>,/←</kbd> ◄ <kbd>./→</kbd> ►');
-    legend.innerHTML = parts.join(' · ');
+    if (values.includes('☕')) parts.push('<span class="kb-entry"><span class="kb-key">C</span><span class="kb-val">☕</span></span>');
+    if (values.includes('?'))  parts.push('<span class="kb-entry"><span class="kb-key">Q</span><span class="kb-val">?</span></span>');
+    if (values.includes('🚫')) parts.push('<span class="kb-entry"><span class="kb-key">−</span><span class="kb-val">🚫</span></span>');
+    parts.push('<span class="kb-entry"><span class="kb-key">,</span><span class="kb-key">←</span><span class="kb-val">◄</span></span>');
+    parts.push('<span class="kb-entry"><span class="kb-key">.</span><span class="kb-key">→</span><span class="kb-val">►</span></span>');
+    legend.innerHTML = parts.join(' ');
     legend.style.display = '';
 }
 

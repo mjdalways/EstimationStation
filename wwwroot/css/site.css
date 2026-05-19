@@ -1562,6 +1562,61 @@ h1, h2, h3, h4, h5, h6 {
     line-height: 1.4;
 }
 
+/* AK — keyboard legend: each entry = 3D key + plain value label */
+.kb-entry {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 3px;
+    vertical-align: middle;
+}
+.kb-key {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    background: linear-gradient(to bottom, #686868 0%, #525252 100%);
+    color: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 0.63rem;
+    font-weight: 600;
+    line-height: 1;
+    box-shadow:
+        inset 1px 1px 2px rgba(255,255,255,0.15),
+        inset -1px -1px 2px rgba(0,0,0,0.4),
+        0 3px 0 #313131,
+        0 4px 6px rgba(0,0,0,0.35);
+    user-select: none;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.kb-val {
+    font-size: 0.7rem;
+    font-family: var(--bs-font-monospace, monospace);
+    color: var(--text-secondary, #6c757d);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* AK — inline shortcut hint inside action buttons */
+.btn-kb-hint {
+    font-size: 0.6rem;
+    opacity: 0.65;
+    vertical-align: middle;
+    background: transparent;
+    border-color: currentColor;
+    color: inherit;
+    box-shadow: none;
+    padding: 0 3px;
+    line-height: 1.2;
+    pointer-events: none;
+    margin-left: 4px;
+}
+
 /* P2 — Emoji Reaction panel */
 .reaction-panel {
     display: flex;
