@@ -5,9 +5,12 @@
 
 <div class="lobby-container">
     <div class="lobby-card">
-        <div class="lobby-header" style="position:relative;">
+        <div class="lobby-header text-center" style="position:relative;">
             <button class="btn btn-sm btn-outline-secondary" style="position:absolute;top:0;right:0;" onclick="openSettingsModal()" title="Settings">⚙️</button>
-            <h1 class="lobby-title">🃏 EstimationStation</h1>
+            <a href="#" onclick="event.preventDefault(); openSettingsModal('about');" title="About Estimation Station" style="display:inline-block;">
+                <img src="/images/estimationStation_logo.png" alt="Estimation Station Logo" class="img-fluid mb-2" style="max-width:180px;" />
+            </a>
+            <h1 class="lobby-title" style="cursor:pointer;" onclick="openSettingsModal('about')">EstimationStation</h1>
             <p class="lobby-subtitle">Collaborative Planning Poker for your team</p>
             @if (!string.IsNullOrWhiteSpace(inviteRoom))
             {

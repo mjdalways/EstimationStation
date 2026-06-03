@@ -11,6 +11,29 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
     <title>@ViewData["Title"] - EstimationStation</title>
+    @{
+        var _baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+        var _pageDesc = (ViewData["MetaDescription"] as string) ?? "Free online Planning Poker for agile teams. Run story point estimation sessions in real time — no sign-up needed. Fibonacci, T-shirt sizes, custom decks, themes, and more.";
+        var _pageTitle = (ViewData["MetaTitle"] as string) ?? "EstimationStation — Free Planning Poker for Agile Teams";
+        var _ogImage = _baseUrl + "/images/estimationStation_logo.png";
+    }
+    <!-- SEO -->
+    <meta name="description" content="@_pageDesc" />
+    <meta name="keywords" content="planning poker, story points, agile estimation, scrum poker, sprint planning, fibonacci, team estimation, free planning poker, online planning poker" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="@(_baseUrl + Context.Request.Path)" />
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="EstimationStation" />
+    <meta property="og:title" content="@_pageTitle" />
+    <meta property="og:description" content="@_pageDesc" />
+    <meta property="og:url" content="@(_baseUrl + Context.Request.Path)" />
+    <meta property="og:image" content="@_ogImage" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="@_pageTitle" />
+    <meta name="twitter:description" content="@_pageDesc" />
+    <meta name="twitter:image" content="@_ogImage" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/shame.css" asp-append-version="true" />
@@ -23,7 +46,10 @@
 <body data-theme="classic" id="appBody">
     <nav class="navbar navbar-expand-lg" id="mainNavbar">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">🃏 EstimationStation</a>
+            <a class="navbar-brand d-flex align-items-center gap-2" href="/" onclick="event.preventDefault(); openSettingsModal('about');" style="cursor:pointer;" title="About Estimation Station">
+                <img src="/images/estimationStation_logo.png" alt="Estimation Station" style="height:28px;width:auto;" />
+                EstimationStation
+            </a>
 
             <!-- Bootstrap hamburger toggler -->
             <button class="navbar-toggler ms-auto me-2" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavContent" aria-controls="mainNavContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -1463,6 +1489,22 @@
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-about" role="tabpanel">
 
+                        <!-- Logo & tagline -->
+                        <div class="text-center mb-4">
+                            <img src="/images/estimationStation_logo.png" alt="Estimation Station Logo" class="img-fluid mb-3" style="max-width:220px;" />
+                            <h4 class="fw-bold mb-1">Estimation Station by mjdalways</h4>
+                            <p class="text-muted mb-3" style="max-width:480px;margin:0 auto;">A real-time Planning Poker tool for agile teams. Run story point estimation sessions, reveal votes together, and keep your sprint planning focused and fun.</p>
+                            <ul class="list-unstyled text-muted small mb-0" style="max-width:420px;margin:0 auto;text-align:left;">
+                                <li>🃏 Vote with classic Fibonacci, T-shirt sizes, or custom decks</li>
+                                <li>🎉 Celebrations, animations, and seasonal themes to keep things lively</li>
+                                <li>🔗 Jira integration to pull in and estimate tickets directly</li>
+                                <li>🎨 Fully customizable themes with a live preview editor</li>
+                                <li>📊 Vote distribution, team temperature meter, and streak bonuses</li>
+                                <li>💬 Built-in chat and emoji reactions during sessions</li>
+                            </ul>
+                        </div>
+                        <hr class="mb-4" />
+
                         <!-- Keyboard shortcuts -->
                         <h6 class="fw-bold mb-2">⌨️ Keyboard Shortcuts</h6>
                         <table class="table table-sm table-borderless mb-4" style="max-width:360px;">
@@ -1480,6 +1522,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/3/2026 (90)</strong></p>
+                        <ul class="mb-2">
+                            <li>ℹ️ Branding &amp; SEO — Logo image replaces 🃏 in navbar and lobby. Clicking the logo or "EstimationStation" text opens the About tab. About tab shows logo, tagline, and feature summary. Added meta description, Open Graph, Twitter Card tags, robots.txt, and /sitemap.xml for search engine indexing.</li>
+                        </ul>
                         <p class="mb-2"><strong>5/19/2026 (89)</strong></p>
                         <ul class="mb-2">
                             <li>🔧 Five Bug Fixes — (1) Compact participant cards toggle in Settings now also updates the Participant/Revealed specimens in the live preview (previously only changed the room behind the modal). (2) Runner animation Flip checkbox now works for all motion styles (wave, bounce, hop, etc.) — was previously cancelled by CSS animation transform conflict. (3) Clicking a 🧪 Test button while settings is open no longer causes participant cards to float above the modal. (4) Emoji reaction button rate limit reduced from 2 s → 0.8 s so buttons no longer silently block every-other press at a normal click pace. (5) Compact toggle now calls applyCompactMode() so the live room stays in sync without redundant DOM manipulation.</li>

@@ -49,6 +49,11 @@ app.UseAuthorization();
 app.MapStaticAssets();
 
 app.MapControllerRoute(
+    name: "sitemap",
+    pattern: "sitemap.xml",
+    defaults: new { controller = "Home", action = "Sitemap" });
+
+app.MapControllerRoute(
     name: "room",
     pattern: "room/{roomName}",
     defaults: new { controller = "Room", action = "Index" });
