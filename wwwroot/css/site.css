@@ -64,6 +64,11 @@
     color: var(--bs-table-color);
 }
 
+/* Let Bootstrap's text-muted respect theme secondary text color */
+[data-theme] .text-muted {
+    color: var(--text-secondary) !important;
+}
+
 body {
   background-color: var(--bg-primary, #f8f9fa);
   color: var(--text-primary, #212529);
