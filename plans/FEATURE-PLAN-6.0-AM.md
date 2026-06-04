@@ -1,6 +1,6 @@
-# AM — Fully-Customizable Event System
+# AM — Fully-Customizable Event System ✅ Done (v6 / 2026-06-04)
 
-> **Priority:** 3
+> **Priority:** 3 — Done
 > **Effort:** Hard
 > **Files:** `wwwroot/js/seasonal.js`, `Views/Shared/_Layout.cshtml`, `wwwroot/js/site.js`
 > [← Back to Feature Plan](../FEATURE-PLAN-6.0.md)
@@ -118,7 +118,10 @@ es_eventConfig = {
    - `_seaApplyUserEventsTables` called on page load to restore persisted user events.
    - `es_eventConfig` included in Export/Import so user events round-trip across browsers.
    - Verified: add/remove/disable/re-enable all work; user event appears in `SEA_ANIMS` and `SEA_EVENT_TABLE`.
-5. **AM5** — Save/Load whole config (extend Export/Import) + final polish.
+5. **AM5** — Save/Load whole config (extend Export/Import) + final polish. ✅ **Done (v6 / 2026-06-04)**
+   - Import re-applies user events to `SEA_ANIMS`/`SEA_EVENT_TABLE` and re-renders the user-events panel.
+   - **↩ Reset all customisations** button in the Events tab: clears `es_eventConfig`, removes user events from runtime tables, and re-injects built-in buttons.
+   - What's New build 104 — first user-facing AM changelog entry.
 
 (Confirm milestone breakdown before starting AM1.)
 

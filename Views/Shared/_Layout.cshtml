@@ -1204,8 +1204,12 @@
                             <div class="sea-row"><input class="form-check-input sea-check" type="checkbox" id="cel-seasonal-endofyear"><label for="cel-seasonal-endofyear">⏰ End of Year</label><span>Dec 27–30</span><button onclick="runTest(testSpecificSeason.bind(null, 'endofyear'))">▶</button></div>
                         </div>
 
-                        <!-- AM4: user/disabled events panel (populated by _seaRenderUserEvents) -->
+                        <!-- AM4/AM5: user/disabled events panel + reset-all -->
                         <div id="sea-user-events" class="mb-2"></div>
+                        <div class="mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="_seaResetAllCustomisations()" style="font-size:0.75rem;">↩ Reset all customisations</button>
+                            <span class="text-muted ms-2" style="font-size:0.7rem;">Removes custom events, re-enables disabled built-ins, clears action overrides.</span>
+                        </div>
 
                         <!-- AA8: Frequency sliders -->
                         <div class="border-top pt-3 mb-3">
@@ -1568,6 +1572,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/4/2026 (104)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎛️ Fully customizable event &amp; animation system — The <strong>Events</strong> settings tab now lets you take full control: <strong>disable</strong> any built-in event or animation without deleting it, <strong>add your own events</strong> with a custom name and date range, <strong>add/remove animations</strong> within any event, and <strong>change the action</strong> (executor) of any animation from a full picker of all 57 registered animation types. Changes persist, round-trip with Export/Import, and the <strong>↩ Reset all customisations</strong> button restores everything to its factory state at any time.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/4/2026 (103)</strong></p>
                         <ul class="mb-2">
                             <li>🚩 Pick any country's flag — Flag-based event animations (Presidents Day, Memorial Day, Independence Day, Veterans Day) now let you choose the flag from a <strong>country dropdown</strong> of ~250 countries instead of typing a URL. All flags are bundled with the app (no external image service), so they load fast and work offline.</li>

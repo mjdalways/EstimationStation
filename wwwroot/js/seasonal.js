@@ -2522,8 +2522,11 @@ function importSeasonalConfig() {
                 Object.keys(data).forEach(function(k) {
                     localStorage.setItem(k, data[k]);
                 });
+                // AM5: re-apply user events to runtime tables after import
+                if (typeof _seaApplyUserEventsTables === 'function') _seaApplyUserEventsTables();
                 if (typeof _seaInjectCustomSeasons === 'function') _seaInjectCustomSeasons();
-                alert('Seasonal config imported! Reload the page to see all changes.');
+                if (typeof _seaRenderUserEvents === 'function') _seaRenderUserEvents();
+                alert('Events config imported! Reload the page to see all changes.');
             } catch(ex) {
                 alert('Import failed: invalid JSON file.');
             }
@@ -2690,3 +2693,23 @@ function _seaApplyUserEventsTables() {
 }
 // AM4: on page load, apply persisted user events
 (function(){ _seaApplyUserEventsTables(); })();
+
+// AM5: nuke all user customisations and restore built-in state
+function _seaResetAllCustomisations() {
+    if (!confirm('Remove all custom events, re-enable all disabled built-in events, and clear all action overrides? Season animation params (emoji, size, etc.) are kept.')) return;
+    // Remove user-added events from runtime tables before clearing
+    var cfg = _seaGetEventConfig();
+    var events = cfg.events || {};
+    Object.keys(events).forEach(function(k) {
+        if (!SEA_ANIMS[k] || !events[k].builtin) {
+            delete SEA_ANIMS[k];
+            for (var i = SEA_EVENT_TABLE.length - 1; i >= 0; i--) {
+                if (SEA_EVENT_TABLE[i][0] === k) { SEA_EVENT_TABLE.splice(i, 1); break; }
+            }
+        }
+    });
+    _seaResetEventConfig();
+    _seaRenderUserEvents();
+    // Re-inject config buttons so disable buttons re-appear on built-in rows
+    setTimeout(function() { if (typeof _seaAddConfigButtons === 'function') _seaAddConfigButtons(); }, 50);
+}

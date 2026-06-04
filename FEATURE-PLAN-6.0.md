@@ -13,10 +13,10 @@ Carries forward all unimplemented items from v5.0. Completed groups have been mo
 
 | # | Group | Feature | Effort | Status |
 |---|-------|---------|--------|--------|
-| 1 | [AM](./plans/FEATURE-PLAN-6.0-AM.md) | 🎛️ Fully-customizable event system — add/remove/edit events & animations, action-name based, save/load, reset, override-not-delete defaults | Hard | ⏳ **Next up** |
+| — | [AM](./plans/FEATURE-PLAN-6.0-AM.md) | 🎛️ Fully-customizable event system | Hard | ✅ Done |
 | — | [AN](./plans/FEATURE-PLAN-6.0-AN.md) | 🏷️ Terminology rename — "Events" tab → **Fun**, "Seasons" tab → **Events** | Small | ✅ Done |
 | — | [AL](./plans/FEATURE-PLAN-6.0-AL.md) | 🚩 Local flag pack (~250, MIT) + country dropdown, no CDN | Medium | ✅ Done |
-| 2 | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ⏳ Pending |
+| 1 | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ⏳ **Next up** |
 | 3 | [AK2](./plans/FEATURE-PLAN-6.0-AK.md) | ✋ Story drag-reorder + drag-handle cursor (unblocks deferred AK2) | Medium | ⏳ Pending |
 | 4 | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE) | Hard | ⏳ Pending |
 | 5 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
