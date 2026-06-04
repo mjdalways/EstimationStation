@@ -913,21 +913,44 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0; vertical-align: middle;
 }
 .wgt-detach-btn:hover { opacity: 1; }
-/* Dock-direction buttons in float header */
-.wgt-dock-left, .wgt-dock-right { font-size: 0.7rem; }
-/* Snap-zone hints shown during drag */
-.wgt-snap-hint {
-  position: fixed; top: 0; bottom: 0; width: 80px; z-index: 1040;
-  background: rgba(91,141,238,0.10);
-  border: 2px dashed rgba(91,141,238,0.3);
-  pointer-events: none; transition: background 0.15s, border-color 0.15s;
+/* Float header dock buttons */
+.wgt-float-btn { font-size: 0.72rem; }
+
+/* Dock zones — invisible when empty, expand + highlight during drag */
+.wgt-dock-zone {
+  min-height: 0;
+  border: 2px dashed transparent;
+  border-radius: 6px;
+  margin: 2px;
+  transition: min-height 0.15s, background 0.15s, border-color 0.15s;
+  box-sizing: border-box;
 }
-.wgt-snap-hint.active {
-  background: rgba(91,141,238,0.22);
-  border-color: rgba(91,141,238,0.7);
+/* When the zone has docked content — give it a subtle background */
+.wgt-dock-zone:not(:empty) {
+  background: rgba(91,141,238,0.04);
+  border-color: rgba(91,141,238,0.2);
+  padding: 4px;
+  min-height: auto;
 }
-.wgt-snap-left  { left: 0; border-left: none; }
-.wgt-snap-right { right: 0; border-right: none; }
+/* During drag: expand all zones so they're easy to hit */
+body.wgt-dragging .wgt-dock-zone {
+  min-height: 52px;
+  border-color: rgba(91,141,238,0.35);
+  background: rgba(91,141,238,0.06);
+}
+body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
+  border-color: rgba(91,141,238,0.85);
+  background: rgba(91,141,238,0.18);
+}
+/* Resize handle (bottom-right corner of float) */
+.wgt-resize-handle {
+  position: absolute; bottom: 0; right: 0;
+  width: 14px; height: 14px;
+  cursor: se-resize;
+  background: linear-gradient(135deg, transparent 50%, rgba(128,128,128,0.25) 50%);
+  border-radius: 0 0 var(--border-radius,8px) 0;
+}
+.wgt-float { position: relative; overflow: visible; min-width: 160px; }
 
 /* AK1: controls panel collapse toggle */
 .controls-collapse-header {

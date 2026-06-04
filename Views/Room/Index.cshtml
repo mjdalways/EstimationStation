@@ -21,6 +21,7 @@
     <!-- Left Panel: Stories -->
     <div class="stories-panel" id="storiesPanel">
         <div id="sidebar-resize-handle" aria-hidden="true"></div>
+        <div id="wgt-zone-L-top" class="wgt-dock-zone" title="Drop here to dock"></div>
         <div class="panel-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0">📋 Stories</h6>
             <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="_closeStoriesSheet()" title="Close stories panel">✕</button>
@@ -48,6 +49,7 @@
             </details>
         </div>
         <div id="storiesList" class="stories-list"></div>
+        <div id="wgt-zone-L-bot" class="wgt-dock-zone" title="Drop here to dock"></div>
         <div id="sprintDashboard" class="px-1 pt-1 border-top" style="display:none;">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="text-muted" style="font-size:0.72rem;">Sprint total</span>
@@ -62,7 +64,8 @@
     </div>
 
     <!-- Main Content -->
-    <div class="main-content">
+    <div class="main-content" id="mainContent">
+        <div id="wgt-zone-C-top" class="wgt-dock-zone" title="Drop here to dock"></div>
         <!-- Current Story Bar -->
         <div class="current-story-bar">
             <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -156,6 +159,7 @@
             <div id="participantsContainer" class="participants-container"></div>
         </div>
 
+        <div id="wgt-zone-C-bot" class="wgt-dock-zone" title="Drop here to dock"></div>
         <!-- Vote History (populated by JS after each reveal) -->
         <div class="vote-history-section" id="voteHistorySection" style="display:none;">
             <div class="d-flex align-items-center gap-2">
@@ -178,6 +182,7 @@
             <span class="ccp-label">🎮 Controls</span>
             <span class="ccp-icon" id="controlsToggleIcon">⟩</span>
         </div>
+        <div id="wgt-zone-R-top" class="wgt-dock-zone" title="Drop here to dock"></div>
         <div class="control-group">
             <h6 class="control-title">🎮 Controls</h6>
             <button class="btn btn-success w-100 mb-2" id="revealBtn" onclick="revealVotes()" title="Reveal votes (Space / Enter)">👁️ Reveal <kbd class="btn-kb-hint">Space/Enter</kbd></button>
@@ -276,6 +281,7 @@
         <div class="control-group">
             <button class="btn btn-sm btn-outline-secondary w-100" onclick="exportCSV()">📥 Export CSV</button>
         </div>
+        <div id="wgt-zone-R-bot" class="wgt-dock-zone" title="Drop here to dock"></div>
     </div>
 </div>
 
