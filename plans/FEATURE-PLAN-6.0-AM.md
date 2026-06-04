@@ -75,7 +75,21 @@ es_eventConfig = {
 ## Suggested incremental milestones (each its own small patch)
 
 1. **AM1** — Introduce the action registry + refactor existing animations to resolve their executor
-   by `action` name (no behaviour change).
+   by `action` name (no behaviour change). ✅ **Done (v6 / 2026-06-04)**
+   - ✅ **AM1a (infra + reference slice, done):** `SEA_ACTIONS` registry, `_seaRegisterAction`,
+     `_seaActionFor` (resolves `meta.action || meta.type`), and `_seaInvokeAction` dispatcher (single
+     execution chokepoint; falls back to the animation's own global fn for not-yet-registered
+     bespoke "custom" animations so behaviour is unchanged). Generic executors runner/particles/
+     popup/corner registered. **presidentsday** (`_seaPresParade`/`_seaPresStars`/`_seaPresPopup`)
+     converted as the reference pattern and verified (registry-routed firing identical to before).
+   - ✅ **AM1b (done):** PowerShell regex converted all 156 generic call-sites (40 runners + 116
+     others) to `_seaInvokeAction`. Verified via grep — only executor definitions and registrations
+     remain using the direct names.
+   - ✅ **AM1c (done):** 53 bespoke animations registered under their own action names via an IIFE
+     after all function definitions. Each `type:'custom'` meta entry gains `action:'_seaFnName'`
+     so `_seaActionFor` resolves through the registry (not returning the string `'custom'`).
+     `_seaInvokeAction` fallback retained for safety. Registry total: **57 actions** (4 generic
+     + 53 bespoke). Verified: generic/bespoke/fallback all fire correctly in browser.
 2. **AM2** — Effective-config merge layer (`es_eventConfig` over builtins) with `disabled` override
    + Reset-to-default; wire existing toggles through it.
 3. **AM3** — UI: edit an animation's `action` + params; add/remove animations within an event.
