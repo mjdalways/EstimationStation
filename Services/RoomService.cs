@@ -108,6 +108,39 @@ public class RoomService
         return room;
     }
 
+    /// <summary>Result of removing a participant from a room.</summary>
+    public record RemovalResult(bool Removed, string Name, bool WasHost, string? NewHostId);
+
+    /// <summary>
+    /// Removes a participant from a room's state under lock and transfers host to the next
+    /// remaining participant if the one removed was the host. Pure state mutation — the caller
+    /// is responsible for connection cleanup, persistence, and broadcasting.
+    /// </summary>
+    public RemovalResult RemoveParticipant(Room room, string connectionId)
+    {
+        string name = string.Empty;
+        bool removed = false, wasHost = false;
+        string? newHostId = null;
+        lock (room)
+        {
+            var p = room.Participants.FirstOrDefault(x => x.ConnectionId == connectionId);
+            if (p != null) { name = p.Name; room.Participants.Remove(p); removed = true; }
+            if (room.HostConnectionId == connectionId)
+            {
+                wasHost = true;
+                if (room.Participants.Count > 0)
+                {
+                    room.HostConnectionId = room.Participants[0].ConnectionId;
+                    newHostId = room.HostConnectionId;
+                }
+            }
+        }
+        return new RemovalResult(removed, name, wasHost, newHostId);
+    }
+
+    /// <summary>Returns the in-memory rooms (used by the idle sweep).</summary>
+    public IEnumerable<Room> ActiveRooms => _rooms.Values;
+
     public void MapConnection(string connectionId, string roomName)
     {
         _connectionToRoom[connectionId] = roomName;

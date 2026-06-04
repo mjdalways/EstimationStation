@@ -180,7 +180,7 @@
             <button class="btn btn-warning w-100 mb-2" onclick="resetVotes()" title="Reset votes (R)">🔄 Reset <kbd class="btn-kb-hint">R</kbd></button>
             <button class="btn btn-outline-info w-100 mb-2" onclick="openDecider()">🎡 Decider</button>
             <button class="btn btn-outline-secondary w-100 mb-2" id="ghostToggleBtn" onclick="toggleGhostMode()" title="Latecomers join as ghosts (watch only) when on" data-room-setting="ghostMode">👻 Ghost: Off</button>
-            <button id="pinBtn" class="btn btn-outline-secondary w-100 mb-2" onclick="openPinModal(false)" title="Set or clear room PIN">🔒 PIN</button>
+            <button id="pinBtn" data-host-only class="btn btn-outline-secondary w-100 mb-2" onclick="openPinModal(false)" title="Set or clear room PIN (host only)">🔒 PIN</button>
             <button class="btn btn-outline-secondary w-100 mb-2" id="fullscreenBtn" onclick="togglePresentationMode()" title="Toggle full-screen presentation mode (F)">⛶ Full Screen <kbd class="btn-kb-hint">F</kbd></button>
             <button class="btn btn-outline-secondary btn-sm w-100 mb-2" onclick="openSettingsModal('about')" title="View all keyboard shortcuts">⌨️ Shortcuts Help <kbd class="btn-kb-hint">?</kbd></button>
         </div>
@@ -214,6 +214,16 @@
                     <option value="hidden">🙈 Host only (hidden from others)</option>
                 </select>
                 <div class="text-muted mt-1" style="font-size:0.68rem;">Only room-level settings (👥) are locked. Personal settings are always individual.</div>
+                <hr class="my-2" />
+                <div class="mb-1 small fw-bold text-muted">🚪 "Are you there?" timeout</div>
+                <select class="form-select form-select-sm" id="leaveTimeoutSelect" onchange="setLeaveTimeout(this.value)" title="How long an unanswered leave prompt waits before the user is auto-removed">
+                    <option value="30">30 seconds</option>
+                    <option value="60" selected>1 minute</option>
+                    <option value="120">2 minutes</option>
+                    <option value="180">3 minutes</option>
+                    <option value="300">5 minutes</option>
+                </select>
+                <div class="text-muted mt-1" style="font-size:0.68rem;">If someone is asked to leave and doesn't respond in time, they're removed from the room.</div>
             </div>
         </div>
 

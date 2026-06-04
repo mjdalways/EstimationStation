@@ -26,6 +26,7 @@ let _roundVoteOrder  = [];                // connectionIds in order votes were c
 let _roundFlipCounts = {};                // connectionId → number of vote changes this round
 let _pendingRoomName = null;              // PIN: used when re-joining after PIN_REQUIRED
 let _pendingUserName = null;
+let _pinJoinPending = false;              // PIN: true while the join-required prompt is open; if it's dismissed without joining, go home
 var _isMobile = window.innerWidth <= 600;
 window.addEventListener('resize', function() { _isMobile = window.innerWidth <= 600; });
 let _pendingIsObserver = false;
@@ -91,6 +92,8 @@ function registerHandlers() {
         roomState.isHost = state.isHost === true;
         roomState.hostConnectionId = state.hostConnectionId || null;
         roomState.settingsLockMode = state.settingsLockMode || 'none';
+        roomState.leaveRequestTimeoutSeconds = state.leaveRequestTimeoutSeconds || 60;
+        _syncLeaveTimeoutSelect();
 
         document.getElementById('autoRevealCheck').checked = state.autoReveal;
         var rmfChk = document.getElementById('revealMajorityCheck');
@@ -493,6 +496,23 @@ function registerHandlers() {
     connection.on('PrivateReactionReceived', (senderName, emoji) => {
         _reactionFloatFromBadge(null, emoji, senderName);
     });
+
+    // Remove-user flow
+    connection.on('LeaveRequested', (requestId, requesterName, timeoutSeconds) => {
+        _showLeaveRequestDialog(requestId, requesterName, timeoutSeconds);
+    });
+    connection.on('LeaveRequestSent', (targetName) => {
+        _showToastAD('🚪 Asked ' + targetName + ' if they\'re still here', 'info');
+    });
+    connection.on('LeaveDeclined', (targetName) => {
+        _showToastAD('✋ ' + targetName + ' is staying', 'info');
+    });
+    connection.on('LeaveRequestExpired', () => { _closeLeaveRequestDialog(); });
+    connection.on('LeaveTimeoutChanged', (seconds) => {
+        roomState.leaveRequestTimeoutSeconds = seconds;
+        _syncLeaveTimeoutSelect();
+    });
+    connection.on('RemovedFromRoom', (reason) => { _handleRemovedFromRoom(reason); });
 }
 
 // ============================================================
@@ -988,6 +1008,8 @@ async function toggleGhostMode() {
 }
 
 function openPinModal(forJoin) {
+    // Setting/clearing the PIN is host-only; the join-required prompt (forJoin) is for everyone.
+    if (!forJoin && !roomState.isHost) { _showToastAD('🔒 Only the host can set the room PIN', 'warning'); return; }
     const modal = document.getElementById('pinModal');
     if (!modal) return;
     const titleEl = document.getElementById('pinModalTitle');
@@ -996,7 +1018,7 @@ function openPinModal(forJoin) {
     const inp = document.getElementById('pinInput');
     if (forJoin) {
         if (titleEl) titleEl.textContent = '🔒 PIN Required';
-        if (submitEl) submitEl.textContent = 'Join';
+        if (submitEl) { submitEl.textContent = 'Join'; submitEl.style.display = ''; }
         if (msgEl) { msgEl.textContent = 'This room has a PIN. Enter it to join.'; msgEl.style.display = ''; }
         if (inp) inp.oninput = null;
     } else {
@@ -1010,6 +1032,17 @@ function openPinModal(forJoin) {
     }
     if (inp) inp.value = '';
     if (!forJoin) _updatePinSubmitLabel();
+
+    // For the join-required prompt, dismissing the modal (X / Cancel / backdrop / Esc) without
+    // entering the PIN means they can't join — send them back to the home page.
+    _pinJoinPending = forJoin;
+    if (forJoin) {
+        modal.addEventListener('hidden.bs.modal', function _onPinHide() {
+            modal.removeEventListener('hidden.bs.modal', _onPinHide);
+            if (_pinJoinPending) window.location.href = '/';
+        });
+    }
+
     new bootstrap.Modal(modal).show();
     setTimeout(() => { if (inp) inp.focus(); }, 350);
 }
@@ -1018,11 +1051,22 @@ function _updatePinSubmitLabel() {
     const submitEl = document.getElementById('pinSubmitBtn');
     if (!submitEl) return;
     const hasText = ((document.getElementById('pinInput')?.value) || '').trim().length > 0;
-    submitEl.textContent = hasText ? 'Set PIN' : (roomState.hasPin ? 'Clear PIN' : 'Cancel');
+    if (hasText) {
+        submitEl.textContent = 'Set PIN';
+        submitEl.style.display = '';
+    } else if (roomState.hasPin) {
+        submitEl.textContent = 'Clear PIN';
+        submitEl.style.display = '';
+    } else {
+        // No PIN and empty box — the footer Cancel button already covers this, so hide
+        // the primary button rather than show a second "Cancel".
+        submitEl.style.display = 'none';
+    }
 }
 
 function submitPin() {
     const pin = (document.getElementById('pinInput')?.value || '').trim();
+    _pinJoinPending = false; // submitting (Join/Set/Clear) — don't treat the ensuing hide as a cancel
     const bsModal = bootstrap.Modal.getInstance(document.getElementById('pinModal'));
     if (bsModal) bsModal.hide();
     if (_pendingRoomName) {
@@ -2597,11 +2641,16 @@ function _showParticipantContextMenu(e, connectionId, name) {
     var items = [];
     if (roomState.isHost && connectionId !== myConnectionId) {
         items.push({ label: '👑 Transfer Host', action: function() { transferHost(connectionId); } });
+        items.push({ label: '🚷 Remove from room', action: function() { kickParticipant(connectionId, name); } });
         items.push({ type: 'sep' });
     }
     items.push({ label: '📨 Private Message', action: function() { _openPrivateMessageInput(connectionId, name); } });
     items.push({ label: '😄 Send Emoji',      action: function() { _openEmojiSendPicker(connectionId, name); } });
     items.push({ label: '🔊 Send Sound',      action: function() { _openSoundSendMenu(connectionId, name); } });
+    if (connectionId !== myConnectionId) {
+        items.push({ type: 'sep' });
+        items.push({ label: '🚪 Ask if still here', action: function() { askParticipantLeave(connectionId, name); } });
+    }
 
     var menu = document.createElement('ul');
     menu.id = 'participant-ctx-menu';
@@ -2630,6 +2679,88 @@ function _showParticipantContextMenu(e, connectionId, name) {
 function _closeParticipantCtxMenu() {
     var m = document.getElementById('participant-ctx-menu');
     if (m) m.remove();
+}
+
+// ============================================================
+// Remove-user flow (host kick / "ask to leave" / idle handled server-side)
+// ============================================================
+
+// Host-only: immediately remove a participant (with a quick confirm to avoid misclicks).
+async function kickParticipant(connectionId, name) {
+    if (!roomState.isHost) return;
+    if (!confirm('Remove ' + (name || 'this participant') + ' from the room?')) return;
+    try { await connection.invoke('RemoveParticipant', connectionId); } catch (e) { console.error(e); }
+}
+
+// Anyone: ping a participant asking if they're still there.
+async function askParticipantLeave(connectionId, name) {
+    try { await connection.invoke('RequestLeave', connectionId); } catch (e) { console.error(e); }
+}
+
+// Shown to the target of a leave request. Yes -> leave, No -> stay; if they don't answer before
+// the countdown ends, the server removes them (or transfers host if they are the host).
+function _showLeaveRequestDialog(requestId, requesterName, timeoutSeconds) {
+    _closeLeaveRequestDialog();
+    var secs = timeoutSeconds || 60;
+    var backdrop = document.createElement('div');
+    backdrop.id = 'leave-request-modal';
+    backdrop.className = 'host-setup-modal-backdrop';
+    backdrop.innerHTML =
+        '<div class="host-setup-modal-box" style="max-width:380px;">' +
+        '<div class="host-setup-title">🚪 Are you still there?</div>' +
+        '<p class="host-setup-desc"><strong>' + escHtml(requesterName) + '</strong> asked if you want to leave the room.<br>' +
+        'Do you want to leave?</p>' +
+        '<div class="d-flex gap-2 justify-content-center mb-2">' +
+        '<button class="btn btn-danger" onclick="_respondLeave(\'' + requestId + '\', true)">🚪 Yes, leave</button>' +
+        '<button class="btn btn-success" onclick="_respondLeave(\'' + requestId + '\', false)">✋ No, I\'m staying</button>' +
+        '</div>' +
+        '<div class="small text-muted">Auto-removed in <strong id="leave-countdown">' + secs + '</strong>s if you don\'t respond.</div>' +
+        '</div>';
+    document.body.appendChild(backdrop);
+
+    var remaining = secs;
+    backdrop._timer = setInterval(function () {
+        remaining--;
+        var el = document.getElementById('leave-countdown');
+        if (el) el.textContent = Math.max(0, remaining);
+        if (remaining <= 0) { _closeLeaveRequestDialog(); } // server removes us shortly after
+    }, 1000);
+}
+
+function _closeLeaveRequestDialog() {
+    var m = document.getElementById('leave-request-modal');
+    if (!m) return;
+    if (m._timer) clearInterval(m._timer);
+    m.remove();
+}
+
+async function _respondLeave(requestId, willLeave) {
+    _closeLeaveRequestDialog();
+    try { await connection.invoke('RespondLeave', requestId, willLeave); } catch (e) { console.error(e); }
+}
+
+// We were removed (kicked / accepted leave / timed out / idle). Show why, then return to lobby.
+function _handleRemovedFromRoom(reason) {
+    var msgMap = {
+        removed: 'You were removed from the room by the host.',
+        left:    'You left the room.',
+        timeout: 'You were removed from the room (no response to the "are you there?" prompt).',
+        idle:    'You were removed from the room after 2 hours of inactivity.'
+    };
+    try { if (connection) connection.stop(); } catch (e) {}
+    alert(msgMap[reason] || 'You have been removed from the room.');
+    window.location.href = '/';
+}
+
+async function setLeaveTimeout(seconds) {
+    try { await connection.invoke('SetLeaveTimeout', parseInt(seconds, 10)); } catch (e) { console.error(e); }
+}
+
+function _syncLeaveTimeoutSelect() {
+    var sel = document.getElementById('leaveTimeoutSelect');
+    if (sel && String(roomState.leaveRequestTimeoutSeconds)) {
+        sel.value = String(roomState.leaveRequestTimeoutSeconds || 60);
+    }
 }
 
 // AD7 — Private message

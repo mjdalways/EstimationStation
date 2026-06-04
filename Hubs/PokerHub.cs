@@ -9,6 +9,7 @@ public class PokerHub : Hub
 {
     private readonly RoomService _roomService;
     private readonly JiraService _jiraService;
+    private readonly LeaveRequestStore _leaveStore;
 
     // AD3 — Pending setting-change requests for "ask" lock mode
     private static readonly ConcurrentDictionary<string, PendingSettingRequest> _pendingRequests = new();
@@ -30,10 +31,11 @@ public class PokerHub : Hub
         return !allowed;
     }
 
-    public PokerHub(RoomService roomService, JiraService jiraService)
+    public PokerHub(RoomService roomService, JiraService jiraService, LeaveRequestStore leaveStore)
     {
         _roomService = roomService;
         _jiraService = jiraService;
+        _leaveStore = leaveStore;
     }
 
     public override async Task OnConnectedAsync()
@@ -307,6 +309,8 @@ public class PokerHub : Hub
         if (roomName == null) return;
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        // Only the host may set or clear the room PIN.
+        if (!string.IsNullOrEmpty(room.HostConnectionId) && room.HostConnectionId != Context.ConnectionId) return;
         lock (room)
         {
             room.Pin = string.IsNullOrWhiteSpace(pin) ? null : pin.Trim();
@@ -522,6 +526,100 @@ public class PokerHub : Hub
         lock (room) { room.HostConnectionId = targetConnectionId; }
         _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("HostChanged", targetConnectionId);
+    }
+
+    // Host-only: immediately remove a participant from the room.
+    public async Task RemoveParticipant(string targetConnectionId)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || room.HostConnectionId != Context.ConnectionId) return;
+        if (targetConnectionId == Context.ConnectionId) return; // host can't kick themselves
+        if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+        await RemoveAndBroadcastAsync(_roomService, Clients, Groups, room, roomName, targetConnectionId, "removed");
+    }
+
+    // Anyone: ask a participant whether they're still there / want to leave. They get a confirm
+    // dialog; no answer within the room's timeout means the background sweep removes them (or,
+    // if they're the host, transfers host to the requester).
+    public async Task RequestLeave(string targetConnectionId)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        if (targetConnectionId == Context.ConnectionId) return; // no asking yourself to leave
+        if (RateLimited("requestLeave", TimeSpan.FromSeconds(2))) return;
+
+        Participant? target, requester;
+        int timeout;
+        lock (room)
+        {
+            target = room.Participants.FirstOrDefault(p => p.ConnectionId == targetConnectionId);
+            requester = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+            timeout = room.LeaveRequestTimeoutSeconds;
+        }
+        if (target == null || requester == null) return;
+
+        // Collapse any existing pending request for the same target so timers don't stack.
+        foreach (var kv in _leaveStore.Requests)
+            if (kv.Value.RoomName == roomName && kv.Value.TargetConnectionId == targetConnectionId)
+                _leaveStore.Requests.TryRemove(kv.Key, out _);
+
+        var requestId = Guid.NewGuid().ToString("N")[..8];
+        _leaveStore.Requests[requestId] = new PendingLeave(
+            roomName, Context.ConnectionId, requester.Name, targetConnectionId, target.Name, DateTime.UtcNow, timeout);
+
+        await Clients.Client(targetConnectionId).SendAsync("LeaveRequested", requestId, requester.Name, timeout);
+        await Clients.Caller.SendAsync("LeaveRequestSent", target.Name);
+    }
+
+    // Target's answer to a leave request: true = leave now, false = staying.
+    public async Task RespondLeave(string requestId, bool willLeave)
+    {
+        if (!_leaveStore.Requests.TryGetValue(requestId, out var req)) return;
+        if (req.TargetConnectionId != Context.ConnectionId) return; // only the target may answer
+        _leaveStore.Requests.TryRemove(requestId, out _);
+
+        var room = _roomService.GetRoom(req.RoomName);
+        if (room == null) return;
+
+        if (willLeave)
+            await RemoveAndBroadcastAsync(_roomService, Clients, Groups, room, req.RoomName, req.TargetConnectionId, "left");
+        else
+            await Clients.Client(req.RequesterConnectionId).SendAsync("LeaveDeclined", req.TargetName);
+    }
+
+    // Host-only: configure how long the "are you there?" prompt waits before auto-removal.
+    public async Task SetLeaveTimeout(int seconds)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || room.HostConnectionId != Context.ConnectionId) return;
+        if (!new[] { 30, 60, 120, 180, 300 }.Contains(seconds)) return;
+        lock (room) { room.LeaveRequestTimeoutSeconds = seconds; }
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("LeaveTimeoutChanged", seconds);
+    }
+
+    // Shared removal + broadcast, used by the hub (host kick / accepted leave) and the background
+    // sweep (timeout / idle). Removes from room state, cleans up the connection, persists, tells
+    // the removed client to leave, and notifies the room (including any host hand-off).
+    internal static async Task RemoveAndBroadcastAsync(
+        RoomService roomService, IHubClients<IClientProxy> clients, IGroupManager groups,
+        Room room, string roomName, string targetConnectionId, string reason)
+    {
+        var res = roomService.RemoveParticipant(room, targetConnectionId);
+        if (!res.Removed) return;
+        roomService.RemoveConnection(targetConnectionId);
+        await groups.RemoveFromGroupAsync(targetConnectionId, roomName);
+        roomService.SaveRoom(room);
+        await clients.Client(targetConnectionId).SendAsync("RemovedFromRoom", reason);
+        await clients.Group(roomName).SendAsync("ParticipantLeft", targetConnectionId, res.Name);
+        if (res.NewHostId != null)
+            await clients.Group(roomName).SendAsync("HostChanged", res.NewHostId);
     }
 
     // AD2 — Change settings lock mode (host-only)
@@ -1009,6 +1107,7 @@ public class PokerHub : Hub
             isHost = room.HostConnectionId == requestingConnectionId,
             hostConnectionId = room.HostConnectionId,
             settingsLockMode = room.SettingsLockMode,
+            leaveRequestTimeoutSeconds = room.LeaveRequestTimeoutSeconds,
             participants = room.Participants.Select(p => new
             {
                 connectionId = p.ConnectionId,

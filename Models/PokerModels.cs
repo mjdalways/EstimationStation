@@ -22,6 +22,8 @@ public class Room
     public string? HostConnectionId { get; set; }
     // AD2 — Settings lock: none | ask | hostonly | hidden
     public string SettingsLockMode { get; set; } = "none";
+    // Host-configurable seconds an "are you there?" leave prompt waits before auto-removal (30..300)
+    public int LeaveRequestTimeoutSeconds { get; set; } = 60;
 }
 
 public class Participant
@@ -34,6 +36,8 @@ public class Participant
     public bool CounterUsed { get; set; } = false;
     public string? AvatarData { get; set; }
     public int? Confidence { get; set; }
+    // Last time this participant interacted; drives the 2-hour idle removal sweep.
+    public DateTime LastSeen { get; set; } = DateTime.UtcNow;
 }
 
 public class Story

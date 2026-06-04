@@ -1,16 +1,24 @@
 using EstimationStation.Hubs;
 using EstimationStation.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 1_048_576); // 1 MB for custom audio broadcast
+builder.Services.AddSingleton<ActivityHubFilter>();
+builder.Services.AddSignalR(o =>
+{
+    o.MaximumReceiveMessageSize = 1_048_576; // 1 MB for custom audio broadcast
+    o.AddFilter<ActivityHubFilter>();          // stamp participant activity for idle sweep
+});
 builder.Services.AddSingleton<IRoomRepository, FileRoomRepository>();
 builder.Services.AddSingleton<RoomService>();
+builder.Services.AddSingleton<LeaveRequestStore>();
 builder.Services.AddHostedService<RoomCleanupService>();
 builder.Services.AddHostedService<RoomPersistenceService>();
+builder.Services.AddHostedService<ParticipantSweepService>();
 builder.Services.AddHttpClient("jira");
 builder.Services.AddTransient<JiraService>();
 
