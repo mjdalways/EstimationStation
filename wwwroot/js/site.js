@@ -1042,13 +1042,101 @@ function setFlipDuration(ms) {
 }
 document.addEventListener('DOMContentLoaded', _applyFlipDuration);
 
-function _previewFlipVoteCard() {
-    const card = document.getElementById('vote-card-preview');
+// ── AJ: unified card animation applier (CSS class + JS particle effects) ────
+// Called from both the preview button and castVote in room.js.
+function _applyCardAnim(card) {
     if (!card) return;
     var style = localStorage.getItem('es_cardAnimStyle') || 'flip';
+    if (style === 'none') return;
     var cls = style === 'flip' ? 'card-flipping' : 'card-anim-' + style;
+    var dur = _getFlipDuration();
     card.classList.add(cls);
-    setTimeout(function() { card.classList.remove(cls); }, _getFlipDuration() + 100);
+    setTimeout(function() { card.classList.remove(cls); }, dur + 100);
+    // JS-assisted particle effects
+    if (style === 'shatter') _cardShatterEffect(card, dur);
+    if (style === 'burst')   _cardBurstEffect(card, dur);
+}
+window._applyCardAnim = _applyCardAnim;
+
+// Shatter: 3×3 glowing fragments scatter then reassemble
+function _cardShatterEffect(card, dur) {
+    var rect = card.getBoundingClientRect();
+    var rows = 3, cols = 3;
+    var fw = rect.width / cols, fh = rect.height / rows;
+    var accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#5b8dee').trim();
+    var startDelay = dur * 0.20;
+    setTimeout(function() {
+        for (var r = 0; r < rows; r++) {
+            for (var c = 0; c < cols; c++) {
+                (function(ri, ci) {
+                    var dx = (ci - 1) * (70 + Math.random() * 90) + (Math.random() - 0.5) * 50;
+                    var dy = (ri - 1) * (70 + Math.random() * 90) + (Math.random() - 0.5) * 50;
+                    var rot = (Math.random() - 0.5) * 600;
+                    var flyT = (dur * 0.36 / 1000).toFixed(3);
+                    var retT = (dur * 0.30 / 1000).toFixed(3);
+                    var frag = document.createElement('div');
+                    frag.style.cssText = [
+                        'position:fixed', 'z-index:9999', 'pointer-events:none',
+                        'width:' + (fw - 3) + 'px', 'height:' + (fh - 3) + 'px',
+                        'left:' + (rect.left + ci * fw + 1.5) + 'px',
+                        'top:' + (rect.top + ri * fh + 1.5) + 'px',
+                        'background:var(--card-selected,#0d6efd)',
+                        'box-shadow:0 0 8px 3px ' + accent,
+                        'border-radius:3px',
+                        'transition:transform ' + flyT + 's cubic-bezier(.2,0,1,.8),opacity ' + flyT + 's ease-out'
+                    ].join(';');
+                    document.body.appendChild(frag);
+                    requestAnimationFrame(function() { requestAnimationFrame(function() {
+                        frag.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + rot + 'deg)';
+                        frag.style.opacity = '0';
+                    }); });
+                    setTimeout(function() {
+                        frag.style.transition = 'transform ' + retT + 's cubic-bezier(0,.8,.4,1),opacity ' + retT + 's ease-in';
+                        frag.style.transform = 'translate(0,0) rotate(0deg)';
+                        frag.style.opacity = '1';
+                        setTimeout(function() { frag.remove(); }, dur * 0.35 + 60);
+                    }, dur * 0.50);
+                })(r, c);
+            }
+        }
+    }, startDelay);
+}
+
+// Burst: coloured circle particles explode outward
+function _cardBurstEffect(card, dur) {
+    var rect = card.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top + rect.height / 2;
+    var colors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#c77dff','#ff9f1c','#f72585','#4cc9f0','#ff5f40','#00f5d4'];
+    var count = 22;
+    setTimeout(function() {
+        for (var i = 0; i < count; i++) {
+            (function(idx) {
+                var angle = (idx / count) * 360 + (Math.random() - 0.5) * 20;
+                var dist  = 55 + Math.random() * 95;
+                var sz    = 5 + Math.random() * 9;
+                var color = colors[idx % colors.length];
+                var flyT  = (dur * 0.52 / 1000).toFixed(3);
+                var p = document.createElement('div');
+                p.style.cssText = [
+                    'position:fixed', 'z-index:9999', 'pointer-events:none', 'border-radius:50%',
+                    'width:' + sz + 'px', 'height:' + sz + 'px', 'background:' + color,
+                    'box-shadow:0 0 4px 1px ' + color,
+                    'left:' + cx + 'px', 'top:' + cy + 'px',
+                    'transform:translate(-50%,-50%)',
+                    'transition:left ' + flyT + 's cubic-bezier(0,.6,.4,1),top ' + flyT + 's cubic-bezier(0,.6,.4,1),opacity ' + flyT + 's ease-out'
+                ].join(';');
+                document.body.appendChild(p);
+                requestAnimationFrame(function() { requestAnimationFrame(function() {
+                    var rad = angle * Math.PI / 180;
+                    p.style.left = (cx + Math.cos(rad) * dist) + 'px';
+                    p.style.top  = (cy + Math.sin(rad) * dist) + 'px';
+                    p.style.opacity = '0';
+                }); });
+                setTimeout(function() { p.remove(); }, dur * 0.58 + 100);
+            })(i);
+        }
+    }, dur * 0.16);
 }
 
 // ── AK5: Card gradient builders (card-bg / card-selected) ─────

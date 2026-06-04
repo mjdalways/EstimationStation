@@ -594,23 +594,6 @@
                         <!-- X1/X2: Vote animation toggles -->
                         <hr class="my-2">
                         <div class="mb-1 fw-bold small">🃏 Voting Animations</div>
-                        <!-- AJ: vote card animation style selector -->
-                        <div class="mb-2">
-                            <label class="form-label small mb-1" for="card-anim-style-select">Vote card animation</label>
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <select class="form-select form-select-sm" id="card-anim-style-select" style="width:auto;"
-                                        onchange="localStorage.setItem('es_cardAnimStyle', this.value)">
-                                    <option value="flip">🔄 Flip</option>
-                                    <option value="tardis">🌀 Tardis</option>
-                                    <option value="hide">⬇️ Hide &amp; reveal</option>
-                                    <option value="run-away">💨 Run-away</option>
-                                    <option value="fly-away">🚀 Fly-away</option>
-                                    <option value="explode">💥 Explode</option>
-                                    <option value="none">✋ None</option>
-                                </select>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="_previewFlipVoteCard()" title="Preview animation">▶ Preview</button>
-                            </div>
-                        </div>
                         <div class="mb-2">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="flip-on-vote-toggle" checked
@@ -692,12 +675,12 @@
                             </div>
                         </div>
 
-                        <!-- Y1: Vote Picker Card Style -->
+                        <!-- Y1 + AJ + AK4: Vote Picker Card Style (animation, speed, preview all unified) -->
                         <hr class="my-2">
                         <div class="mb-1 fw-bold small">🎴 Vote Picker Card Style</div>
-                        <div class="d-flex gap-3 align-items-start flex-wrap mb-2">
+                        <div class="d-flex gap-3 align-items-start flex-wrap">
                             <div>
-                                <label class="form-label small mb-1" for="voteCardBackSelect">Background on unselected vote cards</label>
+                                <label class="form-label small mb-1" for="voteCardBackSelect">Background on unselected cards</label>
                                 <select class="form-select form-select-sm" id="voteCardBackSelect" onchange="setVoteCardBackDesign(this.value)" style="width:auto;">
                                     <option value="default">Default (theme colors)</option>
                                     <option value="baize">🟢 Baize (green felt)</option>
@@ -708,29 +691,45 @@
                                     <option value="stripes">↗ Diagonal Stripes</option>
                                     <option value="solid">🎨 Solid Color</option>
                                 </select>
-                                <!-- Y1: solid color for vote cards -->
                                 <div id="vcb-solid-opts" class="mt-2 d-flex align-items-center gap-2 small" style="display:none!important;">
                                     <label class="mb-0">Color</label>
                                     <input type="color" id="vcb-solid-color" value="#6366f1"
                                            oninput="setVcbSolidColor(this.value)"
                                            style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;" />
                                 </div>
-                                <p class="text-muted mt-1 mb-0" style="font-size:0.72rem;">Applies to the numbered cards in the vote picker row (unselected state only).</p>
+                                <!-- AJ: animation selector -->
+                                <div class="mt-2">
+                                    <label class="form-label small mb-1" for="card-anim-style-select">Animation on vote</label>
+                                    <select class="form-select form-select-sm" id="card-anim-style-select" style="width:auto;"
+                                            onchange="localStorage.setItem('es_cardAnimStyle', this.value)">
+                                        <option value="flip">🔄 Flip</option>
+                                        <option value="tardis">🌀 Tardis</option>
+                                        <option value="hide">⬇️ Hide &amp; reveal</option>
+                                        <option value="run-away">💨 Run-away</option>
+                                        <option value="fly-away">🚀 Fly-away</option>
+                                        <option value="explode">💥 Explode</option>
+                                        <option value="bubble">🫧 Bubble pop</option>
+                                        <option value="shatter">✨ Shatter &amp; glow</option>
+                                        <option value="warp">🔥 Warp</option>
+                                        <option value="burst">🎆 Particle burst</option>
+                                        <option value="none">✋ None</option>
+                                    </select>
+                                </div>
+                                <!-- AK4: Flip speed / animation duration -->
+                                <div class="mt-2">
+                                    <label class="form-label small mb-1" for="flipDurationSlider">Animation speed <span id="flipDurationVal" class="text-muted">0.60s</span></label>
+                                    <input type="range" class="form-range" id="flipDurationSlider" min="200" max="1000" step="50" value="600"
+                                           oninput="setFlipDuration(this.value)" style="max-width:200px;" />
+                                    <p class="text-muted mt-0 mb-0" style="font-size:0.72rem;">Controls the duration of all vote animations above.</p>
+                                </div>
                             </div>
                             <div>
                                 <div class="text-muted small mb-1">Preview</div>
                                 <div class="poker-card" id="vote-card-preview" style="pointer-events:none;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;" data-value="">5</div>
-                                <div class="mt-1">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="_previewFlipVoteCard()" title="Test flip animation">🔄 Flip</button>
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="_applyCardAnim(document.getElementById('vote-card-preview'))" title="Preview chosen animation">▶ Preview</button>
                                 </div>
                             </div>
-                        </div>
-                        <!-- AK4: Flip speed -->
-                        <div class="mb-2">
-                            <label class="form-label small mb-1" for="flipDurationSlider">Flip speed <span id="flipDurationVal" class="text-muted">0.60s</span></label>
-                            <input type="range" class="form-range" id="flipDurationSlider" min="200" max="1000" step="50" value="600"
-                                   oninput="setFlipDuration(this.value)" style="max-width:220px;" />
-                            <p class="text-muted mt-0 mb-0" style="font-size:0.72rem;">Duration of the card flip when a vote is cast. Use the 🔄 Flip button above to preview.</p>
                         </div>
 
                     </div><!-- end tab-visual -->
@@ -1589,6 +1588,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/4/2026 (107)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎴 Vote card animation overhaul — four new complex animations added: <strong>🫧 Bubble pop</strong> (card inflates into a soap bubble and pops), <strong>✨ Shatter &amp; glow</strong> (card breaks into glowing fragments that scatter and reassemble), <strong>🔥 Warp</strong> (heavy distortion and colour-shift destruction effect), <strong>🎆 Particle burst</strong> (22 coloured circles explode outward). The animation selector, speed slider, and live ▶ Preview are now all together in Visual → Vote Picker Card Style. Animation speed controls all eleven effects.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/4/2026 (106)</strong></p>
                         <ul class="mb-2">
                             <li>✋ Story drag-to-reorder — stories now have a ⠿ drag handle on the left. Grab it and drag a story to a new position in the list. The order is broadcast to everyone in the room so all participants see the same sequence.</li>
