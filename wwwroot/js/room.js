@@ -355,6 +355,15 @@ function registerHandlers() {
         updateCurrentStoryDisplay();
     });
 
+    // AK2: server broadcasts the new story order to all clients
+    connection.on('StoriesReordered', (orderedIds) => {
+        const lookup = Object.fromEntries(roomState.stories.map(s => [s.id, s]));
+        const reordered = orderedIds.filter(id => lookup[id]).map(id => lookup[id]);
+        roomState.stories.forEach(s => { if (!orderedIds.includes(s.id)) reordered.push(s); });
+        roomState.stories = reordered;
+        renderStories();
+    });
+
     connection.on('StoryCompleted', (storyId, estimate) => {
         const s = roomState.stories.find(s => s.id === storyId);
         if (s) { s.isCompleted = true; s.finalEstimate = estimate; renderStories(); }
@@ -658,8 +667,12 @@ function renderStories() {
             : escHtml(s.title);
         const hasNote = s.notes && s.notes.trim().length > 0;
         const noteBtnClass = hasNote ? 'btn-warning' : 'btn-outline-secondary';
+        // AK2: drag handle + draggable
+        div.draggable = true;
+        div.dataset.storyId = s.id;
         div.innerHTML = `
             <div class="story-row-main d-flex align-items-start gap-1">
+                <span class="story-drag-handle" title="Drag to reorder">⠿</span>
                 <div class="story-text flex-grow-1 min-w-0">
                     <span class="story-item-title"${_descTooltip || ` title="${escHtml(s.title)}"`}>${jiraBadge}${displayTitle}</span>
                     ${s.isCompleted ? `<span class="story-item-estimate">${escHtml(s.finalEstimate || '')}</span>` : ''}
@@ -675,6 +688,11 @@ function renderStories() {
                 <textarea class="form-control form-control-sm" rows="3" placeholder="Add notes for this story…" onblur="updateStoryNotes('${s.id}', this.value)">${escHtml(s.notes || '')}</textarea>
             </div>
         `;
+        // AK2: drag events
+        div.addEventListener('dragstart', _storyDragStart);
+        div.addEventListener('dragover',  _storyDragOver);
+        div.addEventListener('drop',      _storyDrop);
+        div.addEventListener('dragend',   _storyDragEnd);
         list.appendChild(div);
     });
     _updateSprintDashboard();
@@ -682,6 +700,44 @@ function renderStories() {
     list.querySelectorAll('.story-item-title').forEach(function(el) {
         if (el.scrollWidth > el.offsetWidth && !el.title) el.title = el.textContent.trim();
     });
+}
+
+// AK2: drag-and-drop reorder helpers
+var _dragSrcId = null;
+function _storyDragStart(e) {
+    _dragSrcId = this.dataset.storyId;
+    this.classList.add('story-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', _dragSrcId);
+}
+function _storyDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var over = this;
+    document.querySelectorAll('.story-item').forEach(function(el) { el.classList.remove('story-drop-target'); });
+    if (over.dataset.storyId !== _dragSrcId) over.classList.add('story-drop-target');
+}
+function _storyDrop(e) {
+    e.preventDefault();
+    var targetId = this.dataset.storyId;
+    if (!_dragSrcId || _dragSrcId === targetId) return;
+    // Reorder in local roomState immediately for snappy feel
+    var stories = roomState.stories;
+    var srcIdx = stories.findIndex(function(s){ return s.id === _dragSrcId; });
+    var tgtIdx = stories.findIndex(function(s){ return s.id === targetId; });
+    if (srcIdx < 0 || tgtIdx < 0) return;
+    var moved = stories.splice(srcIdx, 1)[0];
+    stories.splice(tgtIdx, 0, moved);
+    renderStories();
+    // Broadcast the new order to all participants
+    var orderedIds = stories.map(function(s){ return s.id; });
+    connection.invoke('ReorderStories', orderedIds).catch(function(err){ console.error('ReorderStories failed', err); });
+}
+function _storyDragEnd() {
+    document.querySelectorAll('.story-item').forEach(function(el) {
+        el.classList.remove('story-dragging', 'story-drop-target');
+    });
+    _dragSrcId = null;
 }
 
 function _updateSprintDashboard() {

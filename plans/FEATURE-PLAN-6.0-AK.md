@@ -23,12 +23,9 @@ Persist collapsed/position state to `localStorage`.
 
 ---
 
-## AK2 — Stories Panel Drag Handle Cursor
+## AK2 — Stories Panel Drag Handle Cursor ✅ Done (v6 / 2026-06-04)
 
-> ⚠️ **Blocked / premise outdated (2026-06-04):** story list items are **not** currently
-> draggable — there is no drag-reorder implementation in `room.js`/`renderStories`. This item
-> would require building the whole drag-to-reorder feature first, not just adding a cursor cue.
-> Re-scope before picking up.
+> Originally blocked — no drag-reorder existed. Full drag-to-reorder was built as part of this item.
 
 Story list items are draggable for reordering but show no visual cue.
 

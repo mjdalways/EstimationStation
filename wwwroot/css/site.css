@@ -387,7 +387,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--border-radius);
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.4rem;
-  cursor: pointer;
+  cursor: default;
   transition: background-color 0.2s;
   display: flex;
   align-items: center;
@@ -398,6 +398,22 @@ h1, h2, h3, h4, h5, h6 {
 .story-item:hover { background-color: var(--card-hover); }
 .story-item.active { background-color: var(--story-active); border-color: var(--accent); }
 .story-item.completed { background-color: var(--story-completed); opacity: 0.75; }
+
+/* AK2: drag-and-drop reorder */
+.story-drag-handle {
+  cursor: grab;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+  user-select: none;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.story-item:hover .story-drag-handle { opacity: 0.9; }
+.story-item.story-dragging { opacity: 0.4; cursor: grabbing; }
+.story-item.story-drop-target { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(91,141,238,0.35); }
 
 .story-text { overflow: hidden; min-width: 0; flex: 1 1 0; }
 .story-row-main { overflow: hidden; }

@@ -17,9 +17,9 @@ Carries forward all unimplemented items from v5.0. Completed groups have been mo
 | — | [AN](./plans/FEATURE-PLAN-6.0-AN.md) | 🏷️ Terminology rename — "Events" tab → **Fun**, "Seasons" tab → **Events** | Small | ✅ Done |
 | — | [AL](./plans/FEATURE-PLAN-6.0-AL.md) | 🚩 Local flag pack (~250, MIT) + country dropdown, no CDN | Medium | ✅ Done |
 | — | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ✅ Done |
-| 1 | [AK2](./plans/FEATURE-PLAN-6.0-AK.md) | ✋ Story drag-reorder + drag-handle cursor (unblocks deferred AK2) | Medium | ⏳ **Next up** |
-| 4 | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE) | Hard | ⏳ Pending |
-| 5 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
+| — | [AK2](./plans/FEATURE-PLAN-6.0-AK.md) | ✋ Story drag-reorder + drag-handle cursor | Medium | ✅ Done |
+| 1 | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE) | Hard | ⏳ **Next up** |
+| 2 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
 | — | [AB](./plans/FEATURE-PLAN-6.0-AB.md) | ✂️ Image Upload with Crop/Pan/Zoom — shared crop dialog for avatars, card backs, season sprites | Hard | ⏸ Deferred |
 | — | [J](./plans/FEATURE-PLAN-6.0-J.md) | 📱 Mobile Experience — stories bottom sheet, vote tap targets, lite mode | Medium-Hard | ⏸ Deferred |
 | — | [K](./plans/FEATURE-PLAN-6.0-K.md) | 💾 Room Persistence — JSON file per room, survive server restart, 7-day TTL | Hard | ⏸ Deferred |

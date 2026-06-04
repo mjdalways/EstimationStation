@@ -478,6 +478,32 @@ public class PokerHub : Hub
         await Clients.Group(roomName).SendAsync("StoryDeleted", storyId);
     }
 
+    // AK2: reorder stories — client sends the full ordered list of story IDs
+    public async Task ReorderStories(List<string> orderedIds)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        lock (room)
+        {
+            var lookup = room.Stories.ToDictionary(s => s.Id);
+            var reordered = orderedIds
+                .Where(id => lookup.ContainsKey(id))
+                .Select(id => lookup[id])
+                .ToList();
+            // Append any stories not mentioned in orderedIds at the end (safety)
+            reordered.AddRange(room.Stories.Where(s => !orderedIds.Contains(s.Id)));
+            room.Stories = reordered;
+            room.LastActivity = DateTime.UtcNow;
+        }
+
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("StoriesReordered", orderedIds);
+    }
+
     public async Task ToggleAutoReveal(bool enabled)
     {
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
