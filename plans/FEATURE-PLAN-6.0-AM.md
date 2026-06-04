@@ -1,0 +1,95 @@
+# AM — Fully-Customizable Event System
+
+> **Priority:** 3
+> **Effort:** Hard
+> **Files:** `wwwroot/js/seasonal.js`, `Views/Shared/_Layout.cshtml`, `wwwroot/js/site.js`
+> [← Back to Feature Plan](../FEATURE-PLAN-6.0.md)
+> **Approach (confirmed):** extend the existing system, do **not** rewrite from scratch.
+
+---
+
+## Vision (from user)
+
+A fully user-customizable **Event** system (the renamed "Seasons" tab — see [AN](./FEATURE-PLAN-6.0-AN.md)):
+
+1. **No "custom" type.** Drop the special-cased `custom` notion. What makes an event/animation
+   custom is simply the **function/action name** it points at — every event references a named
+   action, built-in or user-defined, uniformly.
+2. **Add new events.** Users can create new events (name, active date range / trigger, set of
+   animations).
+3. **Add / remove / change animations.** Per event, add animations, remove them, or edit their
+   parameters (action name, emoji, direction, size, speed, intensity, flag, …).
+4. **Save / load.** Persist the whole configuration (already partly covered by Export/Import JSON);
+   extend to cover user-created events + animations.
+5. **Reset to default.** Restore the shipped defaults at any time.
+6. **Override, don't delete, defaults.** Built-in/static events & animations are never destroyed.
+   Instead users can **disable/override** them; a reset re-enables the originals.
+
+---
+
+## Current architecture (what we build on)
+
+- `SEA_ANIM_META` — map of animation fn-name → meta (type: runner/particles/popup, emoji, dir, size,
+  dur, flag, enabled, …).
+- `_seaGetAnimCfg(fnName, seasonKey)` — merges meta defaults with localStorage overrides.
+- Seasons defined as keys with date ranges + lists of animation fn-names; per-animation ⚙️ config,
+  per-animation enable/disable, Export/Import JSON, frequency sliders already exist.
+
+So "events" ≈ today's seasons/holidays, and "animations" ≈ today's `SEA_ANIM_META` entries. The gap
+is: there's no UI/data path to **create** events or animations, only to toggle/tweak the built-ins.
+
+---
+
+## Proposed data model (extend, layered over built-ins)
+
+```
+es_eventConfig = {
+  events: {
+    <eventKey>: {
+      name, icon, dateRange|trigger,
+      builtin: true|false,
+      disabled: true|false,            // override-not-delete for builtins
+      animations: [ <animId>, ... ]    // ordering + membership (overrides builtin list)
+    }, ...
+  },
+  animations: {
+    <animId>: {
+      name, action,                    // action = function/action name (built-in or registered)
+      builtin: true|false,
+      disabled: true|false,
+      params: { emoji, dir, size, dur, flagCode, count, ... }
+    }, ...
+  }
+}
+```
+
+- **Effective config = built-in defaults deep-merged with `es_eventConfig`.** Builtins always exist
+  in the merge base; a user entry with the same key overrides/extends, `disabled:true` hides it,
+  and **Reset** clears `es_eventConfig` so only builtins remain.
+- An **action registry**: `{ name -> fn }` of the runner/particle/popup executors. User animations
+  pick an action by name from this registry (this is the "function/action name is what makes it
+  custom" requirement).
+
+---
+
+## Suggested incremental milestones (each its own small patch)
+
+1. **AM1** — Introduce the action registry + refactor existing animations to resolve their executor
+   by `action` name (no behaviour change).
+2. **AM2** — Effective-config merge layer (`es_eventConfig` over builtins) with `disabled` override
+   + Reset-to-default; wire existing toggles through it.
+3. **AM3** — UI: edit an animation's `action` + params; add/remove animations within an event.
+4. **AM4** — UI: add/rename/remove (disable) events.
+5. **AM5** — Save/Load whole config (extend Export/Import) + final polish.
+
+(Confirm milestone breakdown before starting AM1.)
+
+---
+
+## Verification (high level)
+
+- [ ] No `custom`-type special-casing remains; everything resolves via action name
+- [ ] Can add a new event and a new animation, see them run, persist across reload
+- [ ] Disabling a built-in hides it but Reset brings it back (never destroyed)
+- [ ] Save/Load round-trips the full config
+- [ ] `dotnet build` → 0 errors

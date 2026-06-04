@@ -215,9 +215,9 @@ function filterSettings(query) {
     var tabs = [
         { id: 'tab-theme',       btn: 'tab-theme-btn',       label: '🎨 Theme' },
         { id: 'tab-visual',      btn: 'tab-visual-btn',      label: '👁️ Visual' },
-        { id: 'tab-celebration', btn: 'tab-celebration-btn', label: '🎉 Events' },
+        { id: 'tab-celebration', btn: 'tab-celebration-btn', label: '🎉 Fun' },
         { id: 'tab-audio',       btn: 'tab-audio-btn',       label: '🔊 Audio' },
-        { id: 'tab-seasons',     btn: 'tab-seasons-btn',     label: '🗓️ Seasons' },
+        { id: 'tab-seasons',     btn: 'tab-seasons-btn',     label: '🗓️ Events' },
         { id: 'tab-profile',     btn: 'tab-profile-btn',     label: '👤 Profile' },
         { id: 'tab-jira',        btn: 'tab-jira-btn',        label: '🔗 Jira' },
         { id: 'tab-other',       btn: 'tab-other-btn',       label: '⚙️ Other' },

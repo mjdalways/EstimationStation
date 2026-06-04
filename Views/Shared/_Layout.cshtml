@@ -130,13 +130,13 @@
                         <button class="nav-link settings-tab-btn" id="tab-visual-btn" data-bs-toggle="tab" data-bs-target="#tab-visual" type="button" role="tab">👁️ <span class="tab-label">Visual</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link settings-tab-btn" id="tab-celebration-btn" data-bs-toggle="tab" data-bs-target="#tab-celebration" type="button" role="tab">🎉 <span class="tab-label">Events</span></button>
+                        <button class="nav-link settings-tab-btn" id="tab-celebration-btn" data-bs-toggle="tab" data-bs-target="#tab-celebration" type="button" role="tab">🎉 <span class="tab-label">Fun</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-audio-btn" data-bs-toggle="tab" data-bs-target="#tab-audio" type="button" role="tab">🔊 <span class="tab-label">Audio</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link settings-tab-btn" id="tab-seasons-btn" data-bs-toggle="tab" data-bs-target="#tab-seasons" type="button" role="tab">🗓️ <span class="tab-label">Seasons</span></button>
+                        <button class="nav-link settings-tab-btn" id="tab-seasons-btn" data-bs-toggle="tab" data-bs-target="#tab-seasons" type="button" role="tab">🗓️ <span class="tab-label">Events</span></button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-profile-btn" data-bs-toggle="tab" data-bs-target="#tab-profile" type="button" role="tab">👤 <span class="tab-label">Profile</span></button>
@@ -441,10 +441,10 @@
                                     </div>
                                 </div>
 
-                                <!-- Events colors section -->
+                                <!-- Fun colors section (formerly "Events") -->
                                 <div class="mb-2">
                                     <div class="ct-section-header" onclick="ctToggleSection('sec-ct-events', this)">
-                                        <span>🎉 Events</span><em class="ct-section-chevron">▾</em>
+                                        <span>🎉 Fun</span><em class="ct-section-chevron">▾</em>
                                     </div>
                                     <div id="sec-ct-events" class="ct-section-body">
                                         <div class="ct-swatch-row">
@@ -1113,7 +1113,7 @@
                     </div><!-- end tab-celebration -->
 
                     <!-- ══════════════════════════════════════════
-                         TAB: 🗓️ Seasons
+                         TAB: 🗓️ Events (formerly "Seasons" — id kept as tab-seasons)
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-seasons" role="tabpanel">
                         <!-- AA1: Active season status bar -->
@@ -1565,6 +1565,14 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/4/2026 (103)</strong></p>
+                        <ul class="mb-2">
+                            <li>🚩 Pick any country's flag — Flag-based event animations (Presidents Day, Memorial Day, Independence Day, Veterans Day) now let you choose the flag from a <strong>country dropdown</strong> of ~250 countries instead of typing a URL. All flags are bundled with the app (no external image service), so they load fast and work offline.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/4/2026 (102)</strong></p>
+                        <ul class="mb-2">
+                            <li>🏷️ Settings tabs renamed — the <strong>Events</strong> tab (celebration animations) is now <strong>🎉 Fun</strong>, and the <strong>Seasons</strong> tab is now <strong>🗓️ Events</strong> (it still groups seasons and holidays). Your existing settings are unaffected.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/4/2026 (101)</strong></p>
                         <ul class="mb-2">
                             <li>🌈 Gradient card backgrounds — In the custom theme editor (Theme → 🃏 Cards) you can now give the vote-card background and the selected-card background a two-colour gradient. Tick "Card BG gradient" / "Selected gradient", pick two colours and a direction (diagonal, horizontal, vertical, or radial); it overrides the solid colour and saves with the theme.</li>
@@ -2423,6 +2431,7 @@
     <script src="~/js/shame.js" asp-append-version="true"></script>
     <script src="~/js/battle.js" asp-append-version="true"></script>
     <script src="~/js/awards.js" asp-append-version="true"></script>
+    <script src="~/js/flags.js" asp-append-version="true"></script>
     <script src="~/js/seasonal.js" asp-append-version="true"></script>
     <script src="~/js/discussion.js" asp-append-version="true"></script>
     <script src="~/js/voice.js" asp-append-version="true"></script>

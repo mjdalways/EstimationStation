@@ -13,13 +13,17 @@ Carries forward all unimplemented items from v5.0. Completed groups have been mo
 
 | # | Group | Feature | Effort | Status |
 |---|-------|---------|--------|--------|
-| 1 | [AB](./plans/FEATURE-PLAN-6.0-AB.md) | ✂️ Image Upload with Crop/Pan/Zoom — shared crop dialog for avatars, card backs, season sprites | Hard | ⏳ **Next up** |
-| 2 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
-| 3 | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ⏳ Pending |
-| — | [AK](./plans/FEATURE-PLAN-6.0-AK.md) | 🔧 UX Polish Backlog — AK1/AK3/AK4/AK5/AK6 done; **AK2 deferred** (stories aren't draggable — needs the drag-reorder feature built first) | Medium | 🟡 Mostly done |
-| — | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE — deferred with J & K) | Hard | ⏸ Deferred |
+| 1 | [AM](./plans/FEATURE-PLAN-6.0-AM.md) | 🎛️ Fully-customizable event system — add/remove/edit events & animations, action-name based, save/load, reset, override-not-delete defaults | Hard | ⏳ **Next up** |
+| — | [AN](./plans/FEATURE-PLAN-6.0-AN.md) | 🏷️ Terminology rename — "Events" tab → **Fun**, "Seasons" tab → **Events** | Small | ✅ Done |
+| — | [AL](./plans/FEATURE-PLAN-6.0-AL.md) | 🚩 Local flag pack (~250, MIT) + country dropdown, no CDN | Medium | ✅ Done |
+| 2 | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ⏳ Pending |
+| 3 | [AK2](./plans/FEATURE-PLAN-6.0-AK.md) | ✋ Story drag-reorder + drag-handle cursor (unblocks deferred AK2) | Medium | ⏳ Pending |
+| 4 | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE) | Hard | ⏳ Pending |
+| 5 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
+| — | [AB](./plans/FEATURE-PLAN-6.0-AB.md) | ✂️ Image Upload with Crop/Pan/Zoom — shared crop dialog for avatars, card backs, season sprites | Hard | ⏸ Deferred |
 | — | [J](./plans/FEATURE-PLAN-6.0-J.md) | 📱 Mobile Experience — stories bottom sheet, vote tap targets, lite mode | Medium-Hard | ⏸ Deferred |
-| — | [K](./plans/FEATURE-PLAN-6.0-K.md) | 💾 Room Persistence — JSON file per room, survive server restart, 7-day TTL | Hard | 🔍 Investigation |
+| — | [K](./plans/FEATURE-PLAN-6.0-K.md) | 💾 Room Persistence — JSON file per room, survive server restart, 7-day TTL | Hard | ⏸ Deferred |
+| — | [AK](./plans/FEATURE-PLAN-6.0-AK.md) | 🔧 UX Polish Backlog — AK1/AK3/AK4/AK5/AK6 done (AK2 split out as #3 above) | Medium | 🟡 Mostly done |
 
 ---
 
