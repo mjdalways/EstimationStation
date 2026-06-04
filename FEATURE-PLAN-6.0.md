@@ -2,7 +2,7 @@
 
 > **Stack:** ASP.NET Core 10 / C# / SignalR / Bootstrap 5 / Vanilla JS  
 > **Created:** 2026-05-18  
-> **Updated:** 2026-05-19  
+> **Updated:** 2026-06-04  
 > **Shipped in v5.0:** Groups T, U, V, W, X, Y, Z, AA, FX, O, P, Q, C, F, N, AC, AD, AE (partial), AF, AG, AH  
 
 Carries forward all unimplemented items from v5.0. Completed groups have been moved to the [Done table](#done---completed-v3-through-v50).
@@ -24,6 +24,8 @@ Carries forward all unimplemented items from v5.0. Completed groups have been mo
 | — | [J](./plans/FEATURE-PLAN-6.0-J.md) | 📱 Mobile Experience — stories bottom sheet, vote tap targets, lite mode | Medium-Hard | ⏸ Deferred |
 | — | [K](./plans/FEATURE-PLAN-6.0-K.md) | 💾 Room Persistence — JSON file per room, survive server restart, 7-day TTL | Hard | ⏸ Deferred |
 | — | [AK](./plans/FEATURE-PLAN-6.0-AK.md) | 🔧 UX Polish Backlog — AK1/AK3/AK4/AK5/AK6 done (AK2 split out as #3 above) | Medium | 🟡 Mostly done |
+| — | [AP](./plans/FEATURE-PLAN-6.0-AP.md) | 🏷️ Room Identity & Custom Icon — upload/pick room icon; collaborative pixel-art icon designer | Medium | 🔮 Future |
+| — | [AQ](./plans/FEATURE-PLAN-6.0-AQ.md) | 🪑 Room Visualization — 2D table view → seat choice → 3D room → whiteboard + configurable window views (Kumospace-style) | Very Hard (phased) | 🔮 Future |
 
 ---
 
