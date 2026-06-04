@@ -1608,6 +1608,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/4/2026 (112)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 Panel system upgrades — <strong>Stories</strong> and <strong>Controls</strong> are now also floatable (their sidebar columns collapse cleanly when detached). <strong>Restore hidden panels</strong> from Settings → Other → Panels, which lists all 6 panels with their state and Show / ⊡ Float buttons. <strong>Dock anywhere:</strong> while dragging a floating panel, blue snap-zone highlights appear at the left and right edges — release near an edge to snap it into that sidebar. Dock buttons (◁ ⤢ ▷) in each float header let you dock left, home, or right explicitly. <strong>↩ Reset all</strong> button returns every panel to its home position.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/4/2026 (111)</strong></p>
                         <ul class="mb-2">
                             <li>🪟 Four floating panels — <strong>🌡️ Vibe Check</strong>, <strong>⏱️ Timer &amp; Clock</strong>, <strong>🃏 Your Vote</strong>, and <strong>👥 Participants</strong> each have a ⊡ button in their section header. Click it to detach the panel as a floating overlay, drag it anywhere on screen, ⤢ to dock it back, or × to hide it. Positions are remembered between sessions.</li>
@@ -2336,6 +2340,15 @@
                                 Enable animations on mobile (may affect performance)
                             </label>
                         </div>
+
+                        <!-- AE10: Panel / Widget manager -->
+                        <div class="d-flex align-items-center border-bottom pb-1 mb-2">
+                            <h6 class="text-muted mb-0 me-auto">🪟 Panels</h6>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;"
+                                    onclick="_wgtResetAll()" title="Dock all panels back to their home positions and make them all visible">↩ Reset all</button>
+                        </div>
+                        <p class="small text-muted mb-2">Panels can be floated anywhere on screen using the ⊡ button in each panel's header. Drag a floating panel near the <strong>left or right edge</strong> to snap it into that sidebar.</p>
+                        <div id="wgt-settings-list" class="mb-3"></div>
 
                         <!-- PWA / App Install -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2 mt-3">

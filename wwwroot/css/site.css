@@ -913,6 +913,21 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0; vertical-align: middle;
 }
 .wgt-detach-btn:hover { opacity: 1; }
+/* Dock-direction buttons in float header */
+.wgt-dock-left, .wgt-dock-right { font-size: 0.7rem; }
+/* Snap-zone hints shown during drag */
+.wgt-snap-hint {
+  position: fixed; top: 0; bottom: 0; width: 80px; z-index: 1040;
+  background: rgba(91,141,238,0.10);
+  border: 2px dashed rgba(91,141,238,0.3);
+  pointer-events: none; transition: background 0.15s, border-color 0.15s;
+}
+.wgt-snap-hint.active {
+  background: rgba(91,141,238,0.22);
+  border-color: rgba(91,141,238,0.7);
+}
+.wgt-snap-left  { left: 0; border-left: none; }
+.wgt-snap-right { right: 0; border-right: none; }
 
 /* AK1: controls panel collapse toggle */
 .controls-collapse-header {

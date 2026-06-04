@@ -1959,6 +1959,8 @@ function _updateKeyboardLegend() {
 }
 
 function _populateRoomOtherSettings() {
+    // AE10: render the panel manager state
+    if (typeof _wgtRenderSettingsPanel === 'function') _wgtRenderSettingsPanel();
     var kbEl = document.getElementById('kb-shortcuts-toggle');
     if (kbEl) kbEl.checked = _kbShortcutsEnabled;
     var rEnEl = document.getElementById('reaction-enabled-toggle');
@@ -2946,11 +2948,17 @@ function _showToastAD(message, type) {
 
 // ============================================================
 // AE10: Widget Float System
-// Panels can be detached from the room layout and float as
-// draggable overlays. Positions persisted to es_widgetLayout.
-// Desktop-only — no floating on screens < 768 px.
+// Panels float as draggable overlays (desktop ≥ 768px only).
+// Drag near left/right screen edge to snap-dock into sidebars.
+// Positions + visibility persisted to es_widgetLayout.
 // ============================================================
 var _wgtZ = 1050;
+// Snap-dock threshold: within this many px of the screen edge
+var _WGT_SNAP_PX = 100;
+
+// Registered widget list (populated in _wgtRestore IIFE below)
+var _wgtRegistry = [];
+window._wgtRegistry = _wgtRegistry;
 
 function _wgtGetLayout() {
     try { return JSON.parse(localStorage.getItem('es_widgetLayout') || '{}'); } catch(e) { return {}; }
@@ -2961,93 +2969,184 @@ function _wgtSaveState(id, patch) {
     localStorage.setItem('es_widgetLayout', JSON.stringify(all));
 }
 
-// Detach element `srcId` into a floating panel titled `title`.
+// ── Dock zones ──────────────────────────────────────────────
+// 'home'  → return element to its original placeholder position
+// 'left'  → insert at bottom of storiesPanel (after storiesList)
+// 'right' → insert before first .control-group in roomControlsPanel
+var _WGT_ZONES = {
+    left:  { parentId: 'storiesPanel',      beforeSel: null },
+    right: { parentId: 'roomControlsPanel', beforeSel: '.control-group' }
+};
+
+function _widgetDockToZone(srcId, zone) {
+    // Remove floating wrapper if present
+    var wrap = document.getElementById('wft_' + srcId);
+    var ph   = document.getElementById('wgp_' + srcId);
+    var src  = document.getElementById(srcId);
+    if (!src) return;
+    if (wrap && ph) { ph.parentNode.insertBefore(src, ph); ph.remove(); wrap.remove(); }
+    else if (wrap) { wrap.parentNode.insertBefore(src, wrap); wrap.remove(); }
+
+    if (zone === 'home') {
+        _wgtSaveState(srcId, { floating: false, zone: 'home' });
+        _wgtUpdateGridForPanel(srcId, false);
+        return;
+    }
+    var zd = _WGT_ZONES[zone];
+    if (!zd) return;
+    var parent = document.getElementById(zd.parentId);
+    if (!parent) { _wgtSaveState(srcId, { floating: false, zone: 'home' }); return; }
+    var before = zd.beforeSel ? parent.querySelector(zd.beforeSel) : null;
+    if (before) parent.insertBefore(src, before);
+    else parent.appendChild(src);
+    src.style.display = '';
+    _wgtSaveState(srcId, { floating: false, zone: zone });
+    _wgtUpdateGridForPanel(srcId, false);
+}
+
+// Collapse/expand the CSS grid columns when sidebar panels are floated/docked
+function _wgtUpdateGridForPanel(srcId, isFloating) {
+    if (srcId === 'storiesPanel') {
+        var savedW = parseInt(localStorage.getItem('es_sidebarWidth')) || 260;
+        document.documentElement.style.setProperty('--sidebar-width', isFloating ? '0px' : savedW + 'px');
+        var rh = document.getElementById('sidebar-resize-handle');
+        if (rh) rh.style.display = isFloating ? 'none' : '';
+    }
+    if (srcId === 'roomControlsPanel') {
+        document.documentElement.style.setProperty('--controls-width', isFloating ? '0px' : '220px');
+    }
+}
+
+// Detach element into a floating panel
 function _widgetDetach(srcId, title) {
-    if (window.innerWidth < 768) return;  // desktop-only
+    if (window.innerWidth < 768) return;
     var src = document.getElementById(srcId);
-    if (!src || document.getElementById('wft_' + srcId)) return; // already floating
+    if (!src || document.getElementById('wft_' + srcId)) return;
     var saved = (_wgtGetLayout()[srcId] || {});
     var rect  = src.getBoundingClientRect();
     var x = saved.x != null ? saved.x : Math.max(10, Math.round(rect.left));
     var y = saved.y != null ? saved.y : Math.max(10, Math.round(rect.top));
 
-    // Floating wrapper
     var wrap = document.createElement('div');
     wrap.className = 'wgt-float'; wrap.id = 'wft_' + srcId;
     wrap.style.cssText = 'left:' + x + 'px;top:' + y + 'px;';
 
-    // Header / drag handle
     var hdr = document.createElement('div');
     hdr.className = 'wgt-float-hdr';
     hdr.innerHTML = '<span class="wgt-float-grip" aria-hidden="true">⠿</span>'
         + '<span class="wgt-float-title">' + title + '</span>'
-        + '<button class="wgt-float-btn" title="Dock back" onclick="_widgetDock(\'' + srcId + '\')">⤢</button>'
-        + '<button class="wgt-float-btn" title="Hide" onclick="_widgetClose(\'' + srcId + '\')">×</button>';
+        + '<button class="wgt-float-btn wgt-dock-left"  title="Dock to left sidebar"  onclick="_widgetDockToZone(\'' + srcId + '\',\'left\')">◁</button>'
+        + '<button class="wgt-float-btn wgt-dock-home"  title="Dock back to home"     onclick="_widgetDockToZone(\'' + srcId + '\',\'home\')">⤢</button>'
+        + '<button class="wgt-float-btn wgt-dock-right" title="Dock to right sidebar" onclick="_widgetDockToZone(\'' + srcId + '\',\'right\')">▷</button>'
+        + '<button class="wgt-float-btn wgt-close-btn"  title="Hide panel"            onclick="_widgetClose(\'' + srcId + '\')">×</button>';
 
     var body = document.createElement('div');
     body.className = 'wgt-float-body';
 
-    // Leave a hidden placeholder so the original DOM slot is preserved
     var ph = document.createElement('div');
     ph.id = 'wgp_' + srcId; ph.className = 'wgt-placeholder';
-    ph.style.cssText = 'display:none;';
     src.parentNode.insertBefore(ph, src);
     body.appendChild(src);
     wrap.appendChild(hdr); wrap.appendChild(body);
     document.body.appendChild(wrap);
 
-    // Bring to front on click
+    // Collapse grid column if this is a sidebar panel
+    _wgtUpdateGridForPanel(srcId, true);
+
     wrap.addEventListener('mousedown', function() { wrap.style.zIndex = ++_wgtZ; });
 
-    // Drag
     var dragging = false, ox = 0, oy = 0;
     hdr.addEventListener('mousedown', function(e) {
         if (e.target.tagName === 'BUTTON') return;
         dragging = true; ox = e.clientX - wrap.offsetLeft; oy = e.clientY - wrap.offsetTop;
         wrap.style.zIndex = ++_wgtZ; e.preventDefault();
+        // Show snap-zone highlights
+        _wgtShowSnapHints(true);
     });
     document.addEventListener('mousemove', function(e) {
         if (!dragging) return;
         var nx = Math.max(0, Math.min(window.innerWidth  - wrap.offsetWidth,  e.clientX - ox));
         var ny = Math.max(0, Math.min(window.innerHeight - wrap.offsetHeight, e.clientY - oy));
         wrap.style.left = nx + 'px'; wrap.style.top = ny + 'px';
+        // Highlight snap zones when near edge
+        var nearLeft  = (nx < _WGT_SNAP_PX);
+        var nearRight = (nx + wrap.offsetWidth > window.innerWidth - _WGT_SNAP_PX);
+        _wgtHighlightSnap('left',  nearLeft);
+        _wgtHighlightSnap('right', nearRight);
     });
     document.addEventListener('mouseup', function() {
         if (!dragging) return;
         dragging = false;
-        _wgtSaveState(srcId, { floating: true, x: wrap.offsetLeft, y: wrap.offsetTop });
+        _wgtShowSnapHints(false);
+        var x2 = wrap.offsetLeft, w2 = wrap.offsetWidth;
+        if (x2 < _WGT_SNAP_PX) {
+            _widgetDockToZone(srcId, 'left'); return;
+        }
+        if (x2 + w2 > window.innerWidth - _WGT_SNAP_PX) {
+            _widgetDockToZone(srcId, 'right'); return;
+        }
+        _wgtSaveState(srcId, { floating: true, x: x2, y: wrap.offsetTop });
     });
 
     _wgtSaveState(srcId, { floating: true, x: x, y: y });
 }
 
-// Return element to its original DOM position
-function _widgetDock(srcId) {
-    var wrap = document.getElementById('wft_' + srcId);
-    var ph   = document.getElementById('wgp_' + srcId);
-    var src  = document.getElementById(srcId);
-    if (!wrap || !ph) return;
-    ph.parentNode.insertBefore(src, ph);
-    ph.remove(); wrap.remove();
-    _wgtSaveState(srcId, { floating: false });
+// Show/hide the snap-zone hint strips
+function _wgtShowSnapHints(show) {
+    ['wgt-snap-l','wgt-snap-r'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) {
+            if (!show) return;
+            el = document.createElement('div');
+            el.id = id; el.className = 'wgt-snap-hint ' + (id === 'wgt-snap-l' ? 'wgt-snap-left' : 'wgt-snap-right');
+            document.body.appendChild(el);
+        }
+        el.style.display = show ? '' : 'none';
+    });
+}
+function _wgtHighlightSnap(side, active) {
+    var el = document.getElementById(side === 'left' ? 'wgt-snap-l' : 'wgt-snap-r');
+    if (el) el.classList.toggle('active', active);
 }
 
-// Hide the widget (dock first if floating)
+// Dock to home (return to original placeholder)
+function _widgetDock(srcId) {
+    _widgetDockToZone(srcId, 'home');
+}
+
+// Hide the panel (dock first if floating)
 function _widgetClose(srcId) {
     _widgetDock(srcId);
     var src = document.getElementById(srcId);
     if (src) src.style.display = 'none';
     _wgtSaveState(srcId, { floating: false, hidden: true });
+    _wgtRenderSettingsPanel();
 }
 
-// Show a previously closed widget
+// Restore a hidden panel (show + dock home)
 function _widgetShow(srcId) {
     var src = document.getElementById(srcId);
-    if (src) src.style.display = '';
+    if (src) { src.style.display = ''; }
     _wgtSaveState(srcId, { hidden: false });
+    _wgtRenderSettingsPanel();
 }
 
-// Inject a ⊡ detach button into an element's header (first div or h6, or prepend)
+// Reset all panels to home + visible
+function _wgtResetAll() {
+    _wgtRegistry.forEach(function(w) {
+        var wrap = document.getElementById('wft_' + w.id);
+        if (wrap) _widgetDockToZone(w.id, 'home');
+        else {
+            var src = document.getElementById(w.id);
+            if (src) src.style.display = '';
+        }
+    });
+    localStorage.removeItem('es_widgetLayout');
+    _wgtRenderSettingsPanel();
+}
+window._wgtResetAll = _wgtResetAll;
+
+// Inject a ⊡ detach button into an element's header
 function _wgtAddDetachBtn(srcId, title) {
     var src = document.getElementById(srcId);
     if (!src || src.querySelector('.wgt-detach-btn')) return;
@@ -3055,21 +3154,48 @@ function _wgtAddDetachBtn(srcId, title) {
     btn.className = 'wgt-detach-btn'; btn.title = 'Float this panel';
     btn.textContent = '⊡';
     btn.onclick = function(e) { e.stopPropagation(); _widgetDetach(srcId, title); };
-    // Prefer the first direct h6.section-label, then any first div, else prepend
     var hdr = src.querySelector(':scope > h6') || src.querySelector(':scope > div');
     if (hdr) hdr.appendChild(btn); else src.insertBefore(btn, src.firstChild);
 }
 
-// Restore persisted floating state on load
-(function _wgtRestore() {
+// Render the panel state list in Settings → Other
+function _wgtRenderSettingsPanel() {
+    var el = document.getElementById('wgt-settings-list');
+    if (!el || !_wgtRegistry.length) return;
     var all = _wgtGetLayout();
-    // Register known widgets
+    el.innerHTML = _wgtRegistry.map(function(w) {
+        var state = all[w.id] || {};
+        var isHidden   = !!state.hidden;
+        var isFloating = !isHidden && !!state.floating;
+        var isDocked   = !isHidden && !isFloating;
+        var zone = state.zone || 'home';
+        var badge = isHidden   ? '<span class="badge bg-secondary ms-1" style="font-size:0.6rem;">hidden</span>'
+                  : isFloating ? '<span class="badge bg-primary ms-1"   style="font-size:0.6rem;">floating</span>'
+                  : zone !== 'home' ? '<span class="badge bg-info ms-1"    style="font-size:0.6rem;">docked ' + zone + '</span>'
+                  : '';
+        return '<div class="d-flex align-items-center gap-2 mb-1 small">'
+            + '<span class="flex-grow-1">' + w.title + badge + '</span>'
+            + (isHidden
+                ? '<button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" onclick="_widgetShow(\'' + w.id + '\')">👁 Show</button>'
+                : '<button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" onclick="_widgetDetach(\'' + w.id + '\',\'' + w.title + '\')" ' + (isFloating ? 'disabled' : '') + '>⊡ Float</button>')
+            + '</div>';
+    }).join('');
+}
+window._wgtRenderSettingsPanel = _wgtRenderSettingsPanel;
+
+// Restore persisted state on load + register all widgets
+(function _wgtRestore() {
     var widgets = [
         { id: 'vibeCheckPanel',      title: '🌡️ Vibe Check' },
         { id: 'session-tc-bar',      title: '⏱️ Timer & Clock' },
         { id: 'votingSection',       title: '🃏 Your Vote' },
-        { id: 'participantsSection', title: '👥 Participants' }
+        { id: 'participantsSection', title: '👥 Participants' },
+        { id: 'storiesPanel',        title: '📋 Stories' },
+        { id: 'roomControlsPanel',   title: '🎮 Controls' }
     ];
+    _wgtRegistry.push.apply(_wgtRegistry, widgets);
+
+    var all = _wgtGetLayout();
     widgets.forEach(function(w) {
         _wgtAddDetachBtn(w.id, w.title);
         var state = all[w.id];
@@ -3078,6 +3204,8 @@ function _wgtAddDetachBtn(srcId, title) {
             var el = document.getElementById(w.id); if (el) el.style.display = 'none';
         } else if (state.floating) {
             _widgetDetach(w.id, w.title);
+        } else if (state.zone && state.zone !== 'home') {
+            _widgetDockToZone(w.id, state.zone);
         }
     });
 })();
