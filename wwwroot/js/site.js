@@ -124,9 +124,10 @@ function openSettingsModal(tab) {
     if (fovEl) fovEl.checked = localStorage.getItem('es_flipOnVote') !== '0';
     var cvhEl = document.getElementById('change-vote-hint-toggle');
     if (cvhEl) cvhEl.checked = localStorage.getItem('es_changeVoteHint') !== '0';
-    // AJ: card animation style selector
+    // AJ: card animation style + sound selectors
     var casEl = document.getElementById('card-anim-style-select');
     if (casEl) casEl.value = localStorage.getItem('es_cardAnimStyle') || 'flip';
+    _syncCardAnimSoundSelect();
     // AK4: flip speed slider
     var fdEl = document.getElementById('flipDurationSlider');
     if (fdEl) {
@@ -1042,19 +1043,185 @@ function setFlipDuration(ms) {
 }
 document.addEventListener('DOMContentLoaded', _applyFlipDuration);
 
-// ── AJ: unified card animation applier (CSS class + JS particle effects) ────
-// Called from both the preview button and castVote in room.js.
+// ── AJ: per-animation sound registry ────────────────────────
+var _CARD_ANIM_SOUND_DEFAULTS = {
+    'flip':'none', 'tardis':'tardis', 'bubble':'pop', 'shatter':'shatter',
+    'warp':'rumble', 'burst':'rumble', 'explode':'buzz',
+    'fly-spin':'whoosh', 'glass-stretch':'spring',
+    'hide':'whoosh', 'run-away':'whoosh', 'fly-away':'whoosh', 'none':'none'
+};
+function _getCardAnimSound(style) {
+    try { var o=JSON.parse(localStorage.getItem('es_cardAnimSounds')||'{}'); return o[style]!==undefined?o[style]:(_CARD_ANIM_SOUND_DEFAULTS[style]||'none'); } catch(e){return 'none';}
+}
+function _setCardAnimSound(style, soundId) {
+    try { var o=JSON.parse(localStorage.getItem('es_cardAnimSounds')||'{}');
+    if(soundId===(_CARD_ANIM_SOUND_DEFAULTS[style]||'none'))delete o[style]; else o[style]=soundId;
+    localStorage.setItem('es_cardAnimSounds',JSON.stringify(o)); } catch(e){}
+}
+window._getCardAnimSound = _getCardAnimSound;
+window._setCardAnimSound = _setCardAnimSound;
+// Sync the sound select to reflect the currently chosen animation style
+function _syncCardAnimSoundSelect() {
+    var styleEl=document.getElementById('card-anim-style-select');
+    var sndEl=document.getElementById('card-anim-sound-select');
+    if(styleEl&&sndEl) sndEl.value = _getCardAnimSound(styleEl.value);
+}
+window._syncCardAnimSoundSelect = _syncCardAnimSoundSelect;
+
+// ── AJ: Web Audio synth sounds ──────────────────────────────
+function _synthPlayCheck() { return localStorage.getItem('es_soundAllOff') !== '1'; }
+function _synthTardisSound(dur) {
+    if (!_synthPlayCheck()) return;
+    try { var ctx=new(window.AudioContext||window.webkitAudioContext)(),t=ctx.currentTime,end=t+dur/1000;
+    [40,43].forEach(function(f0){
+        var o=ctx.createOscillator(),flt=ctx.createBiquadFilter(),g=ctx.createGain();
+        o.type='sawtooth'; var d=end-t;
+        o.frequency.setValueAtTime(f0,t);
+        o.frequency.linearRampToValueAtTime(f0*3.8,t+d*.28);
+        o.frequency.linearRampToValueAtTime(f0*.7,t+d*.55);
+        o.frequency.linearRampToValueAtTime(f0*3.2,t+d*.78);
+        o.frequency.linearRampToValueAtTime(f0,end);
+        flt.type='bandpass'; flt.frequency.value=360; flt.Q.value=1.4;
+        g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.18,t+.06);
+        g.gain.setValueAtTime(.18,end-.08); g.gain.linearRampToValueAtTime(0,end);
+        o.connect(flt); flt.connect(g); g.connect(ctx.destination);
+        o.start(t); o.stop(end+.05);
+    });
+    setTimeout(function(){try{ctx.close();}catch(e){}},dur+300); } catch(e){}
+}
+function _synthWhooshSound(dur) {
+    if (!_synthPlayCheck()) return;
+    try { var ctx=new(window.AudioContext||window.webkitAudioContext)(),t=ctx.currentTime,d=Math.min(dur/1000,.4);
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(900,t); o.frequency.exponentialRampToValueAtTime(70,t+d);
+    g.gain.setValueAtTime(.22,t); g.gain.exponentialRampToValueAtTime(.001,t+d);
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+d+.02);
+    setTimeout(function(){try{ctx.close();}catch(e){}},500); } catch(e){}
+}
+function _synthPopSound() {
+    if (!_synthPlayCheck()) return;
+    try { var ctx=new(window.AudioContext||window.webkitAudioContext)(),t=ctx.currentTime;
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(320,t); o.frequency.exponentialRampToValueAtTime(55,t+.11);
+    g.gain.setValueAtTime(.38,t); g.gain.exponentialRampToValueAtTime(.001,t+.11);
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+.13);
+    setTimeout(function(){try{ctx.close();}catch(e){}},300); } catch(e){}
+}
+function _synthShatterSound() {
+    if (!_synthPlayCheck()) return;
+    try { var ctx=new(window.AudioContext||window.webkitAudioContext)(),t=ctx.currentTime,len=ctx.sampleRate*.22;
+    var buf=ctx.createBuffer(1,len,ctx.sampleRate),d=buf.getChannelData(0);
+    for(var i=0;i<len;i++) d[i]=Math.random()*2-1;
+    var src=ctx.createBufferSource(); src.buffer=buf;
+    var flt=ctx.createBiquadFilter(); flt.type='highpass'; flt.frequency.value=2200;
+    var g=ctx.createGain(); g.gain.setValueAtTime(.3,t); g.gain.exponentialRampToValueAtTime(.001,t+.20);
+    src.connect(flt); flt.connect(g); g.connect(ctx.destination); src.start(t);
+    setTimeout(function(){try{ctx.close();}catch(e){}},400); } catch(e){}
+}
+function _synthRumbleSound(dur) {
+    if (!_synthPlayCheck()) return;
+    try { var ctx=new(window.AudioContext||window.webkitAudioContext)(),t=ctx.currentTime,d=Math.min(dur/1000,.45);
+    var o=ctx.createOscillator(),g1=ctx.createGain();
+    o.type='sawtooth'; o.frequency.setValueAtTime(85,t); o.frequency.exponentialRampToValueAtTime(28,t+d);
+    g1.gain.setValueAtTime(.28,t); g1.gain.exponentialRampToValueAtTime(.001,t+d);
+    o.connect(g1); g1.connect(ctx.destination); o.start(t); o.stop(t+d+.02);
+    var len=Math.floor(ctx.sampleRate*d),buf=ctx.createBuffer(1,len,ctx.sampleRate),nd=buf.getChannelData(0);
+    for(var i=0;i<len;i++) nd[i]=Math.random()*2-1;
+    var src=ctx.createBufferSource(); src.buffer=buf;
+    var flt=ctx.createBiquadFilter(); flt.type='lowpass'; flt.frequency.value=380;
+    var g2=ctx.createGain(); g2.gain.setValueAtTime(.18,t); g2.gain.exponentialRampToValueAtTime(.001,t+d);
+    src.connect(flt); flt.connect(g2); g2.connect(ctx.destination); src.start(t);
+    setTimeout(function(){try{ctx.close();}catch(e){}},700); } catch(e){}
+}
+function _synthSpringSound() {
+    if (!_synthPlayCheck()) return;
+    try { var ctx=new(window.AudioContext||window.webkitAudioContext)(),t=ctx.currentTime;
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(1100,t);
+    o.frequency.exponentialRampToValueAtTime(180,t+.07);
+    o.frequency.exponentialRampToValueAtTime(850,t+.13);
+    o.frequency.exponentialRampToValueAtTime(280,t+.20);
+    g.gain.setValueAtTime(.25,t); g.gain.exponentialRampToValueAtTime(.001,t+.22);
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+.24);
+    setTimeout(function(){try{ctx.close();}catch(e){}},400); } catch(e){}
+}
+function _synthBuzzSound(dur) {
+    if (!_synthPlayCheck()) return;
+    try { var ctx=new(window.AudioContext||window.webkitAudioContext)(),t=ctx.currentTime,d=Math.min(dur/1000,.28);
+    var o=ctx.createOscillator(),flt=ctx.createBiquadFilter(),g=ctx.createGain();
+    o.type='square'; o.frequency.setValueAtTime(130,t); o.frequency.linearRampToValueAtTime(75,t+d);
+    flt.type='bandpass'; flt.frequency.value=320; flt.Q.value=3;
+    g.gain.setValueAtTime(.2,t); g.gain.exponentialRampToValueAtTime(.001,t+d);
+    o.connect(flt); flt.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+d+.02);
+    setTimeout(function(){try{ctx.close();}catch(e){}},500); } catch(e){}
+}
+function _playCardAnimSound(style, dur) {
+    var id = _getCardAnimSound(style);
+    if (id === 'none') return;
+    switch(id) {
+        case 'tardis':  _synthTardisSound(dur); break;
+        case 'whoosh':  _synthWhooshSound(dur); break;
+        case 'pop':     _synthPopSound();       break;
+        case 'shatter': _synthShatterSound();   break;
+        case 'rumble':  _synthRumbleSound(dur); break;
+        case 'spring':  _synthSpringSound();    break;
+        case 'buzz':    _synthBuzzSound(dur);   break;
+        case 'tick':    if (typeof _qPlayVoteTick==='function') _qPlayVoteTick(); break;
+    }
+}
+window._playCardAnimSound = _playCardAnimSound;
+
+// ── AJ: TARDIS overlay (JS-created TARDIS-shaped element) ────
+function _tardisAnimEffect(card, dur) {
+    var rect = card.getBoundingClientRect();
+    var w = rect.width, h = rect.height;
+    var lanH = Math.max(8, Math.round(h * .14)); // lantern height ≈ 14% of card
+    var lanW = Math.max(6, Math.round(w * .13)); // lantern width ≈ 13% of card
+    var bodyH = h - lanH;
+    // Container: centred on the card, slightly taller to include lantern
+    var wrap = document.createElement('div');
+    wrap.className = 'tardis-ov-wrap';
+    wrap.style.cssText = 'left:' + (rect.left + w/2) + 'px;top:' + (rect.top - lanH/2) + 'px;'
+        + 'width:' + w + 'px;height:' + (h + lanH) + 'px;'
+        + 'transform:translate(-50%,-50%);'
+        + 'animation:cardTardis ' + (dur/1000).toFixed(3) + 's ease-in-out forwards;';
+    // Lantern
+    var lan = document.createElement('div');
+    lan.className = 'tardis-ov-lantern';
+    lan.style.width = lanW + 'px'; lan.style.height = lanH + 'px';
+    // Body (TARDIS blue box with 6 panels: 2 windows + 4 regular)
+    var body = document.createElement('div');
+    body.className = 'tardis-ov-body';
+    body.style.height = bodyH + 'px';
+    for (var i = 0; i < 6; i++) {
+        var p = document.createElement('div');
+        p.className = 'tardis-ov-panel' + (i < 2 ? ' tardis-ov-window' : '');
+        body.appendChild(p);
+    }
+    wrap.appendChild(lan); wrap.appendChild(body);
+    document.body.appendChild(wrap);
+    setTimeout(function() { wrap.remove(); }, dur + 150);
+}
+
+// ── AJ: unified card animation applier (CSS class + JS particle/overlay effects) ────
 function _applyCardAnim(card) {
     if (!card) return;
     var style = localStorage.getItem('es_cardAnimStyle') || 'flip';
     if (style === 'none') return;
-    var cls = style === 'flip' ? 'card-flipping' : 'card-anim-' + style;
     var dur = _getFlipDuration();
-    card.classList.add(cls);
-    setTimeout(function() { card.classList.remove(cls); }, dur + 100);
-    // JS-assisted particle effects
-    if (style === 'shatter') _cardShatterEffect(card, dur);
-    if (style === 'burst')   _cardBurstEffect(card, dur);
+    if (style === 'tardis') {
+        // True TARDIS: hide original card, show themed overlay with vortex-warp
+        card.style.opacity = '0'; card.style.pointerEvents = 'none';
+        _tardisAnimEffect(card, dur);
+        setTimeout(function() { card.style.opacity=''; card.style.pointerEvents=''; }, dur + 160);
+    } else {
+        var cls = style === 'flip' ? 'card-flipping' : 'card-anim-' + style;
+        card.classList.add(cls);
+        setTimeout(function() { card.classList.remove(cls); }, dur + 100);
+        if (style === 'shatter') _cardShatterEffect(card, dur);
+        if (style === 'burst')   _cardBurstEffect(card, dur);
+    }
+    _playCardAnimSound(style, dur);
 }
 window._applyCardAnim = _applyCardAnim;
 

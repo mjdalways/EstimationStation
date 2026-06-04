@@ -697,16 +697,16 @@
                                            oninput="setVcbSolidColor(this.value)"
                                            style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;" />
                                 </div>
-                                <!-- AJ: animation selector -->
+                                <!-- AJ: animation selector + per-animation sound -->
                                 <div class="mt-2">
                                     <label class="form-label small mb-1" for="card-anim-style-select">Animation on vote</label>
                                     <select class="form-select form-select-sm" id="card-anim-style-select" style="width:auto;"
-                                            onchange="localStorage.setItem('es_cardAnimStyle', this.value)">
+                                            onchange="localStorage.setItem('es_cardAnimStyle',this.value);_syncCardAnimSoundSelect()">
                                         <option value="flip">🔄 Flip</option>
-                                        <option value="tardis">🌀 Tardis</option>
+                                        <option value="tardis">🚀 TARDIS</option>
                                         <option value="hide">⬇️ Hide &amp; reveal</option>
                                         <option value="run-away">💨 Run-away</option>
-                                        <option value="fly-away">🚀 Fly-away</option>
+                                        <option value="fly-away">🚁 Fly-away</option>
                                         <option value="explode">💥 Explode</option>
                                         <option value="bubble">🫧 Bubble pop</option>
                                         <option value="shatter">✨ Shatter &amp; glow</option>
@@ -716,6 +716,24 @@
                                         <option value="glass-stretch">🪟 Stretch &amp; snap</option>
                                         <option value="none">✋ None</option>
                                     </select>
+                                    <div class="mt-1 d-flex align-items-center gap-2">
+                                        <label class="form-label small mb-0 text-muted" for="card-anim-sound-select">Sound</label>
+                                        <select class="form-select form-select-sm" id="card-anim-sound-select" style="width:auto;"
+                                                onchange="_setCardAnimSound(document.getElementById('card-anim-style-select').value,this.value)">
+                                            <option value="none">🔇 None</option>
+                                            <option value="tardis">🌀 TARDIS</option>
+                                            <option value="tick">🔔 Tick</option>
+                                            <option value="whoosh">💨 Whoosh</option>
+                                            <option value="pop">🫧 Pop</option>
+                                            <option value="shatter">✨ Shatter</option>
+                                            <option value="rumble">💥 Rumble</option>
+                                            <option value="spring">🪀 Spring</option>
+                                            <option value="buzz">⚡ Buzz</option>
+                                        </select>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1"
+                                                onclick="_playCardAnimSound(document.getElementById('card-anim-style-select').value,_getFlipDuration())"
+                                                title="Test sound">🔊</button>
+                                    </div>
                                 </div>
                                 <!-- AK4: Flip speed / animation duration -->
                                 <div class="mt-2">
@@ -1590,6 +1608,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/4/2026 (109)</strong></p>
+                        <ul class="mb-2">
+                            <li>🚀 True TARDIS animation + per-animation sounds — the TARDIS effect now creates a proper TARDIS-shaped overlay (lantern, blue box, windows) that runs the full vortex-warp: stretches, twists, shrinks to nothing, then rematerializes. Each animation style also has its own <strong>Sound</strong> picker (defaults: TARDIS→🌀 TARDIS synth, Bubble→pop, Shatter→glass, Warp/Burst→rumble, Explode→buzz, Fly-spin/Hide/Run-away→whoosh, Stretch→spring). All sounds are synthesized — no audio files needed. Use the 🔊 button to preview any sound. All configurable and all speed-adjustable.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/4/2026 (108)</strong></p>
                         <ul class="mb-2">
                             <li>🃏 Two new card animations + upgraded flip physics — <strong>🌪️ Fly &amp; spin</strong> arcs the card sideways, scales it up, then completes a full rotation back; <strong>🪟 Stretch &amp; snap</strong> collapses the card to a sliver with a rubbery skew then snaps back with an overshoot bounce. The existing <strong>🔄 Flip</strong> is also upgraded: it now lifts toward you on a Z-axis (perspective + shadow depth) with a snappier easing curve, making all three 3D-style effects feel significantly more physical.</li>
