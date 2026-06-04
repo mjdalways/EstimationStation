@@ -124,6 +124,9 @@ function openSettingsModal(tab) {
     if (fovEl) fovEl.checked = localStorage.getItem('es_flipOnVote') !== '0';
     var cvhEl = document.getElementById('change-vote-hint-toggle');
     if (cvhEl) cvhEl.checked = localStorage.getItem('es_changeVoteHint') !== '0';
+    // AJ: card animation style selector
+    var casEl = document.getElementById('card-anim-style-select');
+    if (casEl) casEl.value = localStorage.getItem('es_cardAnimStyle') || 'flip';
     // AK4: flip speed slider
     var fdEl = document.getElementById('flipDurationSlider');
     if (fdEl) {
@@ -1042,8 +1045,10 @@ document.addEventListener('DOMContentLoaded', _applyFlipDuration);
 function _previewFlipVoteCard() {
     const card = document.getElementById('vote-card-preview');
     if (!card) return;
-    card.classList.add('card-flipping');
-    setTimeout(function() { card.classList.remove('card-flipping'); }, _getFlipDuration() + 100);
+    var style = localStorage.getItem('es_cardAnimStyle') || 'flip';
+    var cls = style === 'flip' ? 'card-flipping' : 'card-anim-' + style;
+    card.classList.add(cls);
+    setTimeout(function() { card.classList.remove(cls); }, _getFlipDuration() + 100);
 }
 
 // ── AK5: Card gradient builders (card-bg / card-selected) ─────

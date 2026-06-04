@@ -978,13 +978,15 @@ async function castVote(val) {
     const wasSelected = selectedVote === val;
     selectedVote = wasSelected ? null : val;
     renderCards();
-    // AH6: brief flip animation on the newly selected card
+    // AH6/AJ: card animation on the newly selected card (style-selectable)
     if (selectedVote !== null) {
         var selCard = document.querySelector('.poker-card.selected');
         if (selCard) {
-            selCard.classList.add('card-flipping');
+            var _animStyle = localStorage.getItem('es_cardAnimStyle') || 'flip';
+            var _animCls = _animStyle === 'flip' ? 'card-flipping' : 'card-anim-' + _animStyle;
+            selCard.classList.add(_animCls);
             var _fd = (typeof _getFlipDuration === 'function' ? _getFlipDuration() : 600) + 100;
-            setTimeout(function() { selCard.classList.remove('card-flipping'); }, _fd);
+            setTimeout(function() { selCard.classList.remove(_animCls); }, _fd);
         }
     }
     if (selectedVote !== null) _qPlayVoteTick();  // Q1
