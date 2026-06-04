@@ -3047,7 +3047,7 @@ function _widgetShow(srcId) {
     _wgtSaveState(srcId, { hidden: false });
 }
 
-// Inject a ⊡ detach button into an element's first-child header div
+// Inject a ⊡ detach button into an element's header (first div or h6, or prepend)
 function _wgtAddDetachBtn(srcId, title) {
     var src = document.getElementById(srcId);
     if (!src || src.querySelector('.wgt-detach-btn')) return;
@@ -3055,8 +3055,8 @@ function _wgtAddDetachBtn(srcId, title) {
     btn.className = 'wgt-detach-btn'; btn.title = 'Float this panel';
     btn.textContent = '⊡';
     btn.onclick = function(e) { e.stopPropagation(); _widgetDetach(srcId, title); };
-    // Insert at end of the first child div (the header row)
-    var hdr = src.querySelector('div');
+    // Prefer the first direct h6.section-label, then any first div, else prepend
+    var hdr = src.querySelector(':scope > h6') || src.querySelector(':scope > div');
     if (hdr) hdr.appendChild(btn); else src.insertBefore(btn, src.firstChild);
 }
 
@@ -3065,8 +3065,10 @@ function _wgtAddDetachBtn(srcId, title) {
     var all = _wgtGetLayout();
     // Register known widgets
     var widgets = [
-        { id: 'vibeCheckPanel', title: '🌡️ Vibe Check' }
-        // more widgets will be registered in subsequent patches
+        { id: 'vibeCheckPanel',      title: '🌡️ Vibe Check' },
+        { id: 'session-tc-bar',      title: '⏱️ Timer & Clock' },
+        { id: 'votingSection',       title: '🃏 Your Vote' },
+        { id: 'participantsSection', title: '👥 Participants' }
     ];
     widgets.forEach(function(w) {
         _wgtAddDetachBtn(w.id, w.title);
