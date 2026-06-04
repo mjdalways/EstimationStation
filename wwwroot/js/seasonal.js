@@ -782,20 +782,37 @@ function _seaIsAnimDisabled(fnName) {
     return !!(cfg.animations && cfg.animations[fnName] && cfg.animations[fnName].disabled);
 }
 // Effective animation list for an event: built-in list filtered by animation-level disabled flag,
-// plus any user-added animations for this event (AM3+).
+// plus any user-added animations for this event.
 function _seaGetEffectiveAnims(eventKey) {
     var builtins = (SEA_ANIMS[eventKey] || []).filter(function(fn) {
         return !_seaIsAnimDisabled(fn.name);
     });
-    // User-added animations will be appended here in AM3+
-    return builtins;
+    // AM3: append user-added animations for this event
+    var cfg = _seaGetEventConfig();
+    var userAnims = (cfg.animations) ? Object.keys(cfg.animations).filter(function(id) {
+        var a = cfg.animations[id];
+        return !a.builtin && !a.disabled && a.eventKey === eventKey;
+    }) : [];
+    var extra = userAnims.map(function(id) {
+        return { name: id };  // same shape as SEA_ANIMS entries (fn references just need .name)
+    });
+    return builtins.concat(extra);
 }
 // Effective meta for an animation: built-in meta merged with any user overrides in es_eventConfig.
+// For user-added animations (not in SEA_ANIM_META) the user entry IS the meta.
 function _seaGetEffectiveAnimMeta(fnName) {
-    var meta = SEA_ANIM_META[fnName] || {};
     var cfg = _seaGetEventConfig();
-    var userParams = (cfg.animations && cfg.animations[fnName] && cfg.animations[fnName].params) || {};
-    return Object.assign({}, meta, userParams);
+    var userEntry = (cfg.animations && cfg.animations[fnName]) || {};
+    if (!SEA_ANIM_META[fnName] && userEntry.action) {
+        // AM3: pure user-added animation — build meta from the user entry
+        var baseMeta = SEA_ANIM_META[userEntry.action] ? Object.assign({}, SEA_ANIM_META[userEntry.action]) : {};
+        return Object.assign(baseMeta, { name: userEntry.name || fnName, action: userEntry.action }, userEntry.params || {});
+    }
+    var meta = SEA_ANIM_META[fnName] || {};
+    var userParams = userEntry.params || {};
+    // AM3: user can override the action on a built-in animation
+    var actionOverride = userEntry.action ? { action: userEntry.action } : {};
+    return Object.assign({}, meta, actionOverride, userParams);
 }
 
 function _seaGetAnimCfg(fnName, seasonKey) {
@@ -832,8 +849,8 @@ function _seaResetSeasonCfg(seasonKey) {
 var SEA_ACTIONS = {};
 function _seaRegisterAction(name, fn) { SEA_ACTIONS[name] = fn; }
 function _seaActionFor(fnName) {
-    var meta = SEA_ANIM_META[fnName] || {};
-    return meta.action || meta.type;   // generic kinds (runner/particles/popup/corner) double as action names
+    var meta = _seaGetEffectiveAnimMeta(fnName);  // AM3: includes user action override
+    return meta.action || meta.type;
 }
 // Invoke an animation through the registry. Generic executors take (fnName, seasonKey, ...extraArgs).
 // If no registered action matches (e.g. a bespoke 'custom' animation not yet registered), fall back
@@ -2117,8 +2134,14 @@ function openSeasonConfig(seasonKey, label) {
 
     animKeys.forEach(function(fnName) {
         var c = _seaGetAnimCfg(fnName, seasonKey);
-        html += _seaBuildAnimRow(fnName, c);
+        var isUserAdded = !SEA_ANIM_META[fnName];
+        html += _seaBuildAnimRow(fnName, c, isUserAdded);
     });
+
+    // AM3: "Add animation" button
+    html += '<div class="mt-2 pt-2 border-top">'
+        + '<button type="button" class="btn btn-sm btn-outline-primary" onclick="_seaAddAnimToEvent(\'' + seasonKey + '\')" style="font-size:0.78rem;">+ Add animation</button>'
+        + '</div>';
 
     document.getElementById('seaConfigModalLabel').textContent = '⚙️ ' + label;
     document.getElementById('seaConfigModalBody').innerHTML = html;
@@ -2130,15 +2153,33 @@ function openSeasonConfig(seasonKey, label) {
     setTimeout(function() { if (typeof _epAutoAttach === 'function') _epAutoAttach(); }, 100);
 }
 
-function _seaBuildAnimRow(fnName, c) {
+function _seaBuildAnimRow(fnName, c, isUserAdded) {
     var safe = fnName.replace(/[^a-zA-Z0-9]/g, '_');
     // AH1: All types now use liveTestBtn so unsaved DOM values are picked up during test
     var liveTestBtn = ' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 flex-shrink-0" onclick="_seaTestAnimLive(\'' + fnName + '\')" title="Test with current values">🧪</button>';
-    var row = '<div class="sea-cfg-row mb-2 p-2 border rounded"><div class="d-flex align-items-center gap-2 mb-1">'
+    // AM3: disable/remove button — built-ins get "disable", user-added get "remove"
+    var disableBtn = isUserAdded
+        ? '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 ms-1 flex-shrink-0" style="font-size:0.65rem;" onclick="_seaRemoveUserAnim(\'' + fnName + '\')" title="Remove this animation">✕ Remove</button>'
+        : '<button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 ms-1 flex-shrink-0" style="font-size:0.65rem;" onclick="_seaDisableBuiltinAnim(\'' + fnName + '\')" title="Hide this animation (reset to restore)">🚫 Disable</button>';
+    // AM3: action picker — all registered action names
+    var actions = Object.keys(SEA_ACTIONS);
+    var curAction = c.action || c.type || 'runner';
+    var actionOpts = actions.map(function(a){
+        return '<option value="' + a + '"' + (a === curAction ? ' selected' : '') + '>' + a + '</option>';
+    }).join('');
+    var actionPicker = '<label class="d-inline-flex align-items-center gap-1 mb-0 flex-shrink-0" style="white-space:nowrap;font-size:0.78rem;">Action '
+        + '<select id="scfg_action_' + safe + '" class="form-select form-select-sm d-inline-block" style="width:130px;">' + actionOpts + '</select></label>';
+    var nameField = isUserAdded
+        ? '<input type="text" id="scfg_name_' + safe + '" value="' + _escHtml(c.name || 'New Animation') + '" class="form-control form-control-sm d-inline-block" style="width:140px;" placeholder="Name">'
+        : '<strong class="small">' + _escHtml(c.name || fnName) + '</strong>';
+    var row = '<div class="sea-cfg-row mb-2 p-2 border rounded"><div class="d-flex align-items-center gap-2 mb-1 flex-wrap">'
         + '<input type="checkbox" id="scfg_en_' + safe + '"' + (c.enabled !== false ? ' checked' : '') + '>'
-        + '<strong class="small">' + (c.name || fnName) + '</strong>'
+        + nameField
+        + (isUserAdded ? '<span class="badge bg-info ms-1" style="font-size:0.65rem;">custom</span>' : '')
         + '<span class="badge bg-secondary ms-auto" style="font-size:0.65rem;">' + (c.type || 'custom') + '</span>'
-        + '</div>';
+        + disableBtn
+        + '</div>'
+        + '<div class="mb-1">' + actionPicker + '</div>';
     // AH7: helper — emoji input wrapped in input-group so _epAutoAttach appends 😊 button inside it
     function emojiInputGroup(id, val) {
         return '<div class="input-group input-group-sm" style="width:130px;display:inline-flex;vertical-align:middle;">'
@@ -2366,6 +2407,36 @@ function saveSeasonConfig() {
                 if (meta.text    !== undefined) { var v = document.getElementById('scfg_text_'    + safe); if (v) o.text    = v.value; }
             }
         }
+        // AM3: for user-added animations, persist name + action + enabled to es_eventConfig directly
+        var isUA = !SEA_ANIM_META[fnName];
+        if (isUA) {
+            var evtCfgUA = _seaGetEventConfig();
+            evtCfgUA.animations = evtCfgUA.animations || {};
+            evtCfgUA.animations[fnName] = evtCfgUA.animations[fnName] || {};
+            var nameEl2 = document.getElementById('scfg_name_' + safe);
+            if (nameEl2) evtCfgUA.animations[fnName].name = nameEl2.value.trim() || 'New Animation';
+            var actEl2 = document.getElementById('scfg_action_' + safe);
+            if (actEl2) evtCfgUA.animations[fnName].action = actEl2.value;
+            evtCfgUA.animations[fnName].enabled = !!(document.getElementById('scfg_en_' + safe) || {}).checked;
+            _seaSaveEventConfig(evtCfgUA);
+        }
+        // AM3: save action override to es_eventConfig if it differs from built-in meta
+        var actEl = document.getElementById('scfg_action_' + safe);
+        if (actEl) {
+            var builtinAction = (SEA_ANIM_META[fnName] || {}).action || (SEA_ANIM_META[fnName] || {}).type;
+            var chosenAction = actEl.value;
+            var evtCfg = _seaGetEventConfig();
+            evtCfg.animations = evtCfg.animations || {};
+            evtCfg.animations[fnName] = evtCfg.animations[fnName] || {};
+            if (chosenAction !== builtinAction) {
+                evtCfg.animations[fnName].action = chosenAction;
+            } else {
+                delete evtCfg.animations[fnName].action;
+            }
+            // clean up empty entry
+            if (!Object.keys(evtCfg.animations[fnName]).length) delete evtCfg.animations[fnName];
+            _seaSaveEventConfig(evtCfg);
+        }
         overrides[fnName] = o;
     });
     localStorage.setItem('sea_spd_' + key, document.getElementById('seaCfgSpeed').value);
@@ -2378,6 +2449,37 @@ function resetSeasonConfig() {
     _seaResetSeasonCfg(_seaConfigSeasonKey);
     var label = document.getElementById('seaConfigModalLabel').textContent.replace('⚙️ ', '');
     openSeasonConfig(_seaConfigSeasonKey, label);
+}
+
+// AM3: disable a built-in animation (persisted; reset restores it)
+function _seaDisableBuiltinAnim(fnName) {
+    var evtCfg = _seaGetEventConfig();
+    evtCfg.animations = evtCfg.animations || {};
+    evtCfg.animations[fnName] = evtCfg.animations[fnName] || {};
+    evtCfg.animations[fnName].disabled = true;
+    _seaSaveEventConfig(evtCfg);
+    var label = document.getElementById('seaConfigModalLabel').textContent.replace('⚙️ ', '');
+    openSeasonConfig(_seaConfigSeasonKey, label);
+}
+// AM3: permanently remove a user-added animation
+function _seaRemoveUserAnim(fnName) {
+    var evtCfg = _seaGetEventConfig();
+    if (evtCfg.animations) delete evtCfg.animations[fnName];
+    _seaSaveEventConfig(evtCfg);
+    var label = document.getElementById('seaConfigModalLabel').textContent.replace('⚙️ ', '');
+    openSeasonConfig(_seaConfigSeasonKey, label);
+}
+// AM3: add a new user animation to the current event
+function _seaAddAnimToEvent(eventKey) {
+    var actions = Object.keys(SEA_ACTIONS);
+    if (!actions.length) return;
+    var evtCfg = _seaGetEventConfig();
+    evtCfg.animations = evtCfg.animations || {};
+    var id = '_seaUser_' + eventKey + '_' + Date.now();
+    evtCfg.animations[id] = { name: 'New Animation', action: actions[0], eventKey: eventKey, builtin: false };
+    _seaSaveEventConfig(evtCfg);
+    var label = document.getElementById('seaConfigModalLabel').textContent.replace('⚙️ ', '');
+    openSeasonConfig(eventKey, label);
 }
 
 function saveSeaFreq() {

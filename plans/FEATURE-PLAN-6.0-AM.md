@@ -99,7 +99,16 @@ es_eventConfig = {
    - `_seaGetAnimCfg` now flows through `_seaGetEffectiveAnimMeta` so user param overrides apply.
    - `_seaFire`, `_seaGetSeason`, `openSeasonConfig`, `saveSeasonConfig` all wired to respect event/animation disabled flags.
    - Verified: disable animation → removed from effective list; disable event → `_seaGetSeason` skips it; reset → full built-in list restored; param override flows through `_seaGetAnimCfg`.
-3. **AM3** — UI: edit an animation's `action` + params; add/remove animations within an event.
+3. **AM3** — UI: edit an animation's `action` + params; add/remove animations within an event. ✅ **Done (v6 / 2026-06-04)**
+   - Each animation row gains an **Action** picker (all 57 registered action names).
+   - Built-in rows have a **🚫 Disable** button (persisted; reset restores).
+   - User-added rows have an **✕ Remove** button + editable name field + "custom" badge.
+   - **+ Add animation** button at the bottom of each event config panel.
+   - `_seaDisableBuiltinAnim`, `_seaRemoveUserAnim`, `_seaAddAnimToEvent` functions.
+   - `saveSeasonConfig` persists action override to `es_eventConfig` for built-ins; saves name/action/enabled for user-added.
+   - `_seaGetEffectiveAnims` appends user-added animations (from `es_eventConfig`) after built-ins.
+   - `_seaGetEffectiveAnimMeta` and `_seaActionFor` handle user-added animations with no `SEA_ANIM_META` entry.
+   - Verified in browser: action picker (57 options), disable/re-enable/add/remove all work correctly.
 4. **AM4** — UI: add/rename/remove (disable) events.
 5. **AM5** — Save/Load whole config (extend Export/Import) + final polish.
 
