@@ -7,6 +7,8 @@ public class RoomService
 {
     private readonly ConcurrentDictionary<string, Room> _rooms = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _connectionToRoom = new();
+    // Rooms with unsaved in-memory changes, flushed to disk by RoomPersistenceService.
+    private readonly ConcurrentDictionary<string, byte> _dirty = new();
     private readonly IRoomRepository _repo;
 
     public RoomService(IRoomRepository repo)
@@ -48,13 +50,25 @@ public class RoomService
         }
     };
 
+    /// <summary>
+    /// Canonical room key: strip to letters/digits/-/_ and lower-case. This MUST match the
+    /// file-name rule in <see cref="FileRoomRepository"/> so the in-memory key and the persisted
+    /// file never diverge. Without it, "My Room", "my room" and "myroom" would map to one file
+    /// but three separate in-memory rooms, clobbering each other's state. Returns "" when nothing
+    /// usable remains (callers should reject empty).
+    /// </summary>
+    public static string NormalizeName(string? roomName) =>
+        string.Concat((roomName ?? "").Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')).ToLowerInvariant();
+
     public Room GetOrCreateRoom(string roomName)
     {
+        roomName = NormalizeName(roomName);
         if (_rooms.TryGetValue(roomName, out var existing)) return existing;
 
         var persisted = _repo.GetRoom(roomName);
         if (persisted != null)
         {
+            persisted.Name = roomName; // keep loaded room's name canonical
             _rooms[roomName] = persisted;
             return persisted;
         }
@@ -65,15 +79,32 @@ public class RoomService
         return room;
     }
 
+    /// <summary>
+    /// Records a change in memory and marks the room dirty. Persistence is coalesced and written
+    /// by <see cref="RoomPersistenceService"/> off the SignalR threads, so a burst of votes/vibes
+    /// no longer triggers one synchronous disk write each. The in-memory state stays current, so
+    /// real-time broadcasts and joins are unaffected; only the on-disk copy lags by a few seconds.
+    /// </summary>
     public void SaveRoom(Room room)
     {
         room.LastActivity = DateTime.UtcNow;
-        _repo.SaveRoom(room);
+        _dirty[NormalizeName(room.Name)] = 1;
+    }
+
+    /// <summary>Writes all rooms with pending changes to disk. Called periodically and on shutdown.</summary>
+    public void FlushDirty()
+    {
+        foreach (var name in _dirty.Keys.ToArray())
+        {
+            if (!_dirty.TryRemove(name, out _)) continue;
+            if (_rooms.TryGetValue(name, out var room))
+                _repo.SaveRoom(room);
+        }
     }
 
     public Room? GetRoom(string roomName)
     {
-        _rooms.TryGetValue(roomName, out var room);
+        _rooms.TryGetValue(NormalizeName(roomName), out var room);
         return room;
     }
 

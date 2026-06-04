@@ -4,7 +4,7 @@ public class RoomCleanupService : BackgroundService
 {
     private readonly IServiceProvider _services;
     private readonly ILogger<RoomCleanupService> _logger;
-    private static readonly TimeSpan _ttl = TimeSpan.FromDays(7);
+    private static readonly TimeSpan _ttl = TimeSpan.FromDays(30);
     private static readonly TimeSpan _interval = TimeSpan.FromHours(1);
 
     public RoomCleanupService(IServiceProvider services, ILogger<RoomCleanupService> logger)

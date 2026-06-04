@@ -18,8 +18,9 @@ public class FileRoomRepository : IRoomRepository
     private string FilePath(string name) =>
         Path.Combine(_basePath, SanitizeName(name) + ".json");
 
+    // Must stay in sync with RoomService.NormalizeName so the file name matches the in-memory key.
     private static string SanitizeName(string name) =>
-        string.Concat(name.Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')).ToLower();
+        string.Concat(name.Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')).ToLowerInvariant();
 
     public Room? GetRoom(string name)
     {
@@ -38,7 +39,15 @@ public class FileRoomRepository : IRoomRepository
         try
         {
             var path = FilePath(room.Name);
-            File.WriteAllText(path, JsonSerializer.Serialize(room, _jsonOpts));
+            // Serialize under the same monitor the hub uses (lock(room)) so we never
+            // enumerate Participants/Stories while another connection is mutating them,
+            // which would otherwise throw "Collection was modified" or persist a torn state.
+            string json;
+            lock (room)
+            {
+                json = JsonSerializer.Serialize(room, _jsonOpts);
+            }
+            File.WriteAllText(path, json);
         }
         catch { /* log in production */ }
     }

@@ -10,6 +10,7 @@ builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 1_048_576); // 1 
 builder.Services.AddSingleton<IRoomRepository, FileRoomRepository>();
 builder.Services.AddSingleton<RoomService>();
 builder.Services.AddHostedService<RoomCleanupService>();
+builder.Services.AddHostedService<RoomPersistenceService>();
 builder.Services.AddHttpClient("jira");
 builder.Services.AddTransient<JiraService>();
 

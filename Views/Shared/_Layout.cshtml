@@ -1522,6 +1522,14 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/4/2026 (92)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔒 Smarter PIN dialog — The Set Room PIN button now adapts to what you've typed: it reads <strong>Set PIN</strong> when the box has a value, <strong>Clear PIN</strong> when the box is empty and the room currently has a PIN, and <strong>Cancel</strong> when the box is empty and there's no PIN — so it's clear what pressing it will do.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/4/2026 (91)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔒 Security &amp; stability fixes — (1) Room settings lock (Host only / Ask first) is now enforced on the server, not just hidden in the UI, so it can no longer be bypassed by a crafted client. (2) Fixed a rare race where saving a room while another participant was voting/joining could throw or persist a corrupted state — room data is now serialized safely. (3) Host is correctly reclaimed when the previous host's connection is gone, and everyone's 👑 crown stays in sync. (4) Server now enforces length limits on display names (50) and story titles (200), matching the input fields. (5) Room names are now normalized consistently (e.g. "My Room" and "my room" resolve to the same room) — fixes a case where look-alike names could split a team across separate rooms or clobber each other's saved state. (6) Added server-side rate limits on sounds, emoji reactions, vibes, chat and custom audio so the room can't be flooded. (7) Performance — room state is now saved to disk in a coalesced background flush every couple of seconds instead of writing the whole room file on every single vote, vibe and reaction, keeping the real-time server responsive under load. (8) Inactive rooms are now kept for 30 days instead of 7 before automatic cleanup.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/3/2026 (90)</strong></p>
                         <ul class="mb-2">
                             <li>ℹ️ Branding &amp; SEO — Logo image replaces 🃏 in navbar and lobby. Clicking the logo or "EstimationStation" text opens the About tab. About tab shows logo, tagline, and feature summary. Added meta description, Open Graph, Twitter Card tags, robots.txt, and /sitemap.xml for search engine indexing.</li>

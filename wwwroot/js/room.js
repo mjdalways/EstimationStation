@@ -85,6 +85,7 @@ function registerHandlers() {
         roomState.revealMajorityFirst = state.revealMajorityFirst !== false; // N3: default true
         roomState.currentStoryId = state.currentStoryId;
         roomState.estimateSet = state.estimateSet;
+        roomState.hasPin = state.hasPin === true;
         currentEstimateValues = state.estimateValues || currentEstimateValues;
         // AD1 — host fields
         roomState.isHost = state.isHost === true;
@@ -448,6 +449,7 @@ function registerHandlers() {
     });
 
     connection.on('RoomPinSet', (hasPin) => {
+        roomState.hasPin = !!hasPin;
         const badge = document.getElementById('pinBadge');
         if (badge) badge.style.display = hasPin ? '' : 'none';
         const btn = document.getElementById('pinBtn');
@@ -991,19 +993,32 @@ function openPinModal(forJoin) {
     const titleEl = document.getElementById('pinModalTitle');
     const submitEl = document.getElementById('pinSubmitBtn');
     const msgEl = document.getElementById('pinModalMsg');
+    const inp = document.getElementById('pinInput');
     if (forJoin) {
         if (titleEl) titleEl.textContent = '🔒 PIN Required';
         if (submitEl) submitEl.textContent = 'Join';
         if (msgEl) { msgEl.textContent = 'This room has a PIN. Enter it to join.'; msgEl.style.display = ''; }
+        if (inp) inp.oninput = null;
     } else {
         if (titleEl) titleEl.textContent = '🔒 Set Room PIN';
-        if (submitEl) submitEl.textContent = 'Set PIN';
         if (msgEl) msgEl.style.display = 'none';
+        // The primary button's meaning depends on whether a PIN exists and whether the box is empty:
+        //   box not empty            -> Set PIN
+        //   box empty + PIN exists    -> Clear PIN
+        //   box empty + no PIN        -> Cancel (no-op)
+        if (inp) inp.oninput = _updatePinSubmitLabel;
     }
-    const inp = document.getElementById('pinInput');
     if (inp) inp.value = '';
+    if (!forJoin) _updatePinSubmitLabel();
     new bootstrap.Modal(modal).show();
     setTimeout(() => { if (inp) inp.focus(); }, 350);
+}
+
+function _updatePinSubmitLabel() {
+    const submitEl = document.getElementById('pinSubmitBtn');
+    if (!submitEl) return;
+    const hasText = ((document.getElementById('pinInput')?.value) || '').trim().length > 0;
+    submitEl.textContent = hasText ? 'Set PIN' : (roomState.hasPin ? 'Clear PIN' : 'Cancel');
 }
 
 function submitPin() {
@@ -1015,9 +1030,12 @@ function submitPin() {
         sessionStorage.setItem('es_roomPin_' + _pendingRoomName, pin);
         connection.invoke('JoinRoom', _pendingRoomName, _pendingUserName, _pendingIsObserver, pin).catch(console.error);
         _pendingRoomName = null;
-    } else {
-        connection.invoke('SetRoomPin', pin || null).catch(console.error);
+    } else if (pin) {
+        connection.invoke('SetRoomPin', pin).catch(console.error);          // Set PIN
+    } else if (roomState.hasPin) {
+        connection.invoke('SetRoomPin', null).catch(console.error);         // Clear PIN
     }
+    // else: no PIN and empty box -> Cancel, nothing to do
 }
 
 function _updateGhostToggleBtn() {

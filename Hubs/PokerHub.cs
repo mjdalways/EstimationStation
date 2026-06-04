@@ -14,6 +14,22 @@ public class PokerHub : Hub
     private static readonly ConcurrentDictionary<string, PendingSettingRequest> _pendingRequests = new();
     private record PendingSettingRequest(string RoomName, string RequesterConnectionId, string RequesterName, string SettingKey, string ValueJson, DateTime CreatedAt);
 
+    // Server-side rate limiting: connectionId -> (action -> last-fired ticks). Backstops the
+    // client-side throttles so a crafted client can't flood the room with sounds/reactions/audio.
+    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, long>> _rateLimits = new();
+
+    private bool RateLimited(string action, TimeSpan minInterval)
+    {
+        var perConn = _rateLimits.GetOrAdd(Context.ConnectionId, _ => new());
+        var now = DateTime.UtcNow.Ticks;
+        var min = minInterval.Ticks;
+        bool allowed = false;
+        perConn.AddOrUpdate(action,
+            _ => { allowed = true; return now; },
+            (_, last) => { if (now - last >= min) { allowed = true; return now; } return last; });
+        return !allowed;
+    }
+
     public PokerHub(RoomService roomService, JiraService jiraService)
     {
         _roomService = roomService;
@@ -28,11 +44,22 @@ public class PokerHub : Hub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         await LeaveRoom();
+        _rateLimits.TryRemove(Context.ConnectionId, out _);
         await base.OnDisconnectedAsync(exception);
     }
 
     public async Task JoinRoom(string roomName, string userName, bool isObserver, string? pin = null)
     {
+        // Canonicalize once at the boundary so the group, connection map, dictionary key and
+        // persisted file all agree (every downstream method reads the name back via
+        // GetRoomForConnection). Reject names that have no usable characters.
+        roomName = RoomService.NormalizeName(roomName);
+        if (string.IsNullOrEmpty(roomName))
+        {
+            await Clients.Caller.SendAsync("Error", "INVALID_ROOM");
+            return;
+        }
+
         var room = _roomService.GetOrCreateRoom(roomName);
 
         // PIN check — skip for the very first joiner (they set the PIN after joining)
@@ -44,6 +71,10 @@ public class PokerHub : Hub
 
         _roomService.MapConnection(Context.ConnectionId, roomName);
 
+        // Cap display name length server-side (client maxlength is advisory only)
+        userName = string.IsNullOrWhiteSpace(userName) ? "Anonymous" : userName.Trim();
+        if (userName.Length > 50) userName = userName[..50];
+
         var participant = new Participant
         {
             ConnectionId = Context.ConnectionId,
@@ -51,6 +82,7 @@ public class PokerHub : Hub
             IsObserver = isObserver
         };
 
+        bool hostReclaimed = false;
         lock (room)
         {
             bool midVote = !room.VotesRevealed && room.Participants.Any(p => !p.IsObserver && p.Vote != null);
@@ -59,12 +91,13 @@ public class PokerHub : Hub
             room.Participants.Add(participant);
             room.LastActivity = DateTime.UtcNow;
 
-            // AD1 — Set host to first joiner; also reclaim if previous host disconnected
-            if (string.IsNullOrEmpty(room.HostConnectionId) ||
-                !room.Participants.Any(p => p.ConnectionId == room.HostConnectionId && p.ConnectionId != Context.ConnectionId))
+            // AD1 — Set host to first joiner; also reclaim if the previous host is no longer present
+            bool hostPresent = !string.IsNullOrEmpty(room.HostConnectionId)
+                && room.Participants.Any(p => p.ConnectionId == room.HostConnectionId);
+            if (!hostPresent)
             {
-                if (string.IsNullOrEmpty(room.HostConnectionId))
-                    room.HostConnectionId = Context.ConnectionId;
+                room.HostConnectionId = Context.ConnectionId;
+                hostReclaimed = true;
             }
         }
 
@@ -84,6 +117,10 @@ public class PokerHub : Hub
             hasVoted = participant.Vote != null,
             avatarData = participant.AvatarData
         });
+
+        // AD1 — if this joiner reclaimed an absent host, keep everyone's crown in sync
+        if (hostReclaimed)
+            await Clients.OthersInGroup(roomName).SendAsync("HostChanged", Context.ConnectionId);
     }
 
     public async Task LeaveRoom()
@@ -135,6 +172,9 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+
+        newName = string.IsNullOrWhiteSpace(newName) ? "Anonymous" : newName.Trim();
+        if (newName.Length > 50) newName = newName[..50];
 
         lock (room)
         {
@@ -250,6 +290,7 @@ public class PokerHub : Hub
         if (roomName == null) return;
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
         string togglerName;
         lock (room)
         {
@@ -299,6 +340,7 @@ public class PokerHub : Hub
     {
         var allowed = new HashSet<string> { "🚀", "😱", "😴", "🤔", "💪", "🤷" };
         if (!allowed.Contains(emoji)) return;
+        if (RateLimited("vibe", TimeSpan.FromMilliseconds(500))) return;
 
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
@@ -326,6 +368,10 @@ public class PokerHub : Hub
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
 
+        if (string.IsNullOrWhiteSpace(title)) return;
+        title = title.Trim();
+        if (title.Length > 200) title = title[..200];
+
         var story = new Story { Title = title };
         lock (room)
         {
@@ -351,6 +397,10 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+
+        if (string.IsNullOrWhiteSpace(title)) return;
+        title = title.Trim();
+        if (title.Length > 200) title = title[..200];
 
         lock (room)
         {
@@ -431,6 +481,7 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         lock (room)
         {
@@ -449,6 +500,7 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         lock (room)
         {
@@ -568,6 +620,7 @@ public class PokerHub : Hub
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
         if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+        if (RateLimited("privateMsg", TimeSpan.FromMilliseconds(750))) return;
         var sender = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
         if (sender == null) return;
         message = (message ?? "").Trim();
@@ -580,6 +633,7 @@ public class PokerHub : Hub
     public async Task SendPrivateReaction(string targetConnectionId, string emoji)
     {
         if (string.IsNullOrWhiteSpace(emoji) || emoji.Length > 10) return;
+        if (RateLimited("privateReaction", TimeSpan.FromMilliseconds(500))) return;
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
         var room = _roomService.GetRoom(roomName);
@@ -600,6 +654,7 @@ public class PokerHub : Hub
         if (sender == null) return;
         var validSounds = new[] { "fanfare", "drumroll", "bell", "airhorn" };
         if (!validSounds.Contains(soundId)) return;
+        if (RateLimited("sound", TimeSpan.FromSeconds(1))) return;
         await Clients.Client(targetConnectionId).SendAsync("SoundTriggered", soundId, sender.Name);
     }
 
@@ -610,6 +665,7 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         string[] values;
         lock (room)
@@ -637,6 +693,7 @@ public class PokerHub : Hub
     public async Task SendChat(string message)
     {
         if (string.IsNullOrWhiteSpace(message)) return;
+        if (RateLimited("chat", TimeSpan.FromMilliseconds(500))) return;
         if (message.Length > 500) message = message[..500];
 
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
@@ -757,6 +814,7 @@ public class PokerHub : Hub
 
         var valid = new[] { "fanfare", "drumroll", "bell", "airhorn" };
         if (!valid.Contains(soundId)) return;
+        if (RateLimited("sound", TimeSpan.FromSeconds(1))) return;
 
         var room = _roomService.GetRoom(roomName);
         var senderName = room?.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name ?? "Someone";
@@ -832,6 +890,7 @@ public class PokerHub : Hub
     public async Task SendReaction(string emoji)
     {
         if (string.IsNullOrWhiteSpace(emoji) || emoji.Length > 10) return;
+        if (RateLimited("reaction", TimeSpan.FromMilliseconds(400))) return;
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
         await Clients.Group(roomName).SendAsync("ReceiveReaction", Context.ConnectionId, emoji);
@@ -842,6 +901,7 @@ public class PokerHub : Hub
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
         if (string.IsNullOrEmpty(base64Data) || base64Data.Length > 700_000) return;
+        if (RateLimited("customSound", TimeSpan.FromSeconds(3))) return;
 
         var room = _roomService.GetRoom(roomName);
         var senderName = room?.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name ?? "Someone";
@@ -878,6 +938,15 @@ public class PokerHub : Hub
             await Clients.Caller.SendAsync("JiraWriteResult", jiraKey, false, ex.Message);
         }
     }
+
+    // AD2 — Server-side enforcement of the room settings lock. The client UI hides/disables
+    // locked controls, but a crafted client could still invoke the hub directly, so every
+    // room-level (👥) setting mutator must verify this. Non-"none" modes restrict changes to
+    // the host; non-hosts must go through RequestSettingChange/ApproveSettingChange instead.
+    private static bool CanChangeRoomSetting(Room room, string connectionId) =>
+        room.SettingsLockMode == "none"
+        || string.IsNullOrEmpty(room.HostConnectionId)
+        || room.HostConnectionId == connectionId;
 
     private static string? FindShameParticipantId(Room room)
     {
