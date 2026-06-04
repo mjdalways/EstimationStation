@@ -176,7 +176,8 @@ function _seaFire() {
     if (!s.seasonalTheme) return;
     var season = _seaGetSeason();
     if (!season) return;
-    var list = (SEA_ANIMS[season] || []).filter(function(fn) {
+    // AM2: use effective animation list (respects user-level disabled flag)
+    var list = _seaGetEffectiveAnims(season).filter(function(fn) {
         return _seaGetAnimCfg(fn.name, season).enabled !== false;
     });
     if (!list.length) return;
@@ -192,6 +193,7 @@ function _seaGetSeason() {
         var row = SEA_EVENT_TABLE[i];
         var key = row[0], m1 = row[1], d1 = row[2], m2 = row[3], d2 = row[4], pri = row[5], sk = row[6];
         if (cs[sk] === false) continue;
+        if (_seaIsEventDisabled(key)) continue;  // AM2: user-level event disable
         var s, e;
         if (m1 === 0) {
             var vd = varDates[key]; if (!vd) continue;
@@ -753,8 +755,51 @@ var SEA_ANIM_META = {
     _seaYearReview:       { name:'Year Review',         type:'runner',    emoji:'📅',   dir:'lr', size:'4rem',   dur:4.5, wave:false, flipX:false, enabled:true }
 };
 
-function _seaGetAnimCfg(fnName, seasonKey) {
+// ══════════════════════════════════════════════════════════
+// AM2: effective-config merge layer
+// es_eventConfig = { events: { <key>: { disabled, name, ... } },
+//                   animations: { <fnName>: { disabled, action, params, ... } } }
+// Built-in events/animations are never deleted — only overridden or disabled.
+// Reset clears es_eventConfig so only built-ins remain.
+// ══════════════════════════════════════════════════════════
+function _seaGetEventConfig() {
+    try { return JSON.parse(localStorage.getItem('es_eventConfig') || '{}'); } catch(e) { return {}; }
+}
+function _seaSaveEventConfig(cfg) {
+    localStorage.setItem('es_eventConfig', JSON.stringify(cfg));
+}
+function _seaResetEventConfig() {
+    localStorage.removeItem('es_eventConfig');
+}
+// Is a built-in event key disabled by the user?
+function _seaIsEventDisabled(eventKey) {
+    var cfg = _seaGetEventConfig();
+    return !!(cfg.events && cfg.events[eventKey] && cfg.events[eventKey].disabled);
+}
+// Is a built-in animation fn disabled by the user?
+function _seaIsAnimDisabled(fnName) {
+    var cfg = _seaGetEventConfig();
+    return !!(cfg.animations && cfg.animations[fnName] && cfg.animations[fnName].disabled);
+}
+// Effective animation list for an event: built-in list filtered by animation-level disabled flag,
+// plus any user-added animations for this event (AM3+).
+function _seaGetEffectiveAnims(eventKey) {
+    var builtins = (SEA_ANIMS[eventKey] || []).filter(function(fn) {
+        return !_seaIsAnimDisabled(fn.name);
+    });
+    // User-added animations will be appended here in AM3+
+    return builtins;
+}
+// Effective meta for an animation: built-in meta merged with any user overrides in es_eventConfig.
+function _seaGetEffectiveAnimMeta(fnName) {
     var meta = SEA_ANIM_META[fnName] || {};
+    var cfg = _seaGetEventConfig();
+    var userParams = (cfg.animations && cfg.animations[fnName] && cfg.animations[fnName].params) || {};
+    return Object.assign({}, meta, userParams);
+}
+
+function _seaGetAnimCfg(fnName, seasonKey) {
+    var meta = _seaGetEffectiveAnimMeta(fnName);  // AM2: include user param overrides
     var overrides = {};
     try {
         var raw = localStorage.getItem('sea_cfg_' + seasonKey);
@@ -2062,7 +2107,7 @@ var _seaConfigSeasonKey = null;
 
 function openSeasonConfig(seasonKey, label) {
     _seaConfigSeasonKey = seasonKey;
-    var animKeys = (SEA_ANIMS[seasonKey] || []).map(function(fn) { return fn.name; });
+    var animKeys = _seaGetEffectiveAnims(seasonKey).map(function(fn) { return fn.name; }); // AM2
     var mults = _seaGetSeasonMults(seasonKey);
 
     var html = '<div class="mb-3 d-flex gap-3 flex-wrap align-items-center">'
@@ -2273,7 +2318,7 @@ function _seaTestAnimLive(fnName) {
 
 function saveSeasonConfig() {
     var key = _seaConfigSeasonKey;
-    var animKeys = (SEA_ANIMS[key] || []).map(function(fn) { return fn.name; });
+    var animKeys = _seaGetEffectiveAnims(key).map(function(fn) { return fn.name; }); // AM2
     var overrides = {};
     animKeys.forEach(function(fnName) {
         var safe = fnName.replace(/[^a-zA-Z0-9]/g, '_');

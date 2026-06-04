@@ -91,7 +91,14 @@ es_eventConfig = {
      `_seaInvokeAction` fallback retained for safety. Registry total: **57 actions** (4 generic
      + 53 bespoke). Verified: generic/bespoke/fallback all fire correctly in browser.
 2. **AM2** — Effective-config merge layer (`es_eventConfig` over builtins) with `disabled` override
-   + Reset-to-default; wire existing toggles through it.
+   + Reset-to-default; wire existing toggles through it. ✅ **Done (v6 / 2026-06-04)**
+   - `_seaGetEventConfig`/`_seaSaveEventConfig`/`_seaResetEventConfig` storage helpers.
+   - `_seaIsEventDisabled(key)` / `_seaIsAnimDisabled(fnName)` per-layer disabled checks.
+   - `_seaGetEffectiveAnims(eventKey)` — built-ins filtered by animation-level disabled flag (user additions appended in AM3).
+   - `_seaGetEffectiveAnimMeta(fnName)` — built-in meta merged with `es_eventConfig.animations[fn].params`.
+   - `_seaGetAnimCfg` now flows through `_seaGetEffectiveAnimMeta` so user param overrides apply.
+   - `_seaFire`, `_seaGetSeason`, `openSeasonConfig`, `saveSeasonConfig` all wired to respect event/animation disabled flags.
+   - Verified: disable animation → removed from effective list; disable event → `_seaGetSeason` skips it; reset → full built-in list restored; param override flows through `_seaGetAnimCfg`.
 3. **AM3** — UI: edit an animation's `action` + params; add/remove animations within an event.
 4. **AM4** — UI: add/rename/remove (disable) events.
 5. **AM5** — Save/Load whole config (extend Export/Import) + final polish.
