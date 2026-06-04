@@ -18,7 +18,7 @@ Carries forward all unimplemented items from v5.0. Completed groups have been mo
 | — | [AL](./plans/FEATURE-PLAN-6.0-AL.md) | 🚩 Local flag pack (~250, MIT) + country dropdown, no CDN | Medium | ✅ Done |
 | — | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ✅ Done |
 | — | [AK2](./plans/FEATURE-PLAN-6.0-AK.md) | ✋ Story drag-reorder + drag-handle cursor | Medium | ✅ Done |
-| 1 | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE) | Hard | ⏳ **Next up** |
+| 1 | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE) — AE10 infra + Vibe Check float in progress | Hard | 🔄 **In progress** |
 | 2 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
 | — | [AB](./plans/FEATURE-PLAN-6.0-AB.md) | ✂️ Image Upload with Crop/Pan/Zoom — shared crop dialog for avatars, card backs, season sprites | Hard | ⏸ Deferred |
 | — | [J](./plans/FEATURE-PLAN-6.0-J.md) | 📱 Mobile Experience — stories bottom sheet, vote tap targets, lite mode | Medium-Hard | ⏸ Deferred |

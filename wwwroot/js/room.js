@@ -1692,7 +1692,15 @@ function _acTick() {
             timerEl.textContent = '⏱ ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
             if (typeof _applyTimerStyle === 'function') _applyTimerStyle(timerEl);  // AK6
             if (timerWrap) timerWrap.style.display = '';
+        } else if (showTimer && !sessionHideTimer && !hasStory) {
+            // AE11b: timer enabled but no story active — show a waiting hint
+            timerEl.textContent = '⏱ —:——';
+            timerEl.title = 'Timer ready — select a story to start';
+            timerEl.style.opacity = '0.45';
+            if (timerWrap) timerWrap.style.display = '';
         } else {
+            timerEl.style.opacity = '';
+            timerEl.title = '';
             if (timerWrap) timerWrap.style.display = 'none';
         }
     }
@@ -2935,6 +2943,142 @@ function _showToastAD(message, type) {
     document.body.appendChild(t);
     setTimeout(function() { if (t.parentNode) t.remove(); }, 4000);
 }
+
+// ============================================================
+// AE10: Widget Float System
+// Panels can be detached from the room layout and float as
+// draggable overlays. Positions persisted to es_widgetLayout.
+// Desktop-only — no floating on screens < 768 px.
+// ============================================================
+var _wgtZ = 1050;
+
+function _wgtGetLayout() {
+    try { return JSON.parse(localStorage.getItem('es_widgetLayout') || '{}'); } catch(e) { return {}; }
+}
+function _wgtSaveState(id, patch) {
+    var all = _wgtGetLayout();
+    all[id] = Object.assign(all[id] || {}, patch);
+    localStorage.setItem('es_widgetLayout', JSON.stringify(all));
+}
+
+// Detach element `srcId` into a floating panel titled `title`.
+function _widgetDetach(srcId, title) {
+    if (window.innerWidth < 768) return;  // desktop-only
+    var src = document.getElementById(srcId);
+    if (!src || document.getElementById('wft_' + srcId)) return; // already floating
+    var saved = (_wgtGetLayout()[srcId] || {});
+    var rect  = src.getBoundingClientRect();
+    var x = saved.x != null ? saved.x : Math.max(10, Math.round(rect.left));
+    var y = saved.y != null ? saved.y : Math.max(10, Math.round(rect.top));
+
+    // Floating wrapper
+    var wrap = document.createElement('div');
+    wrap.className = 'wgt-float'; wrap.id = 'wft_' + srcId;
+    wrap.style.cssText = 'left:' + x + 'px;top:' + y + 'px;';
+
+    // Header / drag handle
+    var hdr = document.createElement('div');
+    hdr.className = 'wgt-float-hdr';
+    hdr.innerHTML = '<span class="wgt-float-grip" aria-hidden="true">⠿</span>'
+        + '<span class="wgt-float-title">' + title + '</span>'
+        + '<button class="wgt-float-btn" title="Dock back" onclick="_widgetDock(\'' + srcId + '\')">⤢</button>'
+        + '<button class="wgt-float-btn" title="Hide" onclick="_widgetClose(\'' + srcId + '\')">×</button>';
+
+    var body = document.createElement('div');
+    body.className = 'wgt-float-body';
+
+    // Leave a hidden placeholder so the original DOM slot is preserved
+    var ph = document.createElement('div');
+    ph.id = 'wgp_' + srcId; ph.className = 'wgt-placeholder';
+    ph.style.cssText = 'display:none;';
+    src.parentNode.insertBefore(ph, src);
+    body.appendChild(src);
+    wrap.appendChild(hdr); wrap.appendChild(body);
+    document.body.appendChild(wrap);
+
+    // Bring to front on click
+    wrap.addEventListener('mousedown', function() { wrap.style.zIndex = ++_wgtZ; });
+
+    // Drag
+    var dragging = false, ox = 0, oy = 0;
+    hdr.addEventListener('mousedown', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        dragging = true; ox = e.clientX - wrap.offsetLeft; oy = e.clientY - wrap.offsetTop;
+        wrap.style.zIndex = ++_wgtZ; e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        var nx = Math.max(0, Math.min(window.innerWidth  - wrap.offsetWidth,  e.clientX - ox));
+        var ny = Math.max(0, Math.min(window.innerHeight - wrap.offsetHeight, e.clientY - oy));
+        wrap.style.left = nx + 'px'; wrap.style.top = ny + 'px';
+    });
+    document.addEventListener('mouseup', function() {
+        if (!dragging) return;
+        dragging = false;
+        _wgtSaveState(srcId, { floating: true, x: wrap.offsetLeft, y: wrap.offsetTop });
+    });
+
+    _wgtSaveState(srcId, { floating: true, x: x, y: y });
+}
+
+// Return element to its original DOM position
+function _widgetDock(srcId) {
+    var wrap = document.getElementById('wft_' + srcId);
+    var ph   = document.getElementById('wgp_' + srcId);
+    var src  = document.getElementById(srcId);
+    if (!wrap || !ph) return;
+    ph.parentNode.insertBefore(src, ph);
+    ph.remove(); wrap.remove();
+    _wgtSaveState(srcId, { floating: false });
+}
+
+// Hide the widget (dock first if floating)
+function _widgetClose(srcId) {
+    _widgetDock(srcId);
+    var src = document.getElementById(srcId);
+    if (src) src.style.display = 'none';
+    _wgtSaveState(srcId, { floating: false, hidden: true });
+}
+
+// Show a previously closed widget
+function _widgetShow(srcId) {
+    var src = document.getElementById(srcId);
+    if (src) src.style.display = '';
+    _wgtSaveState(srcId, { hidden: false });
+}
+
+// Inject a ⊡ detach button into an element's first-child header div
+function _wgtAddDetachBtn(srcId, title) {
+    var src = document.getElementById(srcId);
+    if (!src || src.querySelector('.wgt-detach-btn')) return;
+    var btn = document.createElement('button');
+    btn.className = 'wgt-detach-btn'; btn.title = 'Float this panel';
+    btn.textContent = '⊡';
+    btn.onclick = function(e) { e.stopPropagation(); _widgetDetach(srcId, title); };
+    // Insert at end of the first child div (the header row)
+    var hdr = src.querySelector('div');
+    if (hdr) hdr.appendChild(btn); else src.insertBefore(btn, src.firstChild);
+}
+
+// Restore persisted floating state on load
+(function _wgtRestore() {
+    var all = _wgtGetLayout();
+    // Register known widgets
+    var widgets = [
+        { id: 'vibeCheckPanel', title: '🌡️ Vibe Check' }
+        // more widgets will be registered in subsequent patches
+    ];
+    widgets.forEach(function(w) {
+        _wgtAddDetachBtn(w.id, w.title);
+        var state = all[w.id];
+        if (!state) return;
+        if (state.hidden) {
+            var el = document.getElementById(w.id); if (el) el.style.display = 'none';
+        } else if (state.floating) {
+            _widgetDetach(w.id, w.title);
+        }
+    });
+})();
 
 // ============================================================
 // Init
