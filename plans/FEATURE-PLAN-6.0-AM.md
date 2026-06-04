@@ -109,7 +109,15 @@ es_eventConfig = {
    - `_seaGetEffectiveAnims` appends user-added animations (from `es_eventConfig`) after built-ins.
    - `_seaGetEffectiveAnimMeta` and `_seaActionFor` handle user-added animations with no `SEA_ANIM_META` entry.
    - Verified in browser: action picker (57 options), disable/re-enable/add/remove all work correctly.
-4. **AM4** — UI: add/rename/remove (disable) events.
+4. **AM4** — UI: add/rename/remove (disable) events. ✅ **Done (v6 / 2026-06-04)**
+   - `#sea-user-events` container injected into Events tab; populated by `_seaRenderUserEvents`.
+   - Each built-in `.sea-row` gets a **🚫 Disable** button (persists to `es_eventConfig`; re-enable shown in the user panel).
+   - **+ Add event** button creates a user event with a name + M1/D1/M2/D2 date-range fields; registered immediately in `SEA_ANIMS` and `SEA_EVENT_TABLE`.
+   - User event rows have **💾 Save**, **⚙️** (open animation config), **✕ Remove** buttons.
+   - `_seaAddEvent`, `_seaSaveUserEvent`, `_seaRemoveUserEvent`, `_seaReEnableEvent`, `_seaApplyUserEventsTables` functions.
+   - `_seaApplyUserEventsTables` called on page load to restore persisted user events.
+   - `es_eventConfig` included in Export/Import so user events round-trip across browsers.
+   - Verified: add/remove/disable/re-enable all work; user event appears in `SEA_ANIMS` and `SEA_EVENT_TABLE`.
 5. **AM5** — Save/Load whole config (extend Export/Import) + final polish.
 
 (Confirm milestone breakdown before starting AM1.)

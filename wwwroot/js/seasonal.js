@@ -2496,7 +2496,7 @@ function exportSeasonalConfig() {
     var data = {};
     for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
-        if (k && (k.startsWith('sea_') || k.startsWith('cel-seasonal') || k === 'es_seaFreq' || k === 'es_customSeasons')) {
+        if (k && (k.startsWith('sea_') || k.startsWith('cel-seasonal') || k === 'es_seaFreq' || k === 'es_customSeasons' || k === 'es_eventConfig')) {
             data[k] = localStorage.getItem(k);
         }
     }
@@ -2549,5 +2549,144 @@ function _seaAddConfigButtons() {
         btn.type = 'button';
         btn.onclick = function(e) { e.stopPropagation(); openSeasonConfig(key, label); };
         row.appendChild(btn);
+        // AM4: disable button for built-in events
+        var disBtn = document.createElement('button');
+        disBtn.className = 'sea-dis-btn btn btn-outline-secondary';
+        disBtn.style.cssText = 'font-size:0.65rem;padding:1px 5px;line-height:1.5;';
+        disBtn.textContent = '🚫';
+        disBtn.title = 'Disable this event (reset to restore)';
+        disBtn.type = 'button';
+        disBtn.onclick = (function(k){ return function(e) {
+            e.stopPropagation();
+            var evtCfg = _seaGetEventConfig();
+            evtCfg.events = evtCfg.events || {};
+            evtCfg.events[k] = evtCfg.events[k] || {};
+            evtCfg.events[k].disabled = true;
+            _seaSaveEventConfig(evtCfg);
+            _seaRenderUserEvents();
+        }; })(key);
+        row.appendChild(disBtn);
+    });
+    // AM4: inject disabled built-in events + user events + add-event button
+    _seaRenderUserEvents();
+}
+
+// AM4: render the user/disabled-events panel at the bottom of the Events tab.
+function _seaRenderUserEvents() {
+    var container = document.getElementById('sea-user-events');
+    if (!container) return;
+    var cfg = _seaGetEventConfig();
+    var events = cfg.events || {};
+    var html = '';
+
+    // Disabled built-in events (show re-enable button)
+    var disabledBuiltins = Object.keys(events).filter(function(k) {
+        return events[k].disabled && SEA_ANIMS[k];
+    });
+    if (disabledBuiltins.length) {
+        html += '<p class="small fw-semibold text-muted mb-1">🚫 Disabled events</p>';
+        disabledBuiltins.forEach(function(k) {
+            html += '<div class="sea-row" style="opacity:0.55;">'
+                + '<span class="small flex-grow-1">' + _escHtml(k) + '</span>'
+                + '<button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:0.65rem;" onclick="_seaReEnableEvent(\'' + k + '\')">↩ Re-enable</button>'
+                + '</div>';
+        });
+    }
+
+    // User-added events
+    var userKeys = Object.keys(events).filter(function(k) {
+        return !SEA_ANIMS[k] && !events[k].disabled;
+    });
+    if (userKeys.length) {
+        html += '<p class="small fw-semibold text-muted mb-1 mt-2">✨ Custom events</p>';
+        userKeys.forEach(function(k) {
+            var ev = events[k];
+            var m1 = ev.dateRange ? ev.dateRange[0] : 1;
+            var d1 = ev.dateRange ? ev.dateRange[1] : 1;
+            var m2 = ev.dateRange ? ev.dateRange[2] : 1;
+            var d2 = ev.dateRange ? ev.dateRange[3] : 1;
+            html += '<div class="sea-row">'
+                + '<input class="form-control form-control-sm d-inline-block" id="sevt_name_' + k + '" value="' + _escHtml(ev.name || k) + '" style="width:120px;font-size:0.75rem;" placeholder="Event name">'
+                + '<span class="small text-muted mx-1">|</span>'
+                + '<label class="small text-muted d-inline-flex align-items-center gap-1">M1<input type="number" id="sevt_m1_' + k + '" value="' + m1 + '" min="1" max="12" style="width:42px;" class="form-control form-control-sm d-inline-block"></label>'
+                + '<label class="small text-muted d-inline-flex align-items-center gap-1">D1<input type="number" id="sevt_d1_' + k + '" value="' + d1 + '" min="1" max="31" style="width:42px;" class="form-control form-control-sm d-inline-block"></label>'
+                + '<label class="small text-muted d-inline-flex align-items-center gap-1">M2<input type="number" id="sevt_m2_' + k + '" value="' + m2 + '" min="1" max="12" style="width:42px;" class="form-control form-control-sm d-inline-block"></label>'
+                + '<label class="small text-muted d-inline-flex align-items-center gap-1">D2<input type="number" id="sevt_d2_' + k + '" value="' + d2 + '" min="1" max="31" style="width:42px;" class="form-control form-control-sm d-inline-block"></label>'
+                + '<button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 ms-1" style="font-size:0.65rem;" onclick="_seaSaveUserEvent(\'' + k + '\')">💾</button>'
+                + '<button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 ms-1" style="font-size:0.65rem;" onclick="openSeasonConfig(\'' + k + '\', document.getElementById(\'sevt_name_' + k + '\').value)">⚙️</button>'
+                + '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 ms-1" style="font-size:0.65rem;" onclick="_seaRemoveUserEvent(\'' + k + '\')">✕</button>'
+                + '</div>';
+        });
+    }
+
+    // Add event button
+    html += '<div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary" onclick="_seaAddEvent()" style="font-size:0.78rem;">+ Add event</button></div>';
+    container.innerHTML = html;
+}
+
+// AM4: add a new user event
+function _seaAddEvent() {
+    var evtCfg = _seaGetEventConfig();
+    evtCfg.events = evtCfg.events || {};
+    var key = 'custom_' + Date.now();
+    evtCfg.events[key] = { name: 'My Event', builtin: false, dateRange: [1,1,1,7] };
+    _seaSaveEventConfig(evtCfg);
+    // Register in SEA_ANIMS and the event table immediately
+    if (!SEA_ANIMS[key]) SEA_ANIMS[key] = [];
+    SEA_EVENT_TABLE.push([key, 1, 1, 1, 7, 10, 'cel-seasonal-' + key]);
+    _seaRenderUserEvents();
+}
+// AM4: save user event date range and name
+function _seaSaveUserEvent(key) {
+    var evtCfg = _seaGetEventConfig();
+    evtCfg.events = evtCfg.events || {};
+    evtCfg.events[key] = evtCfg.events[key] || {};
+    var n = document.getElementById('sevt_name_' + key); if (n) evtCfg.events[key].name = n.value.trim() || key;
+    var m1 = document.getElementById('sevt_m1_' + key); var d1 = document.getElementById('sevt_d1_' + key);
+    var m2 = document.getElementById('sevt_m2_' + key); var d2 = document.getElementById('sevt_d2_' + key);
+    if (m1 && d1 && m2 && d2) evtCfg.events[key].dateRange = [+m1.value,+d1.value,+m2.value,+d2.value];
+    _seaSaveEventConfig(evtCfg);
+    _seaApplyUserEventsTables();
+    _seaRenderUserEvents();
+}
+// AM4: remove a user event
+function _seaRemoveUserEvent(key) {
+    var evtCfg = _seaGetEventConfig();
+    if (evtCfg.events) delete evtCfg.events[key];
+    if (evtCfg.animations) {
+        Object.keys(evtCfg.animations).forEach(function(aid){
+            if ((evtCfg.animations[aid]||{}).eventKey === key) delete evtCfg.animations[aid];
+        });
+    }
+    _seaSaveEventConfig(evtCfg);
+    delete SEA_ANIMS[key];
+    _seaApplyUserEventsTables();
+    _seaRenderUserEvents();
+}
+// AM4: re-enable a disabled built-in event
+function _seaReEnableEvent(key) {
+    var evtCfg = _seaGetEventConfig();
+    if (evtCfg.events && evtCfg.events[key]) {
+        delete evtCfg.events[key].disabled;
+        if (!Object.keys(evtCfg.events[key]).length) delete evtCfg.events[key];
+    }
+    _seaSaveEventConfig(evtCfg);
+    _seaRenderUserEvents();
+}
+// AM4: apply user events into SEA_ANIMS and the date-range table so _seaGetSeason finds them
+function _seaApplyUserEventsTables() {
+    var evtCfg = _seaGetEventConfig();
+    var events = evtCfg.events || {};
+    Object.keys(events).forEach(function(key) {
+        var ev = events[key];
+        if (SEA_ANIMS[key] || ev.builtin) return; // built-in, skip
+        if (ev.disabled) return;
+        if (!SEA_ANIMS[key]) SEA_ANIMS[key] = [];
+        var dr = ev.dateRange || [1,1,1,7];
+        // Add to SEA_EVENT_TABLE if not already there
+        var exists = SEA_EVENT_TABLE.some(function(r){ return r[0] === key; });
+        if (!exists) SEA_EVENT_TABLE.push([key, dr[0], dr[1], dr[2], dr[3], 10, 'cel-seasonal-' + key]);
     });
 }
+// AM4: on page load, apply persisted user events
+(function(){ _seaApplyUserEventsTables(); })();
