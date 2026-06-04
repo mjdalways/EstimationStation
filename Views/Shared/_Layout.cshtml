@@ -361,6 +361,42 @@
                                             <div class="ct-swatch-item"><input type="color" id="ct-card-border" value="#dee2e6" oninput="updateThemePreview()" /><span>Border</span></div>
                                             <div class="ct-swatch-item"><input type="color" id="ct-card-voted" value="#198754" oninput="updateThemePreview()" /><span>Voted</span></div>
                                         </div>
+                                        <!-- AK5: gradient builders for Card BG and Selected -->
+                                        <div class="ct-grad-builders mb-2">
+                                            <div class="mb-1">
+                                                <label class="ct-field-label d-inline-flex align-items-center gap-1" style="cursor:pointer;">
+                                                    <input type="checkbox" id="ct-card-bg-grad-on" onchange="_ctToggleGradUI('card-bg')" /> Card BG gradient
+                                                </label>
+                                                <div id="ct-card-bg-grad-opts" class="align-items-center gap-1 flex-wrap mt-1" style="display:none;">
+                                                    <input type="color" id="ct-card-bg-grad-1" value="#ffffff" oninput="updateThemePreview()" title="From color" />
+                                                    <input type="color" id="ct-card-bg-grad-2" value="#cccccc" oninput="updateThemePreview()" title="To color" />
+                                                    <select id="ct-card-bg-grad-dir" class="form-select form-select-sm d-inline-block" style="width:auto;font-size:0.7rem;" onchange="updateThemePreview()">
+                                                        <option value="135deg">↘ Diagonal</option>
+                                                        <option value="to right">→ Horizontal</option>
+                                                        <option value="to bottom">↓ Vertical</option>
+                                                        <option value="45deg">↗ Diagonal up</option>
+                                                        <option value="circle">◍ Radial</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="mb-1">
+                                                <label class="ct-field-label d-inline-flex align-items-center gap-1" style="cursor:pointer;">
+                                                    <input type="checkbox" id="ct-card-selected-grad-on" onchange="_ctToggleGradUI('card-selected')" /> Selected gradient
+                                                </label>
+                                                <div id="ct-card-selected-grad-opts" class="align-items-center gap-1 flex-wrap mt-1" style="display:none;">
+                                                    <input type="color" id="ct-card-selected-grad-1" value="#0d6efd" oninput="updateThemePreview()" title="From color" />
+                                                    <input type="color" id="ct-card-selected-grad-2" value="#6610f2" oninput="updateThemePreview()" title="To color" />
+                                                    <select id="ct-card-selected-grad-dir" class="form-select form-select-sm d-inline-block" style="width:auto;font-size:0.7rem;" onchange="updateThemePreview()">
+                                                        <option value="135deg">↘ Diagonal</option>
+                                                        <option value="to right">→ Horizontal</option>
+                                                        <option value="to bottom">↓ Vertical</option>
+                                                        <option value="45deg">↗ Diagonal up</option>
+                                                        <option value="circle">◍ Radial</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <p class="text-muted mb-0" style="font-size:0.68rem;">When on, the gradient overrides the solid Card BG / Selected color above.</p>
+                                        </div>
                                         <div class="row g-2">
                                             <div class="col-8">
                                                 <label class="ct-field-label">Border Width: <strong><span id="ct-border-width-label">1.5</span>px</strong></label>
@@ -530,16 +566,16 @@
                                     onchange="localStorage.setItem('es_compactMode',this.checked?'1':'0'); applyCompactMode();" />
                                 <label class="form-check-label" for="compact-mode-toggle">Compact participant cards</label>
                             </div>
-                            <div class="d-flex gap-2 p-2" style="background:rgba(128,128,128,0.08);border-radius:6px;max-width:260px;">
-                                <div>
-                                    <div class="text-muted small mb-1">Normal</div>
-                                    <div style="padding:0.4rem 0.6rem;border:1px solid var(--panel-border,#ccc);border-radius:6px;font-size:0.8rem;min-width:60px;text-align:center;">
+                            <div class="d-flex gap-2 p-2" style="background:rgba(128,128,128,0.08);border-radius:6px;max-width:280px;">
+                                <div id="cmp-preview-normal" class="cmp-mode-cell">
+                                    <div class="text-muted small mb-1">Normal <span class="cmp-active-badge">✓ active</span></div>
+                                    <div style="padding:0.4rem 0.6rem;border:1px solid var(--panel-border,#ccc);border-radius:6px;font-size:0.8rem;min-width:60px;text-align:center;background:var(--bg-secondary,#fff);">
                                         <div style="font-size:0.75rem;font-weight:600;">Alice</div><div>?</div>
                                     </div>
                                 </div>
-                                <div>
-                                    <div class="text-muted small mb-1">Compact</div>
-                                    <div style="padding:0.25rem 0.4rem;border:1px solid var(--panel-border,#ccc);border-radius:6px;font-size:0.7rem;min-width:48px;text-align:center;">
+                                <div id="cmp-preview-compact" class="cmp-mode-cell">
+                                    <div class="text-muted small mb-1">Compact <span class="cmp-active-badge">✓ active</span></div>
+                                    <div style="padding:0.25rem 0.4rem;border:1px solid var(--panel-border,#ccc);border-radius:6px;font-size:0.7rem;min-width:48px;text-align:center;background:var(--bg-secondary,#fff);">
                                         <div style="font-size:0.65rem;font-weight:600;">Alice</div><div>?</div>
                                     </div>
                                 </div>
@@ -671,6 +707,13 @@
                                     <button type="button" class="btn btn-outline-secondary btn-sm" onclick="_previewFlipVoteCard()" title="Test flip animation">🔄 Flip</button>
                                 </div>
                             </div>
+                        </div>
+                        <!-- AK4: Flip speed -->
+                        <div class="mb-2">
+                            <label class="form-label small mb-1" for="flipDurationSlider">Flip speed <span id="flipDurationVal" class="text-muted">0.60s</span></label>
+                            <input type="range" class="form-range" id="flipDurationSlider" min="200" max="1000" step="50" value="600"
+                                   oninput="setFlipDuration(this.value)" style="max-width:220px;" />
+                            <p class="text-muted mt-0 mb-0" style="font-size:0.72rem;">Duration of the card flip when a vote is cast. Use the 🔄 Flip button above to preview.</p>
                         </div>
 
                     </div><!-- end tab-visual -->
@@ -1522,6 +1565,30 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/4/2026 (101)</strong></p>
+                        <ul class="mb-2">
+                            <li>🌈 Gradient card backgrounds — In the custom theme editor (Theme → 🃏 Cards) you can now give the vote-card background and the selected-card background a two-colour gradient. Tick "Card BG gradient" / "Selected gradient", pick two colours and a direction (diagonal, horizontal, vertical, or radial); it overrides the solid colour and saves with the theme.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/4/2026 (100)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎮 Collapsible controls panel — The right-hand Controls panel now has a header you can click to collapse it down to a thin strip (giving the voting area more room) and click again to expand. Your choice is remembered between sessions.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/4/2026 (99)</strong></p>
+                        <ul class="mb-2">
+                            <li>👁️ Compact mode preview — The Normal vs Compact participant-card mini previews in Visual settings now highlight which mode is currently active (with a ✓ active marker) and update live as you toggle the switch.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/4/2026 (98)</strong></p>
+                        <ul class="mb-2">
+                            <li>⏱️ Timer style — The count-up timer in the story bar can now be styled independently of the clock. Settings → Other → Timer &amp; Clock has new <strong>Color</strong>, <strong>Size</strong>, and <strong>Font</strong> controls (with a live preview) for the timer text.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/4/2026 (97)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔄 Flip speed setting — Visual → Vote Picker Card Style now has a <strong>Flip speed</strong> slider (0.20s–1.00s) controlling how fast the card flip animation plays when a vote is cast. Your choice is saved and the 🔄 Flip button previews it.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/4/2026 (96)</strong></p>
+                        <ul class="mb-2">
+                            <li>🚩 Custom flags in seasonal animations — Patriotic animations (Presidents Day, Memorial Day, Independence Day, Veterans Day) now build their flag from an image URL instead of an embedded picture. Each flag animation has a <strong>Flag URL</strong> field in its season config, so you can swap the US flag for any country's flag (e.g. <code>flagcdn.com/gb.svg</code> for the UK) and your choice is saved.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/4/2026 (95)</strong></p>
                         <ul class="mb-2">
                             <li>🔒 PIN prompt — If a room requires a PIN to join and you dismiss the prompt (close, Cancel, or Esc) without entering it, you're now sent back to the home page instead of being left on an empty room screen.</li>
@@ -2081,6 +2148,18 @@
                         <div class="form-check form-switch mb-1">
                             <input class="form-check-input" type="checkbox" id="tc-show-timer" onchange="saveTimerClockSettings()">
                             <label class="form-check-label small" for="tc-show-timer">Show count-up timer</label>
+                        </div>
+                        <!-- AK6: count-up timer style -->
+                        <div class="mb-2 ms-4 d-flex flex-wrap gap-3 align-items-center small">
+                            <label>Color <input type="color" id="tc-timer-color" value="#6c757d" oninput="saveTimerStyleSettings()" onchange="saveTimerStyleSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                            <label>Size <input type="number" id="tc-timer-size" value="13" min="10" max="28" style="width:55px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerStyleSettings()">px</label>
+                            <label>Font <select id="tc-timer-font" class="form-select form-select-sm d-inline-block" style="width:120px;" onchange="saveTimerStyleSettings()">
+                                <option value="">Default</option>
+                                <option value="system-ui, sans-serif">Sans-serif</option>
+                                <option value="Georgia, serif">Serif</option>
+                                <option value="'Courier New', monospace">Monospace</option>
+                            </select></label>
+                            <span id="tc-timer-preview" class="border rounded px-2 py-1">⏱ 02:45</span>
                         </div>
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="tc-show-clock" onchange="saveTimerClockSettings()">

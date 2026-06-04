@@ -124,6 +124,14 @@ function openSettingsModal(tab) {
     if (fovEl) fovEl.checked = localStorage.getItem('es_flipOnVote') !== '0';
     var cvhEl = document.getElementById('change-vote-hint-toggle');
     if (cvhEl) cvhEl.checked = localStorage.getItem('es_changeVoteHint') !== '0';
+    // AK4: flip speed slider
+    var fdEl = document.getElementById('flipDurationSlider');
+    if (fdEl) {
+        var fd = _getFlipDuration();
+        fdEl.value = fd;
+        var fdLbl = document.getElementById('flipDurationVal');
+        if (fdLbl) fdLbl.textContent = (fd / 1000).toFixed(2) + 's';
+    }
 
     _settingsSaved = false; // reset the save flag for this session
 
@@ -585,6 +593,11 @@ function applyCompactMode() {
     // Update settings live-preview container (shares CSS rules with #participantsContainer)
     var previewContainer = document.getElementById('preview-participants-container');
     if (previewContainer) previewContainer.classList.toggle('compact', compact);
+    // AK3: highlight the active mode in the Normal/Compact mini previews
+    var normalCell = document.getElementById('cmp-preview-normal');
+    if (normalCell) normalCell.classList.toggle('active', !compact);
+    var compactCell = document.getElementById('cmp-preview-compact');
+    if (compactCell) compactCell.classList.toggle('active', compact);
 }
 
 function applyCardFontSize() {
@@ -888,6 +901,9 @@ function setCustomizerFormValues(vars) {
             }
         }
     });
+    // AK5: route card-bg / card-selected through the gradient-aware applier (overrides the loop above)
+    _ctApplyCardFieldValue('card-bg', vars['card-bg']);
+    _ctApplyCardFieldValue('card-selected', vars['card-selected']);
 }
 
 function normalizePrimaryFont(fontFamily) {
@@ -1003,11 +1019,80 @@ function _previewFlip() {
     setTimeout(function() { back.classList.remove('flip-preview'); }, 700);
 }
 
+// ── AK4: Flip speed ──────────────────────────────────────────
+// es_flipDuration is the card-flip animation length in ms (200–1000, default 600).
+function _getFlipDuration() {
+    var v = parseInt(localStorage.getItem('es_flipDuration'), 10);
+    return (isNaN(v) || v < 200 || v > 1000) ? 600 : v;
+}
+function _applyFlipDuration() {
+    document.documentElement.style.setProperty('--flip-duration', _getFlipDuration() + 'ms');
+}
+function setFlipDuration(ms) {
+    ms = parseInt(ms, 10);
+    if (isNaN(ms)) ms = 600;
+    ms = Math.min(1000, Math.max(200, ms));
+    localStorage.setItem('es_flipDuration', ms);
+    _applyFlipDuration();
+    var lbl = document.getElementById('flipDurationVal');
+    if (lbl) lbl.textContent = (ms / 1000).toFixed(2) + 's';
+}
+document.addEventListener('DOMContentLoaded', _applyFlipDuration);
+
 function _previewFlipVoteCard() {
     const card = document.getElementById('vote-card-preview');
     if (!card) return;
     card.classList.add('card-flipping');
-    setTimeout(function() { card.classList.remove('card-flipping'); }, 700);
+    setTimeout(function() { card.classList.remove('card-flipping'); }, _getFlipDuration() + 100);
+}
+
+// ── AK5: Card gradient builders (card-bg / card-selected) ─────
+function _ctGradValue(f) {
+    var dir = (document.getElementById('ct-' + f + '-grad-dir') || {}).value || '135deg';
+    var c1  = (document.getElementById('ct-' + f + '-grad-1')   || {}).value || '#ffffff';
+    var c2  = (document.getElementById('ct-' + f + '-grad-2')   || {}).value || '#000000';
+    if (dir === 'circle') return 'radial-gradient(circle, ' + c1 + ', ' + c2 + ')';
+    return 'linear-gradient(' + dir + ', ' + c1 + ', ' + c2 + ')';
+}
+// Effective value for a card field: gradient string when its toggle is on, else the solid color.
+function _ctResolveValue(f) {
+    var on = document.getElementById('ct-' + f + '-grad-on');
+    if (on && on.checked) return _ctGradValue(f);
+    var el = document.getElementById('ct-' + f);
+    return el ? el.value : (CUSTOM_DEFAULTS[f] || '');
+}
+// Parse a two-stop linear/radial gradient (the only shapes the builder produces) back into parts.
+function _ctParseGradient(val) {
+    val = val || '';
+    var lin = /linear-gradient\(\s*([^,]+),\s*(#[0-9a-fA-F]{3,8})\s*,\s*(#[0-9a-fA-F]{3,8})\s*\)/.exec(val);
+    if (lin) return { dir: lin[1].trim(), c1: lin[2], c2: lin[3] };
+    var rad = /radial-gradient\([^,]*,\s*(#[0-9a-fA-F]{3,8})\s*,\s*(#[0-9a-fA-F]{3,8})\s*\)/.exec(val);
+    if (rad) return { dir: 'circle', c1: rad[1], c2: rad[2] };
+    return null;
+}
+function _ctToggleGradUI(f) {
+    var on = document.getElementById('ct-' + f + '-grad-on');
+    var opts = document.getElementById('ct-' + f + '-grad-opts');
+    if (opts) opts.style.display = (on && on.checked) ? 'flex' : 'none';
+    updateThemePreview();
+}
+// Apply a saved card field value to the form: detect gradient → populate builder, else solid picker.
+function _ctApplyCardFieldValue(f, val) {
+    val = val || CUSTOM_DEFAULTS[f];
+    var g = _ctParseGradient(val);
+    var on = document.getElementById('ct-' + f + '-grad-on');
+    var colEl = document.getElementById('ct-' + f);
+    if (g) {
+        if (on) on.checked = true;
+        var d = document.getElementById('ct-' + f + '-grad-dir'); if (d) d.value = g.dir;
+        var s1 = document.getElementById('ct-' + f + '-grad-1'); if (s1) s1.value = g.c1;
+        var s2 = document.getElementById('ct-' + f + '-grad-2'); if (s2) s2.value = g.c2;
+        if (colEl) colEl.value = CUSTOM_DEFAULTS[f]; // keep the (hidden) color picker valid
+    } else {
+        if (on) on.checked = false;
+        if (colEl) colEl.value = val;
+    }
+    _ctToggleGradUI(f);
 }
 
 // ── Live preview ──────────────────────────────────────────────
@@ -1020,9 +1105,9 @@ function updateThemePreview() {
     const accent        = g('ct-accent')        || '#0d6efd';
     const navbarBg      = g('ct-navbar-bg')     || '#343a40';
     const navbarText    = g('ct-navbar-text')   || '#ffffff';
-    const cardBg        = g('ct-card-bg')       || bgSecondary;
+    const cardBg        = _ctResolveValue('card-bg')       || bgSecondary;  // AK5: gradient-aware
     const cardBorder    = g('ct-card-border')   || '#dee2e6';
-    const cardSelected  = g('ct-card-selected') || accent;
+    const cardSelected  = _ctResolveValue('card-selected') || accent;        // AK5: gradient-aware
     const cardSelText   = g('ct-card-selected-text') || '#ffffff';
     const cardVoted     = g('ct-card-voted')    || '#198754';
     const btnReveal     = g('ct-btn-reveal')    || '#198754';
@@ -1145,6 +1230,8 @@ function saveCustomTheme() {
         const el = document.getElementById('ct-' + f);
         if (el) vars[f] = el.value;
     });
+    // AK5: card-bg / card-selected may carry a gradient string instead of the solid color
+    ['card-bg', 'card-selected'].forEach(f => { vars[f] = _ctResolveValue(f); });
 
     const themes = getCustomThemes();
     const ctConfettiColorsEl = document.getElementById('ct-confetti-colors');
@@ -1561,6 +1648,37 @@ function saveTimerClockSettings() {
     }
 }
 window.saveTimerClockSettings = saveTimerClockSettings;
+
+// ── AK6: Count-up timer style ────────────────────────────────
+// es_timerStyle = { color, fontSize, fontFamily } applied to the #stc-timer text.
+function _getTimerStyle() {
+    var d = {};
+    try { d = JSON.parse(localStorage.getItem('es_timerStyle') || '{}'); } catch(e) {}
+    return d;
+}
+function _applyTimerStyle(el, styleData) {
+    if (!el) return;
+    var d = styleData || _getTimerStyle();
+    el.style.color = d.color || '';
+    el.style.fontSize = d.fontSize ? d.fontSize + 'px' : '';
+    el.style.fontFamily = d.fontFamily || '';
+}
+function saveTimerStyleSettings() {
+    var c = document.getElementById('tc-timer-color');
+    var s = document.getElementById('tc-timer-size');
+    var f = document.getElementById('tc-timer-font');
+    var styleData = {
+        color:      c ? c.value : '#6c757d',
+        fontSize:   s ? (parseInt(s.value, 10) || 13) : 13,
+        fontFamily: f ? f.value : ''
+    };
+    localStorage.setItem('es_timerStyle', JSON.stringify(styleData));
+    if (typeof _acTick === 'function') _acTick();
+    _applyTimerStyle(document.getElementById('tc-timer-preview'), styleData);
+}
+window.saveTimerStyleSettings = saveTimerStyleSettings;
+window._getTimerStyle = _getTimerStyle;
+window._applyTimerStyle = _applyTimerStyle;
 
 // AG2 — Clock mode toggle (moved from room.js so it works on all pages)
 function _tcToggleMode(mode) {

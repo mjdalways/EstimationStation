@@ -9,7 +9,7 @@ Items deferred from Groups AE and AH that did not fit in those batches.
 
 ---
 
-## AK1 — Controls Panel Draggable / Collapsible
+## AK1 — Controls Panel Draggable / Collapsible ✅ Done (v6 / 2026-06-04)
 
 Make the Reveal / Reset / etc. controls panel either:
 - **(a)** draggable like a floating widget, or
@@ -19,9 +19,16 @@ Persist collapsed/position state to `localStorage`.
 
 **Files:** `Views/Room/Index.cshtml`, `wwwroot/js/room.js`, `wwwroot/css/site.css`
 
+**Implemented (option b):** clickable `.controls-collapse-header` at the top of the panel; `toggleControlsPanel()`/`_setControlsCollapsed()` in room.js add `.collapsed` to the panel and `.controls-collapsed` to `#roomLayout` (which narrows the grid's `--controls-width` to 40px and hides the control groups); chevron ⟩/⟨ reflects state; persisted in `es_controlsPanelCollapsed` and restored on load. Header is desktop-only (`d-none d-md-flex`).
+
 ---
 
 ## AK2 — Stories Panel Drag Handle Cursor
+
+> ⚠️ **Blocked / premise outdated (2026-06-04):** story list items are **not** currently
+> draggable — there is no drag-reorder implementation in `room.js`/`renderStories`. This item
+> would require building the whole drag-to-reorder feature first, not just adding a cursor cue.
+> Re-scope before picking up.
 
 Story list items are draggable for reordering but show no visual cue.
 
@@ -32,7 +39,7 @@ Story list items are draggable for reordering but show no visual cue.
 
 ---
 
-## AK3 — Normal/Compact Preview in View Settings
+## AK3 — Normal/Compact Preview in View Settings ✅ Done (v6 / 2026-06-04)
 
 Add small live thumbnails to the View settings tab showing how Normal vs Compact participant card layout looks before toggling.
 
@@ -40,9 +47,11 @@ Add small live thumbnails to the View settings tab showing how Normal vs Compact
 
 **Files:** `Views/Shared/_Layout.cshtml`
 
+**Implemented:** the existing side-by-side Normal/Compact mockups now carry `#cmp-preview-normal`/`#cmp-preview-compact` ids; `applyCompactMode()` (site.js) toggles an `.active` highlight + "✓ active" marker on the matching cell, updating live with the switch. New `.cmp-mode-cell`/`.cmp-active-badge` styles in site.css.
+
 ---
 
-## AK4 — Flip Speed Setting
+## AK4 — Flip Speed Setting ✅ Done (v6 / 2026-06-04)
 
 Add a speed slider for the card flip animation when a vote is cast (and reuse for AJ animations when built).
 
@@ -51,9 +60,11 @@ Add a speed slider for the card flip animation when a vote is cast (and reuse fo
 
 **Files:** `wwwroot/js/room.js`, `wwwroot/css/site.css`, `Views/Shared/_Layout.cshtml`
 
+**Implemented:** `--flip-duration` CSS var on `.card-flipping`; `_getFlipDuration`/`_applyFlipDuration`/`setFlipDuration` in `site.js` (applied on DOMContentLoaded); slider in Visual → Vote Picker Card Style; flip-removal timeouts in `room.js` and `_previewFlipVoteCard` now derive from the saved duration.
+
 ---
 
-## AK5 — Gradient Card Backgrounds
+## AK5 — Gradient Card Backgrounds ✅ Done (v6 / 2026-06-04)
 
 Allow gradient stops in the card background colour fields:
 - Either a gradient builder UI (two colour pickers + direction selector)
@@ -61,11 +72,13 @@ Allow gradient stops in the card background colour fields:
 
 Applies to both vote card background (`--card-bg`) and selected card background (`--card-selected`) in the custom theme editor.
 
-**Files:** `wwwroot/css/site.css`, `Views/Shared/_Layout.cshtml`, `wwwroot/js/room.js`
+**Files:** `wwwroot/css/site.css`, `Views/Shared/_Layout.cshtml`, `wwwroot/js/site.js`
+
+**Implemented (gradient builder option):** per-field "gradient" toggle + two colour pickers + direction select (diagonal / horizontal / vertical / radial) for `card-bg` and `card-selected` in Theme → Cards. `_ctResolveValue`/`_ctGradValue`/`_ctParseGradient`/`_ctApplyCardFieldValue` in site.js compose & round-trip the gradient string; `updateThemePreview` and `saveCustomTheme` use the resolved value, stored in `vars['card-bg']`/`vars['card-selected']`. CSS card declarations switched from `background-color` to `background` (`.poker-card`, `.poker-card.selected`, `.story-item`, `.participant-badge`) so gradient values render; solid colours still work.
 
 ---
 
-## AK6 — Count-Up Timer Style Settings
+## AK6 — Count-Up Timer Style Settings ✅ Done (v6 / 2026-06-04)
 
 Add `es_timerStyle` localStorage key: `{ color, fontSize, fontFamily }`.
 
@@ -73,6 +86,8 @@ Add `es_timerStyle` localStorage key: `{ color, fontSize, fontFamily }`.
 - Timer text in `#stc-timer` applies styles inline from saved settings
 
 **Files:** `wwwroot/js/room.js` (`_acTick`, `saveTimerClockSettings`, `_populateRoomOtherSettings`), `Views/Shared/_Layout.cshtml`
+
+**Implemented:** `_getTimerStyle`/`_applyTimerStyle`/`saveTimerStyleSettings` in `site.js`; `_acTick` applies the style to `#stc-timer`; `_populateRoomOtherSettings` populates the controls + live preview; UI block (Color / Size / Font + preview) under the "Show count-up timer" switch in Settings → Other.
 
 ---
 

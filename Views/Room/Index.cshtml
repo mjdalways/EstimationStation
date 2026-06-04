@@ -173,6 +173,11 @@
 
     <!-- Right Controls Panel -->
     <div class="controls-panel">
+        <!-- AK1: collapse toggle -->
+        <div class="controls-collapse-header d-none d-md-flex" onclick="toggleControlsPanel()" title="Collapse / expand controls panel">
+            <span class="ccp-label">🎮 Controls</span>
+            <span class="ccp-icon" id="controlsToggleIcon">⟩</span>
+        </div>
         <div class="control-group">
             <h6 class="control-title">🎮 Controls</h6>
             <button class="btn btn-success w-100 mb-2" id="revealBtn" onclick="revealVotes()" title="Reveal votes (Space / Enter)">👁️ Reveal <kbd class="btn-kb-hint">Space/Enter</kbd></button>

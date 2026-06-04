@@ -474,8 +474,6 @@ function _seaParticles(chars, count, animName, durRange, sizeRange, delaySpan) {
 // PER-SEASON ANIMATION CONFIG
 // ══════════════════════════════════════════════════════════
 
-var _SEA_US_FLAG = '<img src="https://flagcdn.com/us.svg" width="1em" height="0.75em" alt="" style="vertical-align:middle;">';
-
 // Generic flag image builder — constructs an <img> tag from a cfg.flagUrl value.
 // All flag-based animations use this; users can override the URL per animation in the season config panel.
 function _seaFlagHtml(cfg) {

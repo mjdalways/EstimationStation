@@ -13,11 +13,10 @@ Carries forward all unimplemented items from v5.0. Completed groups have been mo
 
 | # | Group | Feature | Effort | Status |
 |---|-------|---------|--------|--------|
-| 1 | [AE11a](./plans/FEATURE-PLAN-6.0-AE11a.md) | 🚩 Memorial Flag image support in seasonal config | Small | ⏳ **Next up** |
-| 2 | [AK](./plans/FEATURE-PLAN-6.0-AK.md) | 🔧 UX Polish Backlog — controls panel, stories drag indicator, compact preview, flip speed, gradient cards, timer style | Medium | ⏳ Pending |
-| 3 | [AB](./plans/FEATURE-PLAN-6.0-AB.md) | ✂️ Image Upload with Crop/Pan/Zoom — shared crop dialog for avatars, card backs, season sprites | Hard | ⏳ Pending |
-| 4 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
-| 5 | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ⏳ Pending |
+| 1 | [AB](./plans/FEATURE-PLAN-6.0-AB.md) | ✂️ Image Upload with Crop/Pan/Zoom — shared crop dialog for avatars, card backs, season sprites | Hard | ⏳ **Next up** |
+| 2 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
+| 3 | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ⏳ Pending |
+| — | [AK](./plans/FEATURE-PLAN-6.0-AK.md) | 🔧 UX Polish Backlog — AK1/AK3/AK4/AK5/AK6 done; **AK2 deferred** (stories aren't draggable — needs the drag-reorder feature built first) | Medium | 🟡 Mostly done |
 | — | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE — deferred with J & K) | Hard | ⏸ Deferred |
 | — | [J](./plans/FEATURE-PLAN-6.0-J.md) | 📱 Mobile Experience — stories bottom sheet, vote tap targets, lite mode | Medium-Hard | ⏸ Deferred |
 | — | [K](./plans/FEATURE-PLAN-6.0-K.md) | 💾 Room Persistence — JSON file per room, survive server restart, 7-day TTL | Hard | 🔍 Investigation |
@@ -28,6 +27,7 @@ Carries forward all unimplemented items from v5.0. Completed groups have been mo
 
 | Group | Feature | Version |
 |-------|---------|---------|
+| **AE11a** | 🚩 Generic flag image support in seasonal animations — `flagUrl`/`flagFirst` meta fields; `_seaFlagHtml` builder; per-animation **Flag URL** input; users can swap US flag for any country (flagcdn.com) | v6 / 2026-06-04 |
 | **AH** | 🔧 Bug Sweep + UI Polish — animation tests use live values; clock bar × hides correctly; clock preview on home page; Events tab chevron standardised; ↺ Change hint on vote card; card flip on vote; unified emoji input-group with picker; nowrap settings fields; separate timer/clock × buttons; reactions panel ×; avatar bg for all sources; real badge/card specimens in theme preview; DiceBear tile visibility | v5 / 2026-05-18 |
 | **AG** | ⚙️ Settings Safety + Reaction Preview — `saveTimerClockSettings` and `_tcToggleMode` moved to site.js; `_acOnTimerEnabled` hook in room.js; live reaction palette preview | v5 / 2026-05-18 |
 | **AF** | 🗓️ Seasonal Dates + Animation + Clock Fixes — `:scope>` selector fix; Thanksgiving/Pancake/Aug Bank/Mid-Autumn/Holi next dates; alias crash fix; custom emoji picker; live test values; analog SVG class IDs; sessionStorage × button; clock preview tick interval; draggable settings modal | v5 / 2026-05-18 |

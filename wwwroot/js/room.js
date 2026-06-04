@@ -983,7 +983,8 @@ async function castVote(val) {
         var selCard = document.querySelector('.poker-card.selected');
         if (selCard) {
             selCard.classList.add('card-flipping');
-            setTimeout(function() { selCard.classList.remove('card-flipping'); }, 700);
+            var _fd = (typeof _getFlipDuration === 'function' ? _getFlipDuration() : 600) + 100;
+            setTimeout(function() { selCard.classList.remove('card-flipping'); }, _fd);
         }
     }
     if (selectedVote !== null) _qPlayVoteTick();  // Q1
@@ -1637,6 +1638,7 @@ function _acTick() {
             var elapsed = Math.floor((Date.now() - _acTimerStart) / 1000);
             var m = Math.floor(elapsed / 60), s = elapsed % 60;
             timerEl.textContent = '⏱ ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+            if (typeof _applyTimerStyle === 'function') _applyTimerStyle(timerEl);  // AK6
             if (timerWrap) timerWrap.style.display = '';
         } else {
             if (timerWrap) timerWrap.style.display = 'none';
@@ -1937,6 +1939,16 @@ function _populateRoomOtherSettings() {
     if (analogSizeEl) analogSizeEl.value = styleData.analogSize || 52;
     var prev = document.getElementById('tc-clock-preview');
     if (prev) _acRenderClock(prev);
+
+    // AK6: populate count-up timer style controls + preview
+    var tStyle = (typeof _getTimerStyle === 'function') ? _getTimerStyle() : {};
+    var tColEl = document.getElementById('tc-timer-color');
+    if (tColEl) tColEl.value = tStyle.color || '#6c757d';
+    var tSizeEl = document.getElementById('tc-timer-size');
+    if (tSizeEl) tSizeEl.value = tStyle.fontSize || 13;
+    var tFontEl = document.getElementById('tc-timer-font');
+    if (tFontEl) tFontEl.value = tStyle.fontFamily || '';
+    if (typeof _applyTimerStyle === 'function') _applyTimerStyle(document.getElementById('tc-timer-preview'), tStyle);
 }
 window._populateRoomOtherSettings = _populateRoomOtherSettings;
 
@@ -2510,6 +2522,27 @@ function testSoundboard() {
     });
     var saved = parseInt(localStorage.getItem('es_sidebarWidth'));
     if (saved >= MIN_W) applyWidth(saved);
+})();
+
+// ============================================================
+// AK1: Controls panel collapse/expand (persisted)
+// ============================================================
+function _setControlsCollapsed(collapsed) {
+    var panel = document.querySelector('.controls-panel');
+    var layout = document.getElementById('roomLayout');
+    if (panel) panel.classList.toggle('collapsed', collapsed);
+    if (layout) layout.classList.toggle('controls-collapsed', collapsed);
+    var icon = document.getElementById('controlsToggleIcon');
+    if (icon) icon.textContent = collapsed ? '⟨' : '⟩';
+}
+function toggleControlsPanel() {
+    var panel = document.querySelector('.controls-panel');
+    var collapsed = panel ? !panel.classList.contains('collapsed') : true;
+    _setControlsCollapsed(collapsed);
+    localStorage.setItem('es_controlsPanelCollapsed', collapsed ? '1' : '0');
+}
+(function() {
+    if (localStorage.getItem('es_controlsPanelCollapsed') === '1') _setControlsCollapsed(true);
 })();
 
 // ============================================================
