@@ -1027,7 +1027,7 @@ function _previewFlip() {
 // es_flipDuration is the card-flip animation length in ms (200–1000, default 600).
 function _getFlipDuration() {
     var v = parseInt(localStorage.getItem('es_flipDuration'), 10);
-    return (isNaN(v) || v < 200 || v > 1000) ? 600 : v;
+    return (isNaN(v) || v < 200 || v > 5000) ? 600 : v;
 }
 function _applyFlipDuration() {
     document.documentElement.style.setProperty('--flip-duration', _getFlipDuration() + 'ms');
@@ -1035,7 +1035,7 @@ function _applyFlipDuration() {
 function setFlipDuration(ms) {
     ms = parseInt(ms, 10);
     if (isNaN(ms)) ms = 600;
-    ms = Math.min(1000, Math.max(200, ms));
+    ms = Math.min(5000, Math.max(200, ms));
     localStorage.setItem('es_flipDuration', ms);
     _applyFlipDuration();
     var lbl = document.getElementById('flipDurationVal');
