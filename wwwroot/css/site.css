@@ -885,16 +885,27 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 .wgt-float-hdr {
-  display: flex; align-items: center; gap: 5px;
-  padding: 5px 8px;
   background: var(--bg-secondary, #f8f9fa);
   border-bottom: 1px solid var(--panel-border, #dee2e6);
-  cursor: grab; user-select: none;
+  user-select: none;
   font-size: 0.75rem; font-weight: 600; color: var(--text-secondary, #6c757d);
 }
-.wgt-float-hdr:active { cursor: grabbing; }
+/* Top row: grip + title + close — this is the drag target */
+.wgt-float-hdr-top {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 8px;
+  cursor: grab;
+}
+.wgt-float-hdr-top:active { cursor: grabbing; }
 .wgt-float-grip { opacity: 0.45; font-size: 0.9rem; flex-shrink: 0; }
 .wgt-float-title { flex: 1; }
+/* Bottom row: zone dock buttons — NOT a drag target */
+.wgt-float-hdr-zones {
+  display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+  padding: 2px 8px 4px;
+  border-top: 1px solid var(--panel-border, #dee2e6);
+}
+.wgt-float-hdr-zones .wgt-float-btn { font-size: 0.65rem; padding: 0 4px; }
 .wgt-float-btn {
   background: none; border: none; cursor: pointer;
   padding: 0 3px; font-size: 0.82rem;
@@ -916,35 +927,44 @@ h1, h2, h3, h4, h5, h6 {
 /* Float header dock buttons */
 .wgt-float-btn { font-size: 0.72rem; }
 
-/* Dock zones — invisible when empty, expand + highlight during drag */
+/* Dock zones — completely invisible/zero-size when empty.
+   Occupancy is tracked via the .wgt-zone-occupied class (set in JS),
+   NOT :empty (the resize-handle child would always make zones non-empty). */
 .wgt-dock-zone {
-  min-height: 0;
-  border: 2px dashed transparent;
+  min-height: 0; height: 0;
+  border: 0 dashed transparent;
   border-radius: 6px;
-  margin: 2px;
-  transition: min-height 0.15s, background 0.15s, border-color 0.15s;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  transition: min-height 0.12s, background 0.12s, border-color 0.12s;
   box-sizing: border-box;
 }
-/* When the zone has docked content — give it a subtle background */
-.wgt-dock-zone:not(:empty) {
-  background: rgba(91,141,238,0.04);
-  border-color: rgba(91,141,238,0.2);
-  padding: 4px;
+/* Occupied — sized to content with a subtle frame */
+.wgt-dock-zone.wgt-zone-occupied {
+  height: auto;
   min-height: auto;
+  border-width: 1px;
+  border-color: rgba(91,141,238,0.18);
+  background: rgba(91,141,238,0.04);
+  padding: 4px;
+  margin: 2px 0;
 }
-/* During drag: expand all zones so they're easy to hit */
+/* During drag: expand ALL zones so they're easy to hit */
 body.wgt-dragging .wgt-dock-zone {
-  min-height: 52px;
+  min-height: 48px; height: auto;
+  border-width: 2px;
   border-color: rgba(91,141,238,0.35);
   background: rgba(91,141,238,0.06);
+  margin: 2px 0;
 }
 body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
   border-color: rgba(91,141,238,0.85);
   background: rgba(91,141,238,0.18);
 }
-/* Dock zone resize handle (bottom edge of each zone) */
+/* Dock zone resize handle (bottom edge) — only when occupied */
 .wgt-zone-rzh {
-  display: none;  /* shown only when zone is occupied or hovered */
+  display: none;
   height: 6px;
   cursor: ns-resize;
   background: transparent;
@@ -953,8 +973,7 @@ body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
   border-radius: 0 0 4px 4px;
   transition: border-color 0.15s, background 0.15s;
 }
-.wgt-dock-zone:not(:empty) .wgt-zone-rzh,
-.wgt-dock-zone:hover .wgt-zone-rzh { display: block; }
+.wgt-dock-zone.wgt-zone-occupied .wgt-zone-rzh { display: block; }
 .wgt-zone-rzh:hover,
 .wgt-zone-rzh:active {
   border-color: var(--accent, #5b8dee);
@@ -969,11 +988,16 @@ body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
   background: linear-gradient(135deg, transparent 50%, rgba(128,128,128,0.25) 50%);
   border-radius: 0 0 var(--border-radius,8px) 0;
 }
-.wgt-float { position: relative; overflow: visible; min-width: 160px; }
+.wgt-float { position: relative; overflow: visible; min-width: 160px; max-height: 90vh; display: flex; flex-direction: column; }
+/* Body scrolls if the panel is taller than the float — keeps header + resize reachable */
+.wgt-float-body { padding: 0; overflow: auto; flex: 1 1 auto; min-height: 0; }
+/* Hide structural chrome that's redundant/distracting when a panel is floating */
+.wgt-float-body .wgt-dock-zone { display: none !important; }
+.wgt-float-body .controls-collapse-header { display: none !important; }
+.wgt-float-body .wgt-detach-btn { display: none !important; }
 
-/* AE10: hide duplicate "Controls" title in first control-group when collapse header is present */
-.controls-collapse-header ~ .wgt-dock-zone ~ .control-group > .control-title:first-child,
-.controls-collapse-header ~ .control-group > .control-title:first-child { display: none; }
+/* AE10: hide the duplicate "Controls" title (JS tags just the first control-group's title) */
+.wgt-hide-dup-title { display: none !important; }
 
 /* AK1: controls panel collapse toggle */
 .controls-collapse-header {
