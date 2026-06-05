@@ -29,7 +29,8 @@
       "Bash(cd /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation && dotnet build --no-incremental -v quiet 2>&1 | tail -30)",
       "Bash(findstr /r /s \"av-initials\" \"C:\\\\Users\\\\mjdal\\\\source\\\\repos\\\\mjdalways\\\\EstimationStation\\\\wwwroot\")",
       "Bash(findstr /R \"z-index\" wwwroot\\\\css\\\\site.css)",
-      "PowerShell(git ls-files | ForEach-Object { $f=$_; if\\(Test-Path $f\\){ $lines=\\(Get-Content $f | Measure-Object -Line\\).Lines; [PSCustomObject]@{Lines=$lines;File=$f} } } | Sort-Object Lines -Descending | Select-Object -First 35 | Format-Table -AutoSize)"
+      "PowerShell(git ls-files | ForEach-Object { $f=$_; if\\(Test-Path $f\\){ $lines=\\(Get-Content $f | Measure-Object -Line\\).Lines; [PSCustomObject]@{Lines=$lines;File=$f} } } | Sort-Object Lines -Descending | Select-Object -First 35 | Format-Table -AutoSize)",
+      "Bash(xargs grep -l \"panelSystem\\\\|dockZone\\\\|floatingPanel\")"
     ]
   }
 }

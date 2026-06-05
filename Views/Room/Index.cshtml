@@ -18,56 +18,62 @@
 }
 
 <div class="room-layout" id="roomLayout">
-    <!-- Left Panel: Stories -->
-    <div class="stories-panel" id="storiesPanel">
-        <div id="sidebar-resize-handle" aria-hidden="true"></div>
+    <!-- Left Column: zone wrappers sit outside storiesPanel so they survive when the panel floats -->
+    <div class="room-col room-col-left">
         <div id="wgt-zone-L-top" class="wgt-dock-zone" title="Drop here to dock"></div>
-        <div class="panel-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">📋 Stories</h6>
-            <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="_closeStoriesSheet()" title="Close stories panel">✕</button>
-        </div>
-        <div class="add-story-form">
-            <input type="text" id="newStoryInput" class="form-control form-control-sm" placeholder="Add story… (N to focus)" maxlength="200" />
-            <button class="btn btn-sm btn-primary w-100 mt-1" onclick="addStory()" title="Add story (Enter when input is focused)">+ Add Story <kbd class="btn-kb-hint">N</kbd></button>
-            <details class="mt-2">
-                <summary class="small text-muted" style="cursor:pointer;">📋 Import multiple stories…</summary>
-                <textarea id="importStoriesInput" class="form-control form-control-sm mt-1" rows="4"
-                          placeholder="Paste one story per line..."></textarea>
-                <button class="btn btn-sm btn-outline-primary w-100 mt-1" onclick="importStories()">Import All</button>
-            </details>
-            <details class="mt-2" id="jiraImportDetails">
-                <summary class="small text-muted" style="cursor:pointer;">🔗 Import from Jira…</summary>
-                <div class="mt-1">
-                    <input type="text" id="jiraImportJql" class="form-control form-control-sm"
-                           placeholder="JQL — e.g. sprint in openSprints() ORDER BY rank" />
-                    <div id="jiraImportCreds" class="small text-warning mt-1" style="display:none;">
-                        ⚠️ Jira credentials not set — <a href="#" onclick="openSettingsModal('jira');return false;">configure in Settings → Jira</a>
+        <div class="stories-panel" id="storiesPanel">
+            <div id="sidebar-resize-handle" aria-hidden="true"></div>
+            <div class="stories-collapse-header d-none d-md-flex" onclick="toggleStoriesPanel()" title="Collapse / expand stories panel">
+                <span class="scp-icon" id="storiesToggleIcon">⟨</span>
+                <span class="scp-label">📋 Stories</span>
+            </div>
+            <div class="panel-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">📋 Stories</h6>
+                <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="_closeStoriesSheet()" title="Close stories panel">✕</button>
+            </div>
+            <div class="add-story-form">
+                <input type="text" id="newStoryInput" class="form-control form-control-sm" placeholder="Add story… (N to focus)" maxlength="200" />
+                <button class="btn btn-sm btn-primary w-100 mt-1" onclick="addStory()" title="Add story (Enter when input is focused)">+ Add Story <kbd class="btn-kb-hint">N</kbd></button>
+                <details class="mt-2">
+                    <summary class="small text-muted" style="cursor:pointer;">📋 Import multiple stories…</summary>
+                    <textarea id="importStoriesInput" class="form-control form-control-sm mt-1" rows="4"
+                              placeholder="Paste one story per line..."></textarea>
+                    <button class="btn btn-sm btn-outline-primary w-100 mt-1" onclick="importStories()">Import All</button>
+                </details>
+                <details class="mt-2" id="jiraImportDetails">
+                    <summary class="small text-muted" style="cursor:pointer;">🔗 Import from Jira…</summary>
+                    <div class="mt-1">
+                        <input type="text" id="jiraImportJql" class="form-control form-control-sm"
+                               placeholder="JQL — e.g. sprint in openSprints() ORDER BY rank" />
+                        <div id="jiraImportCreds" class="small text-warning mt-1" style="display:none;">
+                            ⚠️ Jira credentials not set — <a href="#" onclick="openSettingsModal('jira');return false;">configure in Settings → Jira</a>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary w-100 mt-1" onclick="importFromJira()">🔗 Import from Jira</button>
+                        <div id="jiraImportStatus" class="small mt-1"></div>
                     </div>
-                    <button class="btn btn-sm btn-outline-primary w-100 mt-1" onclick="importFromJira()">🔗 Import from Jira</button>
-                    <div id="jiraImportStatus" class="small mt-1"></div>
+                </details>
+            </div>
+            <div id="storiesList" class="stories-list"></div>
+            <div id="sprintDashboard" class="px-1 pt-1 border-top" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted" style="font-size:0.72rem;">Sprint total</span>
+                    <span id="sprintTotal" class="fw-bold text-success" style="font-size:0.8rem;">0 pts</span>
                 </div>
-            </details>
+                <div id="sprintSparkline" style="height:30px; overflow:hidden;"></div>
+                <div id="sprintVelocityWrap" class="mt-1" style="display:none;">
+                    <span class="text-muted" style="font-size:0.65rem;">Past sessions</span>
+                    <div id="sprintVelocityChart" style="height:26px; overflow:hidden;"></div>
+                </div>
+            </div>
         </div>
-        <div id="storiesList" class="stories-list"></div>
         <div id="wgt-zone-L-bot" class="wgt-dock-zone" title="Drop here to dock"></div>
-        <div id="sprintDashboard" class="px-1 pt-1 border-top" style="display:none;">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="text-muted" style="font-size:0.72rem;">Sprint total</span>
-                <span id="sprintTotal" class="fw-bold text-success" style="font-size:0.8rem;">0 pts</span>
-            </div>
-            <div id="sprintSparkline" style="height:30px; overflow:hidden;"></div>
-            <div id="sprintVelocityWrap" class="mt-1" style="display:none;">
-                <span class="text-muted" style="font-size:0.65rem;">Past sessions</span>
-                <div id="sprintVelocityChart" style="height:26px; overflow:hidden;"></div>
-            </div>
-        </div>
     </div>
 
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
         <div id="wgt-zone-C-top" class="wgt-dock-zone" title="Drop here to dock"></div>
         <!-- Current Story Bar -->
-        <div class="current-story-bar">
+        <div class="current-story-bar" id="currentStoryBar">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span class="story-label">Current Story:</span>
                 <span id="currentStoryDisplay" class="current-story-title">No story selected</span>
@@ -175,14 +181,16 @@
         </div>
     </div>
 
-    <!-- Right Controls Panel -->
-    <div class="controls-panel" id="roomControlsPanel">
+    <!-- Right Column: zone wrappers sit outside roomControlsPanel so they survive when the panel floats -->
+    <div class="room-col room-col-right">
+        <div id="wgt-zone-R-top" class="wgt-dock-zone" title="Drop here to dock"></div>
+        <div class="controls-panel" id="roomControlsPanel">
+        <div id="controls-resize-handle" aria-hidden="true"></div>
         <!-- AK1: collapse toggle -->
         <div class="controls-collapse-header d-none d-md-flex" onclick="toggleControlsPanel()" title="Collapse / expand controls panel">
             <span class="ccp-label">🎮 Controls</span>
             <span class="ccp-icon" id="controlsToggleIcon">⟩</span>
         </div>
-        <div id="wgt-zone-R-top" class="wgt-dock-zone" title="Drop here to dock"></div>
         <div class="control-group">
             <h6 class="control-title">🎮 Controls</h6>
             <button class="btn btn-success w-100 mb-2" id="revealBtn" onclick="revealVotes()" title="Reveal votes (Space / Enter)">👁️ Reveal <kbd class="btn-kb-hint">Space/Enter</kbd></button>
@@ -281,9 +289,13 @@
         <div class="control-group">
             <button class="btn btn-sm btn-outline-secondary w-100" onclick="exportCSV()">📥 Export CSV</button>
         </div>
+        </div><!-- end #roomControlsPanel -->
         <div id="wgt-zone-R-bot" class="wgt-dock-zone" title="Drop here to dock"></div>
-    </div>
+    </div><!-- end .room-col-right -->
 </div>
+
+<!-- Bot dock zone — full-width strip between room layout and chat, for docking panels -->
+<div id="wgt-zone-Bot" class="wgt-dock-zone" title="Drop here to dock (bottom strip)"></div>
 
 <!-- Chat Panel (collapsible bottom) -->
 <div class="chat-panel" id="chatPanel">

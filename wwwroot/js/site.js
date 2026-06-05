@@ -340,7 +340,9 @@ function settingsResetAll() {
         if (k && keepKeys.indexOf(k) === -1) toRemove.push(k);
     }
     toRemove.forEach(function(k) { localStorage.removeItem(k); });
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('settingsModal')).hide();
+    var _smEl = document.getElementById('settingsModal');
+    if (_smEl && _smEl.contains(document.activeElement)) document.activeElement.blur();
+    bootstrap.Modal.getOrCreateInstance(_smEl).hide();
     setTimeout(function() { openSettingsModal(); }, 300);
 }
 function exportAllSettings() {
@@ -393,6 +395,12 @@ function _applySoundChoice(choice) {
 
 function confirmSoundChoice(choice) {
     var modalEl = document.getElementById('soundConfirmModal');
+    // Blur any focused descendant before hiding. Bootstrap sets aria-hidden="true" on the
+    // modal during hide(); if a child button still holds focus at that moment the browser
+    // (correctly) warns that a focused element's ancestor is aria-hidden — a11y violation.
+    if (modalEl && modalEl.contains(document.activeElement)) {
+        document.activeElement.blur();
+    }
     if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     var alwaysEl = document.getElementById('sound-choice-always');
     if (alwaysEl && alwaysEl.checked) {

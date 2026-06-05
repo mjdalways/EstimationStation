@@ -1120,7 +1120,9 @@ function _updatePinSubmitLabel() {
 function submitPin() {
     const pin = (document.getElementById('pinInput')?.value || '').trim();
     _pinJoinPending = false; // submitting (Join/Set/Clear) — don't treat the ensuing hide as a cancel
-    const bsModal = bootstrap.Modal.getInstance(document.getElementById('pinModal'));
+    const pinModalEl = document.getElementById('pinModal');
+    if (pinModalEl && pinModalEl.contains(document.activeElement)) document.activeElement.blur();
+    const bsModal = bootstrap.Modal.getInstance(pinModalEl);
     if (bsModal) bsModal.hide();
     if (_pendingRoomName) {
         // Re-join after PIN prompt
@@ -1342,16 +1344,7 @@ function stopLocalTimer() {
     document.getElementById('timerDisplay').style.display = 'none';
 }
 
-// ============================================================
-// Stories Panel Toggle
-// ============================================================
-function toggleStoriesPanel() {
-    const panel = document.getElementById('storiesPanel');
-    const btn = document.getElementById('storiesToggleBtn');
-    const isHidden = panel.style.display === 'none';
-    panel.style.display = isHidden ? 'flex' : 'none';
-    btn.style.display = isHidden ? 'none' : 'block';
-}
+// toggleStoriesPanel — defined later near AK1 with full collapse logic
 
 // ============================================================
 // Chat Toggle
@@ -1666,6 +1659,12 @@ function _acTick() {
     var bar = document.getElementById('session-tc-bar');
     if (!bar) return;
 
+    // Respect widget hide — if the user dismissed this panel via the widget system,
+    // keep it hidden regardless of timer/clock state. Without this, the 1-second tick
+    // overrides the display:none set by _widgetClose, making the hide non-functional.
+    var _wgtLayout = typeof _wgtGetLayout === 'function' ? _wgtGetLayout() : {};
+    if ((_wgtLayout['session-tc-bar'] || {}).hidden) { bar.style.display = 'none'; return; }
+
     var showTimer = localStorage.getItem('es_showTimer') !== '0';
     var showClock = localStorage.getItem('es_showClock') !== '0';
     var hasStory  = !!_acLastStoryId;
@@ -1961,6 +1960,8 @@ function _updateKeyboardLegend() {
 function _populateRoomOtherSettings() {
     // AE10: render the panel manager state
     if (typeof _wgtRenderSettingsPanel === 'function') _wgtRenderSettingsPanel();
+    var icEl = document.getElementById('wgt-infinite-canvas-toggle');
+    if (icEl) icEl.checked = _wgtInfiniteCanvas();
     var kbEl = document.getElementById('kb-shortcuts-toggle');
     if (kbEl) kbEl.checked = _kbShortcutsEnabled;
     var rEnEl = document.getElementById('reaction-enabled-toggle');
@@ -2587,6 +2588,69 @@ function testSoundboard() {
 })();
 
 // ============================================================
+// Controls panel width resize handle (mirrors sidebar resize)
+// ============================================================
+(function() {
+    var handle = document.getElementById('controls-resize-handle');
+    if (!handle) return;
+    var col = document.querySelector('.room-col-right');
+    var dragging = false, startX, startW;
+    var MIN_W = 140;
+    function maxW() { return Math.floor(window.innerWidth * 0.4); }
+    function applyWidth(w) {
+        w = Math.max(MIN_W, Math.min(maxW(), w));
+        document.documentElement.style.setProperty('--controls-width', w + 'px');
+    }
+    handle.addEventListener('mousedown', function(e) {
+        if (!col) return;
+        dragging = true;
+        startX = e.clientX;
+        startW = col.offsetWidth;
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        // Handle is on the left edge — dragging left widens, dragging right narrows
+        applyWidth(startW - (e.clientX - startX));
+    });
+    document.addEventListener('mouseup', function() {
+        if (!dragging) return;
+        dragging = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        var w = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--controls-width'));
+        if (w >= MIN_W) localStorage.setItem('es_controlsWidth', w);
+    });
+    var saved = parseInt(localStorage.getItem('es_controlsWidth'));
+    if (saved >= MIN_W) applyWidth(saved);
+})();
+
+// ============================================================
+// Stories panel collapse/expand (persisted) — mirrors AK1 Controls
+// ============================================================
+function _setStoriesCollapsed(collapsed) {
+    var panel = document.getElementById('storiesPanel');
+    var layout = document.getElementById('roomLayout');
+    if (panel)  panel.classList.toggle('collapsed', collapsed);
+    if (layout) layout.classList.toggle('stories-collapsed', collapsed);
+    var icon = document.getElementById('storiesToggleIcon');
+    // ⟨ when expanded (click to collapse left), ⟩ when collapsed (click to expand right)
+    if (icon) icon.textContent = collapsed ? '⟩' : '⟨';
+}
+function toggleStoriesPanel() {
+    var panel = document.getElementById('storiesPanel');
+    var collapsed = panel ? !panel.classList.contains('collapsed') : true;
+    _setStoriesCollapsed(collapsed);
+    localStorage.setItem('es_storiesPanelCollapsed', collapsed ? '1' : '0');
+}
+window.toggleStoriesPanel = toggleStoriesPanel;
+(function() {
+    if (localStorage.getItem('es_storiesPanelCollapsed') === '1') _setStoriesCollapsed(true);
+})();
+
+// ============================================================
 // AK1: Controls panel collapse/expand (persisted)
 // ============================================================
 function _setControlsCollapsed(collapsed) {
@@ -3028,7 +3092,8 @@ var _WGT_ZONE_IDS = {
     'C-top': 'wgt-zone-C-top',
     'C-bot': 'wgt-zone-C-bot',
     'R-top': 'wgt-zone-R-top',
-    'R-bot': 'wgt-zone-R-bot'
+    'R-bot': 'wgt-zone-R-bot',
+    'Bot':   'wgt-zone-Bot'      // full-width strip below room layout
 };
 
 function _wgtGetZoneEl(zoneKey) {
@@ -3038,7 +3103,20 @@ function _wgtGetZoneEl(zoneKey) {
 function _widgetDockToZone(srcId, zone) {
     var wrap = document.getElementById('wft_' + srcId);
     var src  = document.getElementById(srcId);
-    if (!src) return;
+    if (!src) {
+        // Panel is orphaned (lost from DOM due to prior bug) — try to recover via registry ref
+        var reg = _wgtRegistry.find(function(w) { return w.id === srcId; });
+        if (reg && reg._el) { src = reg._el; } else { return; }
+    }
+
+    // Resolve the zone element BEFORE detaching src. If the zone div lives inside src
+    // (e.g. wgt-zone-R-top lives inside roomControlsPanel), docking there is impossible —
+    // fall back to home. This prevents the panel from being orphaned.
+    if (zone && zone !== 'home') {
+        var zoneElPre = _wgtGetZoneEl(zone);
+        if (!zoneElPre || src.contains(zoneElPre)) { zone = 'home'; }
+    }
+
     // Detach the panel from its current container (float body or a dock zone)
     if (src.parentNode) src.parentNode.removeChild(src);
     if (wrap) wrap.remove();
@@ -3049,26 +3127,49 @@ function _widgetDockToZone(srcId, zone) {
         if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(src, anchor.nextSibling);
         else { var mc = document.querySelector('.main-content'); if (mc) mc.appendChild(src); }
         src.style.display = ''; src.style.opacity = '';
+        // Restore controls panel collapse state that was cleared on float.
+        // Use the DOM-captured state from detach time (_wasCollapsed) as the source of truth;
+        // fall back to localStorage only if we don't have a captured value (e.g. page reload).
+        if (srcId === 'roomControlsPanel') {
+            var _cpReg2 = _wgtRegistry.find(function(w) { return w.id === 'roomControlsPanel'; });
+            var shouldCollapse = (_cpReg2 && _cpReg2._wasCollapsed != null)
+                ? _cpReg2._wasCollapsed
+                : localStorage.getItem('es_controlsPanelCollapsed') === '1';
+            if (_cpReg2) _cpReg2._wasCollapsed = null;
+            _setControlsCollapsed(shouldCollapse);
+        }
+        // Force a synchronous layout pass — reinserting a panel can cause the browser to defer
+        // scroll/overflow recalculation (scrollbar vanishes until next repaint). Reading
+        // offsetHeight forces it immediately.
+        void src.offsetHeight;
         _wgtSaveState(srcId, { floating: false, hidden: false, zone: 'home' });
-        _wgtSyncGrid(srcId);
+        _wgtSyncAllGrids();
         _wgtRefreshZoneClasses();
         _wgtRenderSettingsPanel();
         return;
     }
     var zoneEl = _wgtGetZoneEl(zone);
     if (!zoneEl) { _widgetDockToZone(srcId, 'home'); return; }
-    // Insert before the zone's own resize handle so the handle stays at the bottom
     var rzh = zoneEl.querySelector('.wgt-zone-rzh');
-    if (rzh) zoneEl.insertBefore(src, rzh); else zoneEl.appendChild(src);
+    // Insert at a specific position (from drag-drop) or before the resize handle (append to end)
+    var insertBeforeEl = arguments[2]; // optional 3rd arg from drag drop
+    if (insertBeforeEl && zoneEl.contains(insertBeforeEl) && insertBeforeEl !== src) {
+        zoneEl.insertBefore(src, insertBeforeEl);
+    } else if (rzh) {
+        zoneEl.insertBefore(src, rzh);
+    } else {
+        zoneEl.appendChild(src);
+    }
     src.style.display = ''; src.style.opacity = '';
     _wgtSaveState(srcId, { floating: false, hidden: false, zone: zone });
-    _wgtSyncGrid(srcId);
+    _wgtSaveZoneOrder(zoneEl); // persist the new within-zone order
+    _wgtSyncAllGrids();
     _wgtRefreshZoneClasses();
     _wgtRenderSettingsPanel();
 }
 
 // Collapse/expand the CSS grid columns for the sidebar panels.
-// collapsed=true → column width 0 (panel is floating / docked elsewhere / hidden).
+// collapsed=true → column width 0 (panel is docked to a different column or hidden with no guests).
 function _wgtUpdateGridForPanel(srcId, collapsed) {
     if (srcId === 'storiesPanel') {
         var savedW = parseInt(localStorage.getItem('es_sidebarWidth')) || 260;
@@ -3077,16 +3178,81 @@ function _wgtUpdateGridForPanel(srcId, collapsed) {
         if (rh) rh.style.display = collapsed ? 'none' : '';
     }
     if (srcId === 'roomControlsPanel') {
-        document.documentElement.style.setProperty('--controls-width', collapsed ? '0px' : '220px');
+        var savedCW = parseInt(localStorage.getItem('es_controlsWidth')) || 220;
+        document.documentElement.style.setProperty('--controls-width', collapsed ? '0px' : savedCW + 'px');
+        var crh = document.getElementById('controls-resize-handle');
+        if (crh) crh.style.display = collapsed ? 'none' : '';
     }
 }
 // Derive the correct grid-column state from the panel's saved status.
-// The sidebar column is only shown when the panel is at home AND visible.
+// Rules:
+//   • Hidden AND no guest panels in the column  →  collapse to 0 (column goes away)
+//   • Floating                                  →  keep open (zones must be reachable as drop targets)
+//   • At home or in own column zone             →  keep open
+//   • Any other panel docked to an own zone     →  keep open
+//   • Docked to a different column's zone       →  collapse (panel left this column)
+var _WGT_COL_ZONES = { storiesPanel: ['L-top', 'L-bot'], roomControlsPanel: ['R-top', 'R-bot'] };
 function _wgtSyncGrid(srcId) {
-    var st = _wgtGetLayout()[srcId] || {};
-    var atHomeVisible = !st.hidden && !st.floating && (!st.zone || st.zone === 'home');
-    _wgtUpdateGridForPanel(srcId, !atHomeVisible);
+    if (srcId !== 'storiesPanel' && srcId !== 'roomControlsPanel') return;
+    var ownZones = _WGT_COL_ZONES[srcId] || [];
+    var st  = _wgtGetLayout()[srcId] || {};
+    var zone = st.zone || 'home';
+    // Home panel is "in column" when floating, at home, or in one of the column's own zones
+    var homePanelInCol = !st.hidden && (st.floating || zone === 'home' || ownZones.indexOf(zone) >= 0);
+    // Keep the column open if any guest panel is docked to one of this column's own zones
+    var guestInCol = !homePanelInCol && _wgtRegistry.some(function(w) {
+        if (w.id === srcId) return false;
+        var wSt = _wgtGetLayout()[w.id] || {};
+        return !wSt.hidden && !wSt.floating && ownZones.indexOf(wSt.zone || '') >= 0;
+    });
+    _wgtUpdateGridForPanel(srcId, !homePanelInCol && !guestInCol);
 }
+// Sync both sidebar column widths — call after any widget state change.
+function _wgtSyncAllGrids() {
+    _wgtSyncGrid('storiesPanel');
+    _wgtSyncGrid('roomControlsPanel');
+    _wgtSyncChatBar();
+    _wgtSyncBotZone();
+}
+window._wgtSyncAllGrids = _wgtSyncAllGrids;
+
+// Keep --bot-zone-height in sync so room-layout shrinks when Bot zone is occupied.
+// Uses a ResizeObserver (installed once) for automatic updates when content resizes
+// (e.g. chat body expanding), and reads offsetHeight directly for the initial call.
+var _wgtBotObserver = null;
+function _wgtSyncBotZone() {
+    var botEl = document.getElementById('wgt-zone-Bot');
+    if (!botEl) return;
+
+    function _applyBotHeight() {
+        // Check for real content (anything that's not the zone resize handle)
+        var hasContent = Array.from(botEl.children).some(function(c) {
+            return !c.classList.contains('wgt-zone-rzh');
+        });
+        document.documentElement.style.setProperty(
+            '--bot-zone-height', hasContent ? (botEl.offsetHeight || 100) + 'px' : '0px');
+    }
+
+    // One-time ResizeObserver so height changes (chat expand/collapse) auto-update the var
+    if (!_wgtBotObserver && typeof ResizeObserver !== 'undefined') {
+        _wgtBotObserver = new ResizeObserver(_applyBotHeight);
+        _wgtBotObserver.observe(botEl);
+    }
+
+    // Immediate set (may be 0 before layout if just docked — the observer catches the reflow)
+    requestAnimationFrame(_applyBotHeight);
+}
+window._wgtSyncBotZone = _wgtSyncBotZone;
+
+// Keep the room-layout height correct as chat moves between home / float / zone.
+// When chat is at its home (position:fixed bottom), the room-layout must reserve 48px
+// for it. When chat has left home, those 48px belong back to the room-layout.
+function _wgtSyncChatBar() {
+    var st = _wgtGetLayout()['chatPanel'] || {};
+    var atHome = !st.hidden && !st.floating && (!st.zone || st.zone === 'home');
+    document.documentElement.style.setProperty('--chat-bar-height', atHome ? '48px' : '0px');
+}
+window._wgtSyncChatBar = _wgtSyncChatBar;
 // Add/remove the .wgt-zone-occupied class on each zone based on whether it holds a panel.
 function _wgtRefreshZoneClasses() {
     Object.keys(_WGT_ZONE_IDS).forEach(function(k) {
@@ -3105,16 +3271,22 @@ function _widgetDetach(srcId, title) {
     if (window.innerWidth < 768) return;
     var src = document.getElementById(srcId);
     if (!src || document.getElementById('wft_' + srcId)) return;
+    // If the controls panel is collapsed, expand it before floating — a collapsed float
+    // shows an empty shell. Capture the live DOM state now (not localStorage, which may lag)
+    // so it can be restored exactly when docked home again.
+    if (srcId === 'roomControlsPanel') {
+        var _cpReg = _wgtRegistry.find(function(w) { return w.id === 'roomControlsPanel'; });
+        if (_cpReg) _cpReg._wasCollapsed = src.classList.contains('collapsed');
+        _setControlsCollapsed(false);
+    }
     var saved = (_wgtGetLayout()[srcId] || {});
     var rect  = src.getBoundingClientRect();
     var x = saved.x != null ? saved.x : Math.max(10, Math.round(rect.left));
     var y = saved.y != null ? saved.y : Math.max(10, Math.round(rect.top));
     var w = saved.w || null;
     var h = saved.h || null;
-    // Clamp saved position — ensure at least 200px of the panel is visible vertically,
-    // and the header is on-screen horizontally
-    x = Math.min(Math.max(0, x), Math.max(0, window.innerWidth  - Math.max(100, w || 200)));
-    y = Math.min(Math.max(0, y), Math.max(0, window.innerHeight - 200));
+    // Ensure panel starts within the visible viewport (canvas coords = viewport coords when unscrolled)
+    x = Math.max(0, x); y = Math.max(0, y);
 
     var wrap = document.createElement('div');
     wrap.className = 'wgt-float'; wrap.id = 'wft_' + srcId;
@@ -3123,8 +3295,8 @@ function _widgetDetach(srcId, title) {
 
     // Build dock-zone button list (second row — not a drag target)
     var zoneButtons = Object.keys(_WGT_ZONE_IDS).map(function(k) {
-        var labels = { 'L-top':'◁▲','L-bot':'◁▼','C-top':'▲','C-bot':'▼','R-top':'▷▲','R-bot':'▷▼' };
-        var tips   = { 'L-top':'Dock: left top','L-bot':'Dock: left bottom','C-top':'Dock: centre top','C-bot':'Dock: centre bottom','R-top':'Dock: right top','R-bot':'Dock: right bottom' };
+        var labels = { 'L-top':'◁▲','L-bot':'◁▼','C-top':'▲','C-bot':'▼','R-top':'▷▲','R-bot':'▷▼','Bot':'▼▬' };
+        var tips   = { 'L-top':'Dock: left top','L-bot':'Dock: left bottom','C-top':'Dock: centre top','C-bot':'Dock: centre bottom','R-top':'Dock: right top','R-bot':'Dock: right bottom','Bot':'Dock: bottom strip' };
         return '<button class="wgt-float-btn" title="' + tips[k] + '" onclick="_widgetDockToZone(\'' + srcId + '\',\'' + k + '\')">' + labels[k] + '</button>';
     }).join('');
 
@@ -3135,7 +3307,8 @@ function _widgetDetach(srcId, title) {
     topRow.className = 'wgt-float-hdr-top';
     topRow.innerHTML = '<span class="wgt-float-grip" aria-hidden="true">⠿</span>'
         + '<span class="wgt-float-title">' + title + '</span>'
-        + '<button class="wgt-float-btn wgt-dock-home" title="Dock back to home position" onclick="_widgetDockToZone(\'' + srcId + '\',\'home\')">⤢</button>'
+        + '<button class="wgt-float-btn" title="Reset to default size and bring on-screen" onclick="_widgetResetSize(\'' + srcId + '\')">↺</button>'
+        + '<button class="wgt-float-btn wgt-dock-home" title="Dock back to home position"  onclick="_widgetDockToZone(\'' + srcId + '\',\'home\')">⤢</button>'
         + '<button class="wgt-float-btn wgt-close-btn" title="Hide panel"                  onclick="_widgetClose(\'' + srcId + '\')">×</button>';
     // Bottom row (zone dock buttons — not a drag target)
     var zoneRow = document.createElement('div');
@@ -3153,7 +3326,22 @@ function _widgetDetach(srcId, title) {
 
     body.appendChild(src);  // moves src out of its current parent (home anchor stays put)
     wrap.appendChild(hdr); wrap.appendChild(body); wrap.appendChild(rzh);
-    document.body.appendChild(wrap);
+    _wgtCanvas.appendChild(wrap); // panels live in the scrollable canvas, not body
+
+    // In viewport-bound mode, re-clamp position once the panel has been measured
+    // (offsetWidth/Height are only reliable after the element is in the DOM).
+    if (!_wgtInfiniteCanvas()) {
+        requestAnimationFrame(function() {
+            var mw = Math.max(80, wrap.offsetWidth);
+            var mh = Math.max(40, wrap.offsetHeight);
+            var cx = Math.max(0, Math.min(wrap.offsetLeft, window.innerWidth  - mw));
+            var cy = Math.max(0, Math.min(wrap.offsetTop,  window.innerHeight - mh));
+            if (cx !== wrap.offsetLeft || cy !== wrap.offsetTop) {
+                wrap.style.left = cx + 'px'; wrap.style.top = cy + 'px';
+                _wgtSaveState(srcId, { floating: true, x: cx, y: cy });
+            }
+        });
+    }
 
     // Save floating state BEFORE syncing the grid so the column collapses correctly
     _wgtSaveState(srcId, { floating: true, hidden: false, x: x, y: y });
@@ -3161,10 +3349,14 @@ function _widgetDetach(srcId, title) {
     _wgtRefreshZoneClasses();
     wrap.addEventListener('mousedown', function() { wrap.style.zIndex = ++_wgtZ; });
 
-    // Drag — only the top row (title area) starts a drag; uses the single global controller
+    // Drag — only the top row (title area) starts a drag; uses the single global controller.
+    // Offsets are in canvas-space: clientX + canvas.scrollLeft gives the canvas coordinate.
     topRow.addEventListener('mousedown', function(e) {
         if (e.target.tagName === 'BUTTON') return;
-        _wgtDrag = { wrap: wrap, srcId: srcId, ox: e.clientX - wrap.offsetLeft, oy: e.clientY - wrap.offsetTop };
+        var csl = _wgtCanvas.scrollLeft, cst = _wgtCanvas.scrollTop;
+        _wgtDrag = { wrap: wrap, srcId: srcId,
+                     ox: e.clientX - wrap.offsetLeft + csl,
+                     oy: e.clientY - wrap.offsetTop  + cst };
         wrap.style.zIndex = ++_wgtZ; e.preventDefault();
         document.body.classList.add('wgt-dragging');
     });
@@ -3180,28 +3372,58 @@ function _widgetDetach(srcId, title) {
 // ── Single global drag/resize controller (installed once) ──
 var _wgtDrag = null;   // { wrap, srcId, ox, oy } while dragging
 var _wgtRz   = null;   // { wrap, srcId, sx, sy, sw, sh } while resizing
+// Auto-scroll the canvas when dragging a panel near the viewport edge
+var _wgtAutoScrollFrame = null;
+function _wgtAutoScroll(cx, cy) {
+    var EDGE = 48, SPEED = 10;
+    var dx = 0, dy = 0;
+    if (cx > window.innerWidth  - EDGE) dx =  SPEED;
+    if (cx < EDGE)                      dx = -SPEED;
+    if (cy > window.innerHeight - EDGE) dy =  SPEED;
+    if (cy < EDGE)                      dy = -SPEED;
+    if (dx || dy) {
+        _wgtCanvas.scrollLeft = Math.max(0, _wgtCanvas.scrollLeft + dx);
+        _wgtCanvas.scrollTop  = Math.max(0, _wgtCanvas.scrollTop  + dy);
+    }
+}
+
 document.addEventListener('mousemove', function(e) {
     if (_wgtDrag) {
         var wrap = _wgtDrag.wrap;
-        var nx = Math.max(0, Math.min(window.innerWidth  - Math.max(80, wrap.offsetWidth),  e.clientX - _wgtDrag.ox));
-        var ny = Math.max(0, Math.min(window.innerHeight - 40,                              e.clientY - _wgtDrag.oy));
+        // Position in canvas-space: clientXY + canvas scroll offset
+        var nx = Math.max(0, e.clientX - _wgtDrag.ox + _wgtCanvas.scrollLeft);
+        var ny = Math.max(0, e.clientY - _wgtDrag.oy + _wgtCanvas.scrollTop);
+        // Viewport-bound mode: clamp right/bottom so panels can't go off-screen.
+        // Left/top are already clamped via Math.max(0,…) above.
+        if (!_wgtInfiniteCanvas()) {
+            nx = Math.min(nx, Math.max(0, window.innerWidth  - wrap.offsetWidth));
+            ny = Math.min(ny, Math.max(0, window.innerHeight - wrap.offsetHeight));
+        }
         wrap.style.left = nx + 'px'; wrap.style.top = ny + 'px';
         _wgtHighlightZoneUnder(e.clientX, e.clientY, wrap);
+        if (_wgtInfiniteCanvas()) _wgtAutoScroll(e.clientX, e.clientY);
     } else if (_wgtRz) {
         var w = _wgtRz.wrap;
-        w.style.width  = Math.max(160, _wgtRz.sw + (e.clientX - _wgtRz.sx)) + 'px';
-        w.style.height = Math.max(80,  _wgtRz.sh + (e.clientY - _wgtRz.sy)) + 'px';
+        // Clamp to viewport so the panel can't be resized off-screen — the resize handle
+        // is at the bottom-right corner; once it goes off-screen the user loses access to it.
+        var maxW = Math.floor(window.innerWidth  - w.offsetLeft - 4);
+        var maxH = Math.floor(window.innerHeight - w.offsetTop  - 4);
+        w.style.width  = Math.max(160, Math.min(maxW, _wgtRz.sw + (e.clientX - _wgtRz.sx))) + 'px';
+        w.style.height = Math.max(80,  Math.min(maxH, _wgtRz.sh + (e.clientY - _wgtRz.sy))) + 'px';
     }
 });
 document.addEventListener('mouseup', function(e) {
     if (_wgtDrag) {
         var d = _wgtDrag; _wgtDrag = null;
-        // Detect the zone under the cursor BEFORE collapsing the zones (removing
-        // wgt-dragging shrinks them to 0px, which would defeat the hit-test).
-        var zoneKey = _wgtZoneUnderPoint(e.clientX, e.clientY, d.wrap);
+        // _wgtDragTarget was set on the last mousemove — use it to get both the zone and the
+        // precise insert position (before which sibling panel to land).
+        var dropTarget = _wgtDragTarget;
+        var zoneKey = dropTarget ? dropTarget.zoneKey : _wgtZoneUnderPoint(e.clientX, e.clientY, d.wrap);
+        var insertBefore = (dropTarget && dropTarget.zoneKey === zoneKey) ? dropTarget.insertBefore : null;
         document.body.classList.remove('wgt-dragging');
+        _wgtDragTarget = null;
         _wgtClearZoneHighlights();
-        if (zoneKey) { _widgetDockToZone(d.srcId, zoneKey); }
+        if (zoneKey) { _widgetDockToZone(d.srcId, zoneKey, insertBefore); }
         else { _wgtSaveState(d.srcId, { floating: true, x: d.wrap.offsetLeft, y: d.wrap.offsetTop, w: d.wrap.offsetWidth, h: d.wrap.offsetHeight }); }
     }
     if (_wgtRz) {
@@ -3214,27 +3436,73 @@ document.addEventListener('mouseup', function(e) {
 function _wgtShowSnapHints(show) {
     // No-op — zones are always present in the DOM; body.wgt-dragging class does the work
 }
-// Read the element under the cursor, seeing THROUGH the dragged panel
-// (pointer-events:none avoids the visible flicker that toggling `visibility` caused).
+// Read the element under the cursor, seeing THROUGH the dragged panel AND the float canvas.
+// Both must be temporarily transparent so elementFromPoint reaches the dock zones below.
 function _wgtElUnder(cx, cy, skipEl) {
-    var old = skipEl.style.pointerEvents;
+    var oldWrap   = skipEl.style.pointerEvents;
+    var oldCanvas = _wgtCanvas ? _wgtCanvas.style.pointerEvents : null;
     skipEl.style.pointerEvents = 'none';
+    if (_wgtCanvas) _wgtCanvas.style.pointerEvents = 'none';
     var under = document.elementFromPoint(cx, cy);
-    skipEl.style.pointerEvents = old;
+    skipEl.style.pointerEvents = oldWrap;
+    if (_wgtCanvas) _wgtCanvas.style.pointerEvents = oldCanvas !== null ? oldCanvas : '';
     return under;
 }
+
+// _wgtDragTarget — last hovered zone + insert position (set during mousemove)
+var _wgtDragTarget = null; // { zone: DOMElement, zoneKey: string, insertBefore: DOMElement|null }
+
+// Remove the blue insertion-position indicator line from whatever zone it's in
+function _wgtRemoveInsertIndicator() {
+    var ind = document.getElementById('wgt-insert-ind');
+    if (ind && ind.parentNode) ind.parentNode.removeChild(ind);
+}
+
 function _wgtHighlightZoneUnder(cx, cy, skipEl) {
     _wgtClearZoneHighlights();
+    _wgtDragTarget = null;
     var under = _wgtElUnder(cx, cy, skipEl);
     var zone = under && under.closest ? under.closest('.wgt-dock-zone') : null;
-    if (zone) zone.classList.add('wgt-zone-hover');
+    if (!zone) return;
+    zone.classList.add('wgt-zone-hover');
+
+    // Resolve zone key
+    var zoneKey = null;
+    Object.keys(_WGT_ZONE_IDS).forEach(function(k) { if (_WGT_ZONE_IDS[k] === zone.id) zoneKey = k; });
+
+    // Find which position within the zone the cursor is at (by comparing cursor Y to each
+    // panel's vertical midpoint). insertBefore=null means append to end.
+    var panelsInZone = Array.from(zone.children).filter(function(c) {
+        return c.id && !c.classList.contains('wgt-zone-rzh') && c.id !== (skipEl && skipEl.id);
+    });
+    var insertBefore = null;
+    for (var i = 0; i < panelsInZone.length; i++) {
+        var r = panelsInZone[i].getBoundingClientRect();
+        if (cy < r.top + r.height / 2) { insertBefore = panelsInZone[i]; break; }
+    }
+    _wgtDragTarget = { zone: zone, zoneKey: zoneKey, insertBefore: insertBefore };
+
+    // Show a thin blue line indicating where the panel will land
+    var ind = document.getElementById('wgt-insert-ind') || document.createElement('div');
+    ind.id = 'wgt-insert-ind';
+    ind.style.cssText = 'height:2px;background:var(--accent,#5b8dee);margin:0 2px;pointer-events:none;border-radius:1px;flex-shrink:0;';
+    if (insertBefore && zone.contains(insertBefore)) {
+        zone.insertBefore(ind, insertBefore);
+    } else {
+        var rzh = zone.querySelector('.wgt-zone-rzh');
+        if (rzh) zone.insertBefore(ind, rzh); else zone.appendChild(ind);
+    }
 }
 function _wgtClearZoneHighlights() {
     document.querySelectorAll('.wgt-dock-zone.wgt-zone-hover').forEach(function(el) {
         el.classList.remove('wgt-zone-hover');
     });
+    _wgtRemoveInsertIndicator();
 }
 function _wgtZoneUnderPoint(cx, cy, skipEl) {
+    // Re-use the drag target set during the last mousemove — same cursor position, avoids
+    // a second elementFromPoint call and keeps the insert position consistent.
+    if (_wgtDragTarget) return _wgtDragTarget.zoneKey;
     var under = _wgtElUnder(cx, cy, skipEl);
     var zone = under && under.closest ? under.closest('.wgt-dock-zone') : null;
     if (!zone) return null;
@@ -3242,6 +3510,35 @@ function _wgtZoneUnderPoint(cx, cy, skipEl) {
     Object.keys(_WGT_ZONE_IDS).forEach(function(k) { if (_WGT_ZONE_IDS[k] === zoneId) found = k; });
     return found;
 }
+
+// Reset a floating panel to its natural (CSS-determined) size and re-clamp it fully on-screen.
+// Triggered by the ↺ button in the float header.
+function _widgetResetSize(srcId) {
+    var wrap = document.getElementById('wft_' + srcId);
+    if (!wrap) return;
+    // Clear inline size — panel reverts to CSS-determined natural size
+    wrap.style.width  = '';
+    wrap.style.height = '';
+    // Scroll canvas back to origin so the panel comes into view
+    _wgtCanvas.scrollLeft = 0;
+    _wgtCanvas.scrollTop  = 0;
+    // After one frame the browser has reflowed and we can read the natural dimensions
+    requestAnimationFrame(function() {
+        var pw = wrap.offsetWidth, ph = wrap.offsetHeight;
+        // Clamp to fully within the visible viewport (canvas at scroll 0 = viewport)
+        var nx = Math.max(0, Math.min(window.innerWidth  - pw, wrap.offsetLeft));
+        var ny = Math.max(0, Math.min(window.innerHeight - ph, wrap.offsetTop));
+        wrap.style.left = nx + 'px';
+        wrap.style.top  = ny + 'px';
+        var all = _wgtGetLayout();
+        var st  = all[srcId] || {};
+        delete st.w; delete st.h;
+        st.x = nx; st.y = ny;
+        all[srcId] = st;
+        localStorage.setItem('es_widgetLayout', JSON.stringify(all));
+    });
+}
+window._widgetResetSize = _widgetResetSize;
 
 // Dock to home (return to original placeholder)
 function _widgetDock(srcId) {
@@ -3254,7 +3551,7 @@ function _widgetClose(srcId) {
     var src = document.getElementById(srcId);
     if (src) src.style.display = 'none';
     _wgtSaveState(srcId, { floating: false, hidden: true });
-    _wgtSyncGrid(srcId);          // collapse the grid column if it's a sidebar panel
+    _wgtSyncAllGrids();
     _wgtRefreshZoneClasses();
     _wgtRenderSettingsPanel();
 }
@@ -3264,18 +3561,88 @@ function _widgetShow(srcId) {
     var src = document.getElementById(srcId);
     if (src) { src.style.display = ''; src.style.opacity = ''; }
     _wgtSaveState(srcId, { hidden: false });
-    _wgtSyncGrid(srcId);
+    _wgtSyncAllGrids();
     _wgtRefreshZoneClasses();
     _wgtRenderSettingsPanel();
 }
+
+// ── Within-zone ordering ──────────────────────────────────────────────────────────────
+// Saves the current DOM order of all panels inside a dock zone to localStorage.
+// Called whenever a panel is docked or reordered.
+function _wgtSaveZoneOrder(zoneEl) {
+    if (!zoneEl || !zoneEl.id) return;
+    var zoneKey = null;
+    Object.keys(_WGT_ZONE_IDS).forEach(function(k) { if (_WGT_ZONE_IDS[k] === zoneEl.id) zoneKey = k; });
+    if (!zoneKey) return;
+    var order = Array.from(zoneEl.children)
+        .filter(function(c) { return c.id && !c.classList.contains('wgt-zone-rzh'); })
+        .map(function(c) { return c.id; });
+    var saved = JSON.parse(localStorage.getItem('es_wgtZoneOrder') || '{}');
+    if (order.length > 1) saved[zoneKey] = order;
+    else delete saved[zoneKey];
+    localStorage.setItem('es_wgtZoneOrder', JSON.stringify(saved));
+}
+window._wgtSaveZoneOrder = _wgtSaveZoneOrder;
+
+// Re-orders panels within each zone according to the saved order.
+// Called at end of _wgtRestore so persisted order survives page reload.
+function _wgtApplyZoneOrders() {
+    var saved = JSON.parse(localStorage.getItem('es_wgtZoneOrder') || '{}');
+    Object.keys(saved).forEach(function(zk) {
+        var zoneEl = _WGT_ZONE_IDS[zk] && document.getElementById(_WGT_ZONE_IDS[zk]);
+        if (!zoneEl) return;
+        var rzh = zoneEl.querySelector('.wgt-zone-rzh');
+        saved[zk].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el && zoneEl.contains(el)) {
+                if (rzh) zoneEl.insertBefore(el, rzh); else zoneEl.appendChild(el);
+            }
+        });
+    });
+}
+window._wgtApplyZoneOrders = _wgtApplyZoneOrders;
+
+// Move a panel one step up (-1) or down (+1) within its dock zone.
+// Called from the ▲/▼ buttons in Settings.
+function _wgtReorderInZone(id, dir) {
+    var src = document.getElementById(id);
+    if (!src) return;
+    var zoneEl = src.parentNode;
+    if (!zoneEl || !zoneEl.classList.contains('wgt-dock-zone')) return;
+    var panels = Array.from(zoneEl.children).filter(function(c) {
+        return !c.classList.contains('wgt-zone-rzh');
+    });
+    var idx = panels.indexOf(src);
+    if (dir < 0 && idx > 0) {
+        // Move up: insert before the previous sibling
+        zoneEl.insertBefore(src, panels[idx - 1]);
+    } else if (dir > 0 && idx < panels.length - 1) {
+        // Move down: insert after the next sibling (before panels[idx+2] or rzh/end)
+        var rzh = zoneEl.querySelector('.wgt-zone-rzh');
+        var anchor = panels[idx + 2] || rzh || null;
+        if (anchor) zoneEl.insertBefore(src, anchor); else zoneEl.appendChild(src);
+    } else {
+        return; // already at boundary — nothing to do
+    }
+    _wgtSaveZoneOrder(zoneEl);
+    _wgtRenderSettingsPanel();
+}
+window._wgtReorderInZone = _wgtReorderInZone;
 
 // Reset all panels to home + visible + clear zone sizes
 function _wgtResetAll() {
     // Clear persisted state first so _wgtSyncGrid computes "home" for every panel
     localStorage.removeItem('es_widgetLayout');
     localStorage.removeItem('es_wgtZoneSizes');
+    localStorage.removeItem('es_wgtZoneOrder');
     _wgtRegistry.forEach(function(w) {
-        // _widgetDockToZone('home') detaches from float/zone and re-anchors at home
+        // If the panel was orphaned (lost from DOM by a prior bug), re-attach it via the
+        // stored _el reference before calling dock-home, which needs getElementById to work.
+        if (w._el && !document.contains(w._el)) {
+            var anchor = document.getElementById('wgh_' + w.id);
+            if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(w._el, anchor.nextSibling);
+            else { var mc = document.querySelector('.main-content'); if (mc) mc.appendChild(w._el); }
+        }
         _widgetDockToZone(w.id, 'home');
     });
     // Reset zone sizes
@@ -3288,54 +3655,352 @@ function _wgtResetAll() {
 }
 window._wgtResetAll = _wgtResetAll;
 
+// ── Infinite-canvas setting ────────────────────────────────────────────────────────────
+// 'es_wgtInfiniteCanvas' === '1' → panels can scroll off-screen (canvas grows, scrollbars appear).
+// '0' (default) → viewport-bound mode: drag clamps to keep panels fully on-screen.
+function _wgtInfiniteCanvas() { return localStorage.getItem('es_wgtInfiniteCanvas') === '1'; }
+function _wgtSetInfiniteCanvas(on) {
+    localStorage.setItem('es_wgtInfiniteCanvas', on ? '1' : '0');
+    _wgtApplyCanvasSetting();
+    var el = document.getElementById('wgt-infinite-canvas-toggle');
+    if (el) el.checked = !!on;
+}
+function _wgtApplyCanvasSetting() {
+    document.body.classList.toggle('wgt-infinite-canvas', _wgtInfiniteCanvas());
+}
+window._wgtSetInfiniteCanvas  = _wgtSetInfiniteCanvas;
+window._wgtApplyCanvasSetting = _wgtApplyCanvasSetting;
+
 // Inject a ⊡ detach button into an element's header
 function _wgtAddDetachBtn(srcId, title) {
     var src = document.getElementById(srcId);
-    if (!src || src.querySelector('.wgt-detach-btn')) return;
+    // Guard: use data-for attribute so we only skip when THIS widget's own button already
+    // exists — not when a nested child widget happens to have a .wgt-detach-btn inside it
+    // (e.g. session-tc-bar is nested inside currentStoryBar).
+    if (!src || src.querySelector('.wgt-detach-btn[data-for="' + srcId + '"]')) return;
     var btn = document.createElement('button');
     btn.className = 'wgt-detach-btn'; btn.title = 'Float this panel';
     btn.textContent = '⊡';
+    btn.setAttribute('data-for', srcId);
     btn.onclick = function(e) { e.stopPropagation(); _widgetDetach(srcId, title); };
-    var hdr = src.querySelector(':scope > h6') || src.querySelector(':scope > div');
-    if (hdr) hdr.appendChild(btn); else src.insertBefore(btn, src.firstChild);
+    // Target the panel's real visible header — skip resize handles and dock zones which
+    // come first in the DOM but are not user-visible header elements.
+    var hdr = src.querySelector(':scope > .panel-header')
+           || src.querySelector(':scope > .controls-collapse-header')
+           || src.querySelector(':scope > h6')
+           || src.querySelector(':scope > div:not(#sidebar-resize-handle):not(#controls-resize-handle):not(.wgt-dock-zone)');
+    if (hdr) {
+        if (hdr.classList.contains('panel-header')) {
+            // panel-header uses justify-content-between — inject ⊡ INTO the inner h6 so it
+            // sits LEFT of the title text rather than being space-between'd to the far left
+            // while the title floats to the far right.
+            var h6El = hdr.querySelector('h6');
+            if (h6El) h6El.insertBefore(btn, h6El.firstChild);
+            else      hdr.insertBefore(btn, hdr.firstChild);
+        } else {
+            // Compact bars (current-story-bar, chat) prepend the button on the left.
+            var isCompactBar = hdr.classList.contains('d-flex') || hdr.classList.contains('chat-header');
+            if (isCompactBar) hdr.insertBefore(btn, hdr.firstChild);
+            else              hdr.appendChild(btn);
+        }
+    } else {
+        src.insertBefore(btn, src.firstChild);
+    }
 }
+
+// Dock a panel from the settings UI — handles all three cases: zone, float, hide.
+function _wgtDockFromSettings(id, val) {
+    if (val === 'float') {
+        var reg = _wgtRegistry.find(function(w) { return w.id === id; });
+        _widgetDetach(id, reg ? reg.title : id);
+    } else if (val === 'hidden') {
+        _widgetClose(id);
+    } else {
+        _widgetDockToZone(id, val);
+    }
+}
+window._wgtDockFromSettings = _wgtDockFromSettings;
+
+// Highlight a panel row in the settings list (called from layout preview chip clicks).
+function _wgtHighlightPanel(id) {
+    var row = document.getElementById('wgt-row-' + id);
+    if (!row) return;
+    row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    row.style.transition = 'background 0.15s';
+    row.style.background = 'rgba(91,141,238,0.18)';
+    setTimeout(function() { row.style.background = ''; }, 900);
+}
+window._wgtHighlightPanel = _wgtHighlightPanel;
 
 // Render the panel state list in Settings → Other
 function _wgtRenderSettingsPanel() {
     var el = document.getElementById('wgt-settings-list');
     if (!el || !_wgtRegistry.length) return;
     var all = _wgtGetLayout();
-    el.innerHTML = _wgtRegistry.map(function(w) {
-        var state    = all[w.id] || {};
-        var isHidden = !!state.hidden;
-        var isFloat  = !isHidden && !!state.floating;
-        var isDocked = !isHidden && !isFloat;
-        var zone     = (!isHidden && !isFloat) ? (state.zone || 'home') : '';
-        var zoneLbl  = (zone && zone !== 'home') ? ' (' + zone + ')' : '';
-        // Three-state buttons — active state is highlighted; clicking any state also unhides
-        function btn(label, active, onclick) {
-            return '<button class="btn btn-sm py-0 px-2 ' + (active ? 'btn-primary' : 'btn-outline-secondary') + '"'
-                + ' style="font-size:0.68rem;" onclick="' + onclick + '">' + label + '</button>';
+
+    // ── Zone options for the dropdown ──────────────────────────────────────
+    var ZONE_OPTS = [
+        { v: 'home',   l: '🏠 Home (default position)' },
+        { v: 'L-top',  l: '◁▲ Left · top' },
+        { v: 'L-bot',  l: '◁▼ Left · bottom' },
+        { v: 'C-top',  l: '▲ Centre · top' },
+        { v: 'C-bot',  l: '▼ Centre · bottom' },
+        { v: 'R-top',  l: '▷▲ Right · top' },
+        { v: 'R-bot',  l: '▷▼ Right · bottom' },
+        { v: 'Bot',    l: '▼▬ Bottom strip' },
+        { v: 'float',  l: '⊡ Floating window' },
+        { v: 'hidden', l: '× Hidden' }
+    ];
+
+    // ── Build layout preview ───────────────────────────────────────────────
+    // Build zoneMap in DOM order (= visual order = priority order).
+    // This ensures the preview always reflects the actual on-screen stacking.
+    var zoneMap = {};
+    ['L-top','L-bot','C-top','C-bot','R-top','R-bot','Bot'].forEach(function(zk) {
+        var zoneEl = _WGT_ZONE_IDS[zk] && document.getElementById(_WGT_ZONE_IDS[zk]);
+        if (!zoneEl) { zoneMap[zk] = []; return; }
+        zoneMap[zk] = Array.from(zoneEl.children)
+            .filter(function(c) { return c.id && !c.classList.contains('wgt-zone-rzh'); })
+            .map(function(c) { return _wgtRegistry.find(function(w) { return w.id === c.id; }); })
+            .filter(Boolean);
+    });
+
+    // Panels not accounted for by zones are either at home, floating, or hidden
+    var zonedIds = Object.keys(zoneMap).reduce(function(s, k) {
+        zoneMap[k].forEach(function(w) { s[w.id] = true; }); return s;
+    }, {});
+    var homeLeft = null, homeRight = null, homeMain = [], floating = [], hidden = [];
+    _wgtRegistry.forEach(function(w) {
+        if (zonedIds[w.id]) return;
+        var st = all[w.id] || {};
+        if (st.hidden)   { hidden.push(w);   return; }
+        if (st.floating) { floating.push(w); return; }
+        if (w.id === 'storiesPanel')           homeLeft  = w;
+        else if (w.id === 'roomControlsPanel') homeRight = w;
+        else                                   homeMain.push(w);
+    });
+
+    function pvChip(w, extraCls, orderNum, totalInZone) {
+        var lbl = w.title.split(' ').slice(0, 2).join(' ');
+        // Show numeric order badge when multiple panels share a zone
+        var badge = (totalInZone > 1 && orderNum >= 0)
+            ? '<span style="font-size:0.55rem;opacity:0.55;margin-right:1px;">' + (orderNum + 1) + '.</span>'
+            : '';
+        return '<span class="wgt-pv-chip ' + (extraCls||'') + '" title="' + w.title
+             + (totalInZone > 1 ? ' — position ' + (orderNum+1) + ' of ' + totalInZone : '')
+             + '" onclick="_wgtHighlightPanel(\'' + w.id + '\')">' + badge + lbl + '</span>';
+    }
+    function pvCell(content, extraCls, style) {
+        return '<div class="wgt-pv-cell ' + (extraCls||'') + '"' + (style ? ' style="' + style + '"' : '') + '>'
+             + content + '</div>';
+    }
+    function pvZone(zk, label, extraCls) {
+        var panels = zoneMap[zk] || [];
+        var total = panels.length;
+        var cls = 'wgt-pv-zone' + (total ? ' wgt-pv-occupied' : '') + (extraCls ? ' ' + extraCls : '');
+        var chipsHtml = panels.map(function(p, i) { return pvChip(p, '', i, total); }).join('');
+        return pvCell(
+            '<span class="wgt-pv-zl">' + label + '</span>'
+            + (total ? '<div class="wgt-pv-chips">' + chipsHtml + '</div>' : ''),
+            cls
+        );
+    }
+    function pvHome(w) {
+        return w ? pvChip(w, '', -1, 1) : '<span class="wgt-pv-empty">—</span>';
+    }
+
+    var previewHtml = '<div class="wgt-pv">'
+        + '<div class="wgt-pv-grid">'
+        // Row 1: top zones
+        + pvZone('L-top', '◁▲ L-top')
+        + pvZone('C-top', '▲ C-top')
+        + pvZone('R-top', '▷▲ R-top')
+        // Row 2: home columns + main content
+        + pvCell('<span class="wgt-pv-zl">Left col</span>' + pvHome(homeLeft), 'wgt-pv-col-home')
+        + pvCell('<span class="wgt-pv-zl">Main content</span><div class="wgt-pv-chips">'
+                 + (homeMain.length ? homeMain.map(pvChip).join('') : '<span class="wgt-pv-empty">—</span>')
+                 + '</div>', 'wgt-pv-main')
+        + pvCell('<span class="wgt-pv-zl">Right col</span>' + pvHome(homeRight), 'wgt-pv-col-home')
+        // Row 3: bottom zones
+        + pvZone('L-bot', '◁▼ L-bot')
+        + pvZone('C-bot', '▼ C-bot')
+        + pvZone('R-bot', '▷▼ R-bot')
+        // Row 4: Bot zone full-width
+        + pvZone('Bot', '▼▬ Bottom strip', 'wgt-pv-span')
+        + '</div>';
+
+    // Floating + hidden summary rows
+    if (floating.length) {
+        previewHtml += '<div class="wgt-pv-float-row"><span class="wgt-pv-zl">⊡ Floating:</span>'
+            + floating.map(function(w) { return pvChip(w, 'wgt-pv-float-chip'); }).join('') + '</div>';
+    }
+    if (hidden.length) {
+        previewHtml += '<div class="wgt-pv-hidden-row"><span class="wgt-pv-zl">× Hidden:</span>'
+            + hidden.map(function(w) { return pvChip(w, 'wgt-pv-hidden-chip'); }).join('') + '</div>';
+    }
+    previewHtml += '</div>';
+
+    // ── Panel list with zone dropdown + reorder buttons ───────────────────
+    var isMob = window.innerWidth < 768;
+    var listHtml = _wgtRegistry.map(function(w) {
+        var st = all[w.id] || {};
+        var isHidden = !!st.hidden;
+        var isFloat  = !isHidden && !!st.floating;
+        var curVal   = isFloat ? 'float' : (isHidden ? 'hidden' : (st.zone || 'home'));
+
+        var opts = ZONE_OPTS.map(function(o) {
+            var dis = (o.v === 'float' && isMob) ? ' disabled' : '';
+            return '<option value="' + o.v + '"' + (curVal === o.v ? ' selected' : '') + dis + '>'
+                 + o.l + '</option>';
+        }).join('');
+
+        // ▲▼ reorder controls — only shown when the panel is in a zone with >1 panel
+        var reorderHtml = '';
+        if (!isHidden && !isFloat && curVal !== 'home') {
+            var zEl = _WGT_ZONE_IDS[curVal] && document.getElementById(_WGT_ZONE_IDS[curVal]);
+            if (zEl) {
+                var sibs = Array.from(zEl.children).filter(function(c) {
+                    return c.id && !c.classList.contains('wgt-zone-rzh');
+                });
+                var idx = sibs.findIndex(function(c) { return c.id === w.id; });
+                if (sibs.length > 1 && idx >= 0) {
+                    var btnStyle = 'font-size:0.68rem;line-height:1;padding:1px 5px;';
+                    reorderHtml = '<button class="btn btn-sm btn-outline-secondary" style="' + btnStyle + '"'
+                        + (idx === 0 ? ' disabled' : '')
+                        + ' onclick="_wgtReorderInZone(\'' + w.id + '\',-1)" title="Move up in zone">▲</button>'
+                        + '<button class="btn btn-sm btn-outline-secondary" style="' + btnStyle + '"'
+                        + (idx === sibs.length - 1 ? ' disabled' : '')
+                        + ' onclick="_wgtReorderInZone(\'' + w.id + '\',1)" title="Move down in zone">▼</button>';
+                }
+            }
         }
-        return '<div class="d-flex align-items-center gap-1 mb-1 small flex-wrap">'
-            + '<span class="me-1" style="min-width:110px;">' + w.title + '</span>'
-            + btn('🏠 Docked' + zoneLbl, isDocked, '_widgetDockToZone(\'' + w.id + '\',\'home\')')
-            + btn('⊡ Float',  isFloat,  '_widgetDetach(\'' + w.id + '\',\'' + w.title.replace(/'/g,"&#39;") + '\')')
-            + btn('× Hide',   isHidden, '_widgetClose(\'' + w.id + '\')')
-            + '</div>';
+
+        // ── Collapse toggle + column width for sidebar panels ─────────
+        var colCtrlHtml = '';
+        if (w.id === 'storiesPanel' || w.id === 'roomControlsPanel') {
+            var isStories  = w.id === 'storiesPanel';
+            var cpEl = document.getElementById(isStories ? 'storiesPanel' : 'roomControlsPanel');
+            var isCollapsed = cpEl && cpEl.classList.contains('collapsed');
+            var toggleFn = isStories ? 'toggleStoriesPanel()' : 'toggleControlsPanel()';
+            var collapseBtn = '<button class="btn btn-sm py-0 px-2 ' + (isCollapsed ? 'btn-warning' : 'btn-outline-secondary')
+                + '" style="font-size:0.68rem;" onclick="' + toggleFn + ';_wgtRenderSettingsPanel()" title="Toggle panel collapse">'
+                + (isCollapsed ? (isStories ? '⟩ Collapsed' : '⟨ Collapsed') : (isStories ? '⟨ Expanded' : '⟩ Expanded'))
+                + '</button>';
+            // Column width slider: sidebar 80–500px, controls 140–400px
+            var cssVar = isStories ? '--sidebar-width' : '--controls-width';
+            var lsKey  = isStories ? 'es_sidebarWidth' : 'es_controlsWidth';
+            var minW = isStories ? 80 : 140, maxW = isStories ? 500 : 400;
+            // Read saved (expanded) width from localStorage so slider shows useful value even when collapsed
+            var curW = parseInt(localStorage.getItem(lsKey)) || (isStories ? 260 : 220);
+            colCtrlHtml = collapseBtn
+                + '<label class="ms-2 me-1" style="font-size:0.68rem;white-space:nowrap;">Width:</label>'
+                + '<input type="range" min="' + minW + '" max="' + maxW + '" value="' + curW + '" '
+                + 'style="width:70px;" title="Column width (' + curW + 'px)" '
+                + 'oninput="document.documentElement.style.setProperty(\'' + cssVar + '\',this.value+\'px\');this.title=\'Column width (\'+this.value+\'px)\';localStorage.setItem(\'' + lsKey + '\',this.value)">'
+                + '<span style="font-size:0.65rem;min-width:28px;">' + curW + 'px</span>';
+        }
+
+        return '<div id="wgt-row-' + w.id + '" class="d-flex align-items-center gap-1 mb-1 small flex-wrap" '
+             + 'style="border-radius:4px;padding:2px 4px;transition:background 0.15s;">'
+             + '<span style="min-width:120px;font-size:0.75rem;">' + w.title + '</span>'
+             + '<select class="form-select wgt-zone-select" '
+             + 'onchange="_wgtDockFromSettings(\'' + w.id + '\',this.value)">'
+             + opts + '</select>'
+             + reorderHtml
+             + colCtrlHtml
+             + '</div>';
     }).join('');
+
+    el.innerHTML = previewHtml + listHtml;
 }
 window._wgtRenderSettingsPanel = _wgtRenderSettingsPanel;
+
+// ── Scrollable float canvas ────────────────────────────────────────────────────────
+// Float panels live inside this canvas as position:absolute elements.
+// When panels go beyond the viewport the canvas grows scrollbars so users can scroll to them.
+// The canvas background forwards pointer events through to the page underneath so clicks
+// on voting cards, participants etc. still work normally.
+var _wgtCanvas = (function() {
+    var cv = document.createElement('div');
+    cv.id = 'wgt-float-canvas';
+    document.body.appendChild(cv);
+
+    // Forward background mousedown/click events to whatever is behind the canvas.
+    // Scrollbar clicks are excluded: offsetX > clientWidth means the vertical scrollbar strip.
+    function _fwd(e) {
+        if (e.target !== cv) return; // click is on a float panel — let it handle itself
+        var inScrollbarV = e.offsetX > cv.clientWidth;
+        var inScrollbarH = e.offsetY > cv.clientHeight;
+        if (inScrollbarV || inScrollbarH) return; // real scrollbar click — don't intercept
+        cv.style.pointerEvents = 'none';
+        var under = document.elementFromPoint(e.clientX, e.clientY);
+        cv.style.pointerEvents = '';
+        if (under && under !== cv) {
+            under.dispatchEvent(new MouseEvent(e.type, {
+                bubbles: true, cancelable: true, view: window, detail: e.detail,
+                clientX: e.clientX, clientY: e.clientY,
+                screenX: e.screenX, screenY: e.screenY,
+                button: e.button, buttons: e.buttons,
+                ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey
+            }));
+        }
+    }
+    cv.addEventListener('mousedown', _fwd);
+    cv.addEventListener('click',     _fwd);
+
+    // Forward wheel events to the element underneath ONLY when the canvas itself has
+    // no scrollable overflow (i.e. no floats are off-screen). When floats ARE off-screen,
+    // native canvas scroll handles it so stories/main-content lists can still be scrolled.
+    cv.addEventListener('wheel', function(e) {
+        if (e.target !== cv) return;
+        var canScroll = cv.scrollWidth > cv.clientWidth || cv.scrollHeight > cv.clientHeight;
+        if (!canScroll) {
+            cv.style.pointerEvents = 'none';
+            var under = document.elementFromPoint(e.clientX, e.clientY);
+            cv.style.pointerEvents = '';
+            if (under && under !== cv) {
+                under.dispatchEvent(new WheelEvent('wheel', {
+                    deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ,
+                    deltaMode: e.deltaMode, bubbles: true, cancelable: true
+                }));
+            }
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    return cv;
+})();
+
+// ── Re-clamp floating panel positions when the window is resized ──────────────────
+// Float panels use position:fixed — they don't scroll into view. If the viewport shrinks
+// after a panel was placed, it can go off-screen with no way to reach it.
+// On window resize, scroll the canvas back to origin and re-clamp any panels that
+// are now fully outside the viewport (they'd be unreachable even with scrolling).
+window.addEventListener('resize', function() {
+    if (_wgtCanvas) { _wgtCanvas.scrollLeft = 0; _wgtCanvas.scrollTop = 0; }
+    _wgtRegistry.forEach(function(w) {
+        var wrap = document.getElementById('wft_' + w.id);
+        if (!wrap) return;
+        var maxX = Math.max(0, window.innerWidth  - Math.max(80,  wrap.offsetWidth));
+        var maxY = Math.max(0, window.innerHeight - Math.max(40,  wrap.offsetHeight));
+        var nx = Math.max(0, Math.min(maxX, wrap.offsetLeft));
+        var ny = Math.max(0, Math.min(maxY, wrap.offsetTop));
+        if (nx !== wrap.offsetLeft) { wrap.style.left = nx + 'px'; _wgtSaveState(w.id, { x: nx }); }
+        if (ny !== wrap.offsetTop)  { wrap.style.top  = ny + 'px'; _wgtSaveState(w.id, { y: ny }); }
+    });
+});
 
 // Restore persisted state on load + register all widgets
 (function _wgtRestore() {
     var widgets = [
-        { id: 'vibeCheckPanel',      title: '🌡️ Vibe Check' },
-        { id: 'session-tc-bar',      title: '⏱️ Timer & Clock' },
-        { id: 'votingSection',       title: '🃏 Your Vote' },
-        { id: 'participantsSection', title: '👥 Participants' },
-        { id: 'storiesPanel',        title: '📋 Stories' },
-        { id: 'roomControlsPanel',   title: '🎮 Controls' }
+        { id: 'vibeCheckPanel',      title: '🌡️ Vibe Check'      },
+        { id: 'session-tc-bar',      title: '⏱️ Timer & Clock'   },
+        { id: 'votingSection',       title: '🃏 Your Vote'        },
+        { id: 'participantsSection', title: '👥 Participants'     },
+        { id: 'storiesPanel',        title: '📋 Stories'          },
+        { id: 'roomControlsPanel',   title: '🎮 Controls'         },
+        { id: 'currentStoryBar',     title: '📌 Current Story'    },
+        { id: 'chatPanel',           title: '💬 Chat'             }
     ];
     _wgtRegistry.push.apply(_wgtRegistry, widgets);
 
@@ -3355,12 +4020,16 @@ window._wgtRenderSettingsPanel = _wgtRenderSettingsPanel;
 
     // Create a permanent hidden home-anchor at each panel's ORIGINAL position,
     // so "dock home" always returns the panel exactly where it started.
+    // Also store a direct DOM reference so reset can recover an orphaned panel.
     widgets.forEach(function(w) {
         var src = document.getElementById(w.id);
-        if (src && !document.getElementById('wgh_' + w.id)) {
-            var a = document.createElement('div');
-            a.id = 'wgh_' + w.id; a.className = 'wgt-home-anchor'; a.style.display = 'none';
-            src.parentNode.insertBefore(a, src);
+        if (src) {
+            w._el = src; // strong ref — survives detachment from DOM
+            if (!document.getElementById('wgh_' + w.id)) {
+                var a = document.createElement('div');
+                a.id = 'wgh_' + w.id; a.className = 'wgt-home-anchor'; a.style.display = 'none';
+                src.parentNode.insertBefore(a, src);
+            }
         }
         _wgtAddDetachBtn(w.id, w.title);
     });
@@ -3379,6 +4048,12 @@ window._wgtRenderSettingsPanel = _wgtRenderSettingsPanel;
         }
     });
     _wgtRefreshZoneClasses();
+    // Restore within-zone ordering (panels may have been docked before order was applied)
+    _wgtApplyZoneOrders();
+    // Apply infinite-canvas / viewport-bound CSS setting from localStorage
+    _wgtApplyCanvasSetting();
+    // Sync chat bar height on load so room-layout height is correct from the start
+    _wgtSyncChatBar();
 })();
 
 // ============================================================

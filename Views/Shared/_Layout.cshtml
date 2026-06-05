@@ -1608,6 +1608,26 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/5/2026 (122)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 Stories collapse + panel fixes — added a <strong>⟨ / ⟩ collapse toggle</strong> to the 📋 Stories left sidebar (mirrors the existing Controls toggle). Fixed the sidebar resize handle not working: <code>.stories-panel</code> was missing <code>position: relative</code>, so the absolutely-positioned drag handle anchored to the viewport instead of the panel. Fixed Controls resize handle covering the expand button when collapsed: the 8px drag strip now hides when the panel is in its collapsed state. Fixed the Controls <strong>missing scrollbar</strong>: <code>.room-col</code> was missing <code>min-height: 0</code>, preventing the flex height constraint that makes <code>overflow-y: auto</code> show a scrollbar. <strong>Settings → Panels</strong> now shows a collapse toggle and a width slider for Stories and Controls columns.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/5/2026 (121)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 Bot zone fix — panels docked to the <strong>▼▬ Bottom strip</strong> zone were invisible because the room layout was expanding to fill the full viewport, pushing the zone off-screen. Fixed with a new <code>--bot-zone-height</code> CSS variable (measured via ResizeObserver) that shrinks room-layout to make room. Also fixed the Chat panel specifically: it had a hard-coded <code>height: 48px</code> that prevented the body from showing when docked to a zone — now overridden to <code>height: auto; min-height: 160px; display: flex; flex-direction: column</code> inside any zone.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/5/2026 (120)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 Zone panel ordering — panels in the same dock zone can now be reordered. In <strong>Settings → Other → Panels</strong>, rows that share a zone show ▲/▼ buttons to move a panel up or down within that zone. The layout preview shows a numeric badge (1. 2. …) on chips in multi-panel zones so the current stacking order is visible at a glance. Order is saved to localStorage and restored on reload. When dragging a floating panel onto an occupied zone, a blue insertion-line appears showing exactly where it will land — drop it above or below existing panels for precise placement.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/5/2026 (119)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 Panel layout preview &amp; right-column fix — <strong>Settings → Other → Panels</strong> now shows a mini layout diagram (top/centre/bottom zones, left/right columns, floating and hidden rows) so you can see the full picture at a glance. Click any panel chip to jump to its row. Each panel's location is now a <strong>dropdown</strong> that lists every zone, Float, and Hide — one control instead of three buttons. Fixed an issue where the right column (R-top / R-bot zones) was completely inaccessible while Controls was floating: the grid column collapsed to 0px during drag, hiding the drop targets. A CSS <code>minmax(60px, …)</code> rule now keeps both side columns at least 60px wide while dragging so zones remain reachable.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/5/2026 (118)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 Panel fixes &amp; infinite-canvas setting — fixed the ⊡ detach button position on <strong>📋 Stories</strong> (it was pushed to the right by flex spacing; now correctly sits next to the title). Fixed <strong>📌 Current Story</strong> missing its ⊡ button entirely (caused by the session timer being nested inside the bar — the duplicate-guard now uses a <code>data-for</code> attribute so nested widgets don't block each other). Fixed floating panels going off-screen: a duplicate CSS <code>position: fixed</code> rule was overriding <code>position: absolute</code>, preventing the canvas from growing scrollbars. New <strong>Settings → Panels → Allow panels to scroll off-screen</strong> toggle: off (default) = viewport-bound, panels cannot be dragged past the browser edge; on = infinite canvas, scrollbars appear when panels go off-screen.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/5/2026 (117)</strong></p>
                         <ul class="mb-2">
                             <li>🪟 Floating panel drag fixed — a duplicate CSS rule was overriding the floating panel's <code>position: fixed</code> with <code>position: relative</code>, which dropped detached panels to the bottom of the page and made them impossible to drag up. Panels now float correctly relative to the viewport and can be dragged anywhere. Also: dock zones expand instantly (not via a transition) so drag-to-dock targeting is reliable, and the drop-zone is now detected before the zones collapse so snapping into a zone works every time.</li>
@@ -2367,7 +2387,14 @@
                             <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;"
                                     onclick="_wgtResetAll()" title="Dock all panels back to their home positions and make them all visible">↩ Reset all</button>
                         </div>
-                        <p class="small text-muted mb-2">Panels can be floated anywhere on screen using the ⊡ button in each panel's header. Drag a floating panel near the <strong>left or right edge</strong> to snap it into that sidebar.</p>
+                        <p class="small text-muted mb-2">Use the dropdown next to each panel below to move it to any zone, float it, or hide it. The preview diagram shows the current layout at a glance — click any panel chip to jump to its row.</p>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="wgt-infinite-canvas-toggle"
+                                   onchange="_wgtSetInfiniteCanvas(this.checked)">
+                            <label class="form-check-label small" for="wgt-infinite-canvas-toggle">
+                                Allow panels to scroll off-screen (infinite canvas with scrollbars)
+                            </label>
+                        </div>
                         <div id="wgt-settings-list" class="mb-3"></div>
 
                         <!-- PWA / App Install -->

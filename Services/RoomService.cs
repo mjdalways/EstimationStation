@@ -69,6 +69,14 @@ public class RoomService
         if (persisted != null)
         {
             persisted.Name = roomName; // keep loaded room's name canonical
+            // Participants hold SignalR ConnectionIds that are only valid within a single
+            // server process lifetime. Any participants in the file are stale — their
+            // connections are definitively gone. Clear them so nobody sees ghost participants
+            // after a restart (dev or production). Stories, settings and pin are preserved.
+            persisted.Participants.Clear();
+            persisted.HostConnectionId = null;  // stale connection ID
+            persisted.VotesRevealed = false;    // no participants left to have voted
+            persisted.Vibes.Clear();            // per-round data tied to participants
             _rooms[roomName] = persisted;
             return persisted;
         }

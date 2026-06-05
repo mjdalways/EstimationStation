@@ -324,23 +324,40 @@ h1, h2, h3, h4, h5, h6 {
   display: grid;
   grid-template-columns: var(--sidebar-width, 260px) 1fr var(--controls-width, 220px);
   gap: 0;
-  height: calc(100vh - 52px - 48px); /* navbar + chat */
+  /* --chat-bar-height: reserved for chat at home (position:fixed).
+     --bot-zone-height: reserved for occupied Bot zone below the layout.
+     Both are set by JS (_wgtSyncChatBar, _wgtSyncBotZone). */
+  height: calc(100vh - 52px - var(--chat-bar-height, 48px) - var(--bot-zone-height, 0px));
   overflow: hidden;
 }
 /* AK1: collapsed controls panel narrows its grid column to a thin strip */
 .room-layout.controls-collapsed { --controls-width: 40px; }
+/* Stories panel collapse (mirrors controls) */
+.room-layout.stories-collapsed  { --sidebar-width: 40px; }
+
+/* Column wrappers — L and R panels sit inside these so their dock zones survive floating */
+.room-col {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0; /* required so flex children get a constrained height → overflow-y scrollbar works */
+}
+.room-col-left  { min-width: 80px; } /* was on .stories-panel */
 
 /* Stories Panel */
 .stories-panel {
-  position: relative;
+  position: relative; /* anchors #sidebar-resize-handle { position:absolute } */
   background-color: var(--panel-bg, #ffffff);
   border-right: 1px solid var(--panel-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex: 1 1 auto;   /* fill the room-col-left column */
+  min-height: 0;
 }
 
-/* Fix #10 — sidebar min-width */
+/* Fix #10 — sidebar min-width (now on .room-col-left; keep here for when panel floats standalone) */
 .stories-panel { min-width: 80px; }
 /* Fix #10 — narrow mode: hide text labels, keep icons */
 .stories-panel.narrow .story-title-text { display: none; }
@@ -868,21 +885,85 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Controls Panel */
 .controls-panel {
+  position: relative;         /* anchor the resize handle */
   background-color: var(--panel-bg);
   border-left: 1px solid var(--panel-border);
   overflow-y: auto;
   padding: 0.75rem;
+  flex: 1 1 auto;             /* fill the room-col-right column */
+  min-height: 0;
 }
 
-/* AE10: Floating widget panels */
+/* Controls panel left-edge resize handle (mirrors the sidebar right-edge handle) */
+#controls-resize-handle {
+  position: absolute; left: 0; top: 0; width: 8px; height: 100%;
+  cursor: ew-resize; z-index: 10; background: transparent;
+  display: flex; align-items: center; justify-content: center;
+}
+#controls-resize-handle::after {
+  content: '⋮';
+  font-size: 14px;
+  color: var(--panel-border, #dee2e6);
+  opacity: 0.4;
+  pointer-events: none;
+  line-height: 1;
+}
+#controls-resize-handle:hover { background: rgba(91,141,238,0.12); }
+#controls-resize-handle:hover::after { opacity: 1; color: var(--accent, #5b8dee); }
+/* Hide the resize handle when Controls is collapsed — it otherwise covers the expand button */
+.controls-panel.collapsed #controls-resize-handle { display: none !important; }
+
+/* ── Stories collapse header (mirrors AK1 controls-collapse-header) ── */
+.stories-collapse-header {
+  display: none; /* shown only on desktop via d-md-flex */
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  padding: 0.25rem 0.4rem 0.5rem;
+  user-select: none;
+}
+.stories-collapse-header .scp-icon { font-size: 0.85rem; line-height: 1; }
+/* Collapsed state: hide everything except the collapse header */
+.stories-panel.collapsed { overflow-x: hidden; min-width: auto !important; }
+.stories-panel.collapsed .panel-header,
+.stories-panel.collapsed .add-story-form,
+.stories-panel.collapsed .stories-list,
+.stories-panel.collapsed #sprintDashboard,
+.stories-panel.collapsed #sidebar-resize-handle { display: none !important; }
+.stories-panel.collapsed .stories-collapse-header { justify-content: center; }
+.stories-panel.collapsed .scp-label { display: none; }
+
+/* AE10: Floating widget panels — live inside #wgt-float-canvas (position:fixed scrollable layer) */
+/* Canvas: fixed overlay, transparent, forwards background events to page underneath.
+   Default: overflow:hidden (viewport-bound mode). body.wgt-infinite-canvas enables scrollbars. */
+#wgt-float-canvas {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 1049;
+  background: transparent;
+  /* pointer-events:auto so scrollbar works; background clicks are forwarded in JS */
+}
+/* Infinite-canvas mode: enable scrollbars so panels off-screen can be reached */
+body.wgt-infinite-canvas #wgt-float-canvas { overflow: auto; }
+
 .wgt-float {
-  position: fixed; z-index: 1050;
+  position: absolute; /* relative to #wgt-float-canvas — enables scroll overflow */
+  z-index: 1050;
   background: var(--panel-bg, #fff);
   border: 1px solid var(--panel-border, #dee2e6);
   border-radius: var(--border-radius, 8px);
   box-shadow: 0 6px 24px rgba(0,0,0,0.16);
-  min-width: 180px; max-width: 440px;
-  overflow: hidden;
+  min-width: 160px; max-width: 440px;
+  max-height: 90vh;
+  overflow: visible; /* body handles internal scroll; visible lets resize handle show */
+  display: flex; flex-direction: column;
 }
 .wgt-float-hdr {
   background: var(--bg-secondary, #f8f9fa);
@@ -890,15 +971,29 @@ h1, h2, h3, h4, h5, h6 {
   user-select: none;
   font-size: 0.75rem; font-weight: 600; color: var(--text-secondary, #6c757d);
 }
-/* Top row: grip + title + close — this is the drag target */
+/* Top row: grip + title + action buttons */
 .wgt-float-hdr-top {
-  display: flex; align-items: center; gap: 5px;
-  padding: 5px 8px;
-  cursor: grab;
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 6px;
+  /* No grab cursor on the whole row — only on the draggable parts below.
+     This ensures hovering over the action buttons shows pointer, not grab. */
 }
-.wgt-float-hdr-top:active { cursor: grabbing; }
-.wgt-float-grip { opacity: 0.45; font-size: 0.9rem; flex-shrink: 0; }
-.wgt-float-title { flex: 1; }
+/* Only the grip icon and title text are the drag affordance */
+.wgt-float-grip {
+  opacity: 0.45; font-size: 0.9rem; flex-shrink: 0;
+  cursor: grab; padding: 0 3px;
+}
+.wgt-float-grip:active { cursor: grabbing; }
+.wgt-float-title { flex: 1; cursor: grab; user-select: none; }
+.wgt-float-title:active { cursor: grabbing; }
+/* Action buttons in the header need a bigger hit target so they're easy to click
+   even when they're close to the grab zone */
+.wgt-float-hdr-top > .wgt-float-btn {
+  padding: 3px 7px;
+  font-size: 0.85rem;
+  min-width: 22px;
+  text-align: center;
+}
 /* Bottom row: zone dock buttons — NOT a drag target */
 .wgt-float-hdr-zones {
   display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
@@ -950,6 +1045,21 @@ h1, h2, h3, h4, h5, h6 {
   padding: 4px;
   margin: 2px 0;
 }
+/* Occupied zones inside column wrappers must fill available column space rather than
+   growing to fit their content. Without this, a tall panel (e.g. Controls) docked to
+   R-top/R-bot expands the zone beyond the column height; the panel's own overflow-y:auto
+   never triggers because it is never height-constrained from above, so no scrollbar appears. */
+.room-col .wgt-dock-zone.wgt-zone-occupied {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Keep the resize grip at the bottom of the zone from growing */
+.room-col .wgt-dock-zone .wgt-zone-rzh {
+  flex: 0 0 auto;
+}
 /* During drag: expand ALL zones so they're easy to hit */
 body.wgt-dragging .wgt-dock-zone {
   min-height: 48px; height: auto;
@@ -961,6 +1071,24 @@ body.wgt-dragging .wgt-dock-zone {
 body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
   border-color: rgba(91,141,238,0.85);
   background: rgba(91,141,238,0.18);
+}
+/* Blue line showing where a dragged panel will land within an occupied zone */
+#wgt-insert-ind {
+  height: 2px;
+  background: var(--accent, #5b8dee);
+  margin: 0 2px;
+  border-radius: 1px;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+/* During drag, ensure columns that are collapsed to 0px (controls/stories floated)
+   still have enough width to expose their dock zones as drop targets.
+   minmax() keeps them at least 60px wide while dragging. */
+body.wgt-dragging .room-layout {
+  grid-template-columns:
+    minmax(60px, var(--sidebar-width,  260px))
+    1fr
+    minmax(60px, var(--controls-width, 220px));
 }
 /* Dock zone resize handle (bottom edge) — only when occupied */
 .wgt-zone-rzh {
@@ -988,7 +1116,6 @@ body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
   background: linear-gradient(135deg, transparent 50%, rgba(128,128,128,0.25) 50%);
   border-radius: 0 0 var(--border-radius,8px) 0;
 }
-.wgt-float { position: fixed; overflow: visible; min-width: 160px; max-height: 90vh; display: flex; flex-direction: column; }
 /* Body scrolls if the panel is taller than the float — keeps header + resize reachable */
 .wgt-float-body { padding: 0; overflow: auto; flex: 1 1 auto; min-height: 0; }
 /* Hide structural chrome that's redundant/distracting when a panel is floating */
@@ -998,6 +1125,138 @@ body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
 
 /* AE10: hide the duplicate "Controls" title (JS tags just the first control-group's title) */
 .wgt-hide-dup-title { display: none !important; }
+
+/* ── Panel Layout Preview (Settings → Other → Panels) ──────────────────── */
+.wgt-pv { font-size: 0.68rem; margin-bottom: 8px; }
+.wgt-pv-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+.wgt-pv-cell {
+  border: 1px solid var(--panel-border, #dee2e6);
+  border-radius: 4px;
+  padding: 3px 5px;
+  min-height: 30px;
+  background: var(--bg-primary, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wgt-pv-zone { background: rgba(91,141,238,0.04); }
+.wgt-pv-zone.wgt-pv-occupied { border-color: rgba(91,141,238,0.4); background: rgba(91,141,238,0.09); }
+.wgt-pv-span { grid-column: 1 / -1; flex-direction: row; align-items: center; min-height: 24px; }
+.wgt-pv-col-home { background: var(--bg-secondary, #f8f9fa); }
+.wgt-pv-main { background: var(--bg-secondary, #f8f9fa); }
+.wgt-pv-zl { font-size: 0.6rem; color: var(--text-secondary, #6c757d); opacity: 0.75; white-space: nowrap; }
+.wgt-pv-chips { display: flex; flex-wrap: wrap; gap: 2px; }
+.wgt-pv-chip {
+  display: inline-flex; align-items: center;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(91,141,238,0.15);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+  transition: background 0.12s;
+}
+.wgt-pv-chip:hover { background: rgba(91,141,238,0.32); }
+.wgt-pv-chip.wgt-pv-float-chip { background: rgba(255,193,7,0.2); }
+.wgt-pv-chip.wgt-pv-hidden-chip { background: rgba(108,117,125,0.15); opacity: 0.6; }
+.wgt-pv-float-row, .wgt-pv-hidden-row {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 2px 0;
+}
+.wgt-pv-empty { color: var(--text-secondary, #6c757d); opacity: 0.45; }
+/* Zone select dropdown in settings panel list */
+.wgt-zone-select {
+  font-size: 0.68rem !important;
+  padding: 1px 4px !important;
+  height: auto !important;
+  border-radius: 4px;
+  min-width: 120px;
+  max-width: 160px;
+  display: inline-block;
+}
+
+/* ── Bottom dock zone (full-width strip between room layout and chat) ── */
+#wgt-zone-Bot {
+  /* inherits .wgt-dock-zone base — invisible when empty */
+}
+#wgt-zone-Bot.wgt-zone-occupied {
+  /* Override column-zone flex rules — Bot spans full page width */
+  flex: none !important;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: auto;
+  max-height: 40vh;
+  overflow-y: auto;
+  border-width: 1px;
+  border-color: rgba(91,141,238,0.18);
+  background: rgba(91,141,238,0.04);
+  padding: 4px;
+  margin: 2px 0;
+  box-sizing: border-box;
+}
+body.wgt-dragging #wgt-zone-Bot {
+  display: block;
+  min-height: 48px; height: auto;
+  border: 2px dashed rgba(91,141,238,0.35);
+  background: rgba(91,141,238,0.06);
+  margin: 2px 0;
+}
+body.wgt-dragging #wgt-zone-Bot.wgt-zone-hover {
+  border-color: rgba(91,141,238,0.85);
+  background: rgba(91,141,238,0.18);
+}
+
+/* ── Chat panel: un-fix when inside a widget container ── */
+/* At home chatPanel is position:fixed at the bottom. When floated or docked to a zone   */
+/* it moves into a container — override the fixed positioning so it renders in-place.     */
+.wgt-float-body .chat-panel,
+.wgt-dock-zone  .chat-panel,
+#wgt-zone-Bot   .chat-panel {
+  position: relative !important;
+  bottom: auto !important; left: auto !important; right: auto !important;
+  width: auto !important;
+  /* Remove the hard-coded 48px home height so the panel grows to show its body */
+  height: auto !important;
+  min-height: 160px;
+  display: flex !important;
+  flex-direction: column;
+  z-index: auto !important;
+  transition: none !important;
+}
+/* When floating, the wgt-float header replaces the chat header as the title/drag bar */
+.wgt-float-body .chat-header { display: none !important; }
+/* Ensure the chat body is visible (it's hidden until chat is 'expanded') */
+.wgt-float-body .chat-body,
+.wgt-dock-zone  .chat-body,
+#wgt-zone-Bot   .chat-body {
+  display: flex !important;
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 100px;
+}
+
+/* ⊡ detach button injected into panel-header h6 — sits left of the title text */
+.panel-header h6 > .wgt-detach-btn {
+    margin-right: 4px;
+    vertical-align: middle;
+}
+/* The ⊡ detach button for the compact story bar is prepended (left side) in JS.
+   Give it a small right margin so it sits apart from the "Current Story:" label. */
+#currentStoryBar > .d-flex > .wgt-detach-btn {
+    margin-right: 4px;
+    flex-shrink: 0;
+    opacity: 0.65;
+}
 
 /* AK1: controls panel collapse toggle */
 .controls-collapse-header {
