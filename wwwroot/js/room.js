@@ -3774,7 +3774,7 @@ var _WGT_PRESETS = {
         panels: {} // empty → reset-all is sufficient
     },
     'focus-voting': {
-        label: '🃏 Focus Voting', desc: 'Minimise distractions during a vote',
+        label: '🃏 Focus Voting', desc: 'Minimal UI for voting — hide controls/vibe/chat, collapse stories',
         panels: {
             'roomControlsPanel':   { hidden: true },
             'vibeCheckPanel':      { hidden: true },
@@ -3784,12 +3784,19 @@ var _WGT_PRESETS = {
         storiesCollapsed: true, controlsCollapsed: false
     },
     'facilitator': {
-        label: '🎮 Facilitator', desc: 'All panels visible, controls expanded',
-        panels: {},
+        // Distinct from Default: the facilitator typically doesn't vote themselves.
+        // Voting cards are hidden; participants are promoted to C-top so vote status is prominent;
+        // stories and controls are expanded so the facilitator can manage the session.
+        label: '🎮 Facilitator', desc: 'Participants prominent, voting hidden, stories + controls expanded',
+        panels: {
+            'votingSection':       { hidden: true },
+            'vibeCheckPanel':      { hidden: true },
+            'participantsSection': { zone: 'C-top' }
+        },
         storiesCollapsed: false, controlsCollapsed: false
     },
     'chat-focus': {
-        label: '💬 Chat Focus', desc: 'Chat pinned in bottom strip, controls minimal',
+        label: '💬 Chat Focus', desc: 'Chat pinned in bottom strip, stories + controls collapsed',
         panels: {
             'chatPanel':           { zone: 'Bot' },
             'vibeCheckPanel':      { hidden: true },
@@ -4037,6 +4044,8 @@ function _wgtRenderSettingsPanel() {
                 + '<span style="font-size:0.65rem;min-width:28px;">' + curW + 'px</span>';
         }
 
+        // ↺ reset always comes immediately after the dropdown so its column position never
+        // shifts — the ▲▼ reorder buttons follow and are only present for multi-panel zones.
         var resetBtn = '<button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.68rem;" '
             + 'onclick="_wgtResetPanel(\'' + w.id + '\')" title="Reset this panel to its default home position">↺</button>';
 
@@ -4046,8 +4055,8 @@ function _wgtRenderSettingsPanel() {
              + '<select class="form-select wgt-zone-select" '
              + 'onchange="_wgtDockFromSettings(\'' + w.id + '\',this.value)">'
              + opts + '</select>'
-             + reorderHtml
              + resetBtn
+             + reorderHtml
              + colCtrlHtml
              + '</div>';
     }).join('');
