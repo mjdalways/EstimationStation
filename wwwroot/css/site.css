@@ -937,7 +937,7 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
   padding: 0;
   overflow: visible;
-  transition: min-height 0.12s, background 0.12s, border-color 0.12s;
+  transition: background 0.12s, border-color 0.12s;  /* not min-height — zones must size instantly for reliable drop hit-testing */
   box-sizing: border-box;
 }
 /* Occupied — sized to content with a subtle frame */
@@ -988,7 +988,7 @@ body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
   background: linear-gradient(135deg, transparent 50%, rgba(128,128,128,0.25) 50%);
   border-radius: 0 0 var(--border-radius,8px) 0;
 }
-.wgt-float { position: relative; overflow: visible; min-width: 160px; max-height: 90vh; display: flex; flex-direction: column; }
+.wgt-float { position: fixed; overflow: visible; min-width: 160px; max-height: 90vh; display: flex; flex-direction: column; }
 /* Body scrolls if the panel is taller than the float — keeps header + resize reachable */
 .wgt-float-body { padding: 0; overflow: auto; flex: 1 1 auto; min-height: 0; }
 /* Hide structural chrome that's redundant/distracting when a panel is floating */

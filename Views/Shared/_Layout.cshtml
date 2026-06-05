@@ -1608,6 +1608,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/5/2026 (117)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 Floating panel drag fixed — a duplicate CSS rule was overriding the floating panel's <code>position: fixed</code> with <code>position: relative</code>, which dropped detached panels to the bottom of the page and made them impossible to drag up. Panels now float correctly relative to the viewport and can be dragged anywhere. Also: dock zones expand instantly (not via a transition) so drag-to-dock targeting is reliable, and the drop-zone is now detected before the zones collapse so snapping into a zone works every time.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/4/2026 (116)</strong></p>
                         <ul class="mb-2">
                             <li>🪟 Panel system bug-fix pass — empty dock zones no longer show phantom boxes (the stray dashed area above Controls is gone); fixed the duplicate "🎮 Controls" title hiding all the other control-group titles; floating panels now have a clean two-row header (drag bar + dock buttons), scroll internally if tall so the header is always reachable (no more "stuck at the bottom"), and are clamped on-screen at startup; the grid column collapses whenever Stories/Controls is floated, docked elsewhere, or hidden — and restores correctly; "Dock home" now returns a panel to its exact original spot; and the drag system was rewritten with a single controller (no more listener leaks or flicker).</li>

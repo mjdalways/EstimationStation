@@ -3196,9 +3196,11 @@ document.addEventListener('mousemove', function(e) {
 document.addEventListener('mouseup', function(e) {
     if (_wgtDrag) {
         var d = _wgtDrag; _wgtDrag = null;
+        // Detect the zone under the cursor BEFORE collapsing the zones (removing
+        // wgt-dragging shrinks them to 0px, which would defeat the hit-test).
+        var zoneKey = _wgtZoneUnderPoint(e.clientX, e.clientY, d.wrap);
         document.body.classList.remove('wgt-dragging');
         _wgtClearZoneHighlights();
-        var zoneKey = _wgtZoneUnderPoint(e.clientX, e.clientY, d.wrap);
         if (zoneKey) { _widgetDockToZone(d.srcId, zoneKey); }
         else { _wgtSaveState(d.srcId, { floating: true, x: d.wrap.offsetLeft, y: d.wrap.offsetTop, w: d.wrap.offsetWidth, h: d.wrap.offsetHeight }); }
     }
