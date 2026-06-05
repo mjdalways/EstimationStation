@@ -3045,10 +3045,12 @@ function _widgetDockToZone(srcId, zone) {
     else if (wrap)  { wrap.parentNode.insertBefore(src, wrap); wrap.remove(); }
 
     if (zone === 'home' || !zone) {
-        src.style.display = '';
-        _wgtSaveState(srcId, { floating: false, zone: 'home' });
+        src.style.display = '';  // always un-hide when docking home
+        src.style.opacity  = '';  // restore if timer had set opacity
+        _wgtSaveState(srcId, { floating: false, hidden: false, zone: 'home' });
         _wgtUpdateGridForPanel(srcId, false);
         _wgtShowSnapHints(false);
+        _wgtRenderSettingsPanel();
         return;
     }
     var zoneEl = _wgtGetZoneEl(zone);
@@ -3088,6 +3090,9 @@ function _widgetDetach(srcId, title) {
     var y = saved.y != null ? saved.y : Math.max(10, Math.round(rect.top));
     var w = saved.w || null;
     var h = saved.h || null;
+    // Clamp saved position to current viewport so panels can't appear off-screen
+    x = Math.min(Math.max(0, x), Math.max(0, window.innerWidth  - (w || 200)));
+    y = Math.min(Math.max(0, y), Math.max(0, window.innerHeight - 60));
 
     var wrap = document.createElement('div');
     wrap.className = 'wgt-float'; wrap.id = 'wft_' + srcId;
@@ -3226,19 +3231,24 @@ function _widgetClose(srcId) {
 // Restore a hidden panel (show + dock home)
 function _widgetShow(srcId) {
     var src = document.getElementById(srcId);
-    if (src) { src.style.display = ''; }
+    if (src) { src.style.display = ''; src.style.opacity = ''; }
     _wgtSaveState(srcId, { hidden: false });
+    _wgtUpdateGridForPanel(srcId, false);
     _wgtRenderSettingsPanel();
 }
 
-// Reset all panels to home + visible + clear zone sizes
+// Reset all panels to home + visible + clear zone sizes + clamp to viewport
 function _wgtResetAll() {
     _wgtRegistry.forEach(function(w) {
         var wrap = document.getElementById('wft_' + w.id);
         if (wrap) _widgetDockToZone(w.id, 'home');
         else {
+            // Panel may be in a dock zone — move back to placeholder
+            var ph = document.getElementById('wgp_' + w.id);
             var src = document.getElementById(w.id);
-            if (src) src.style.display = '';
+            if (ph && src) { ph.parentNode.insertBefore(src, ph); ph.remove(); }
+            if (src) { src.style.display = ''; src.style.opacity = ''; }
+            _wgtUpdateGridForPanel(w.id, false);
         }
     });
     localStorage.removeItem('es_widgetLayout');
@@ -3270,20 +3280,22 @@ function _wgtRenderSettingsPanel() {
     if (!el || !_wgtRegistry.length) return;
     var all = _wgtGetLayout();
     el.innerHTML = _wgtRegistry.map(function(w) {
-        var state = all[w.id] || {};
-        var isHidden   = !!state.hidden;
-        var isFloating = !isHidden && !!state.floating;
-        var isDocked   = !isHidden && !isFloating;
-        var zone = state.zone || 'home';
-        var badge = isHidden   ? '<span class="badge bg-secondary ms-1" style="font-size:0.6rem;">hidden</span>'
-                  : isFloating ? '<span class="badge bg-primary ms-1"   style="font-size:0.6rem;">floating</span>'
-                  : zone !== 'home' ? '<span class="badge bg-info ms-1"    style="font-size:0.6rem;">docked ' + zone + '</span>'
-                  : '';
-        return '<div class="d-flex align-items-center gap-2 mb-1 small">'
-            + '<span class="flex-grow-1">' + w.title + badge + '</span>'
-            + (isHidden
-                ? '<button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" onclick="_widgetShow(\'' + w.id + '\')">👁 Show</button>'
-                : '<button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;" onclick="_widgetDetach(\'' + w.id + '\',\'' + w.title + '\')" ' + (isFloating ? 'disabled' : '') + '>⊡ Float</button>')
+        var state    = all[w.id] || {};
+        var isHidden = !!state.hidden;
+        var isFloat  = !isHidden && !!state.floating;
+        var isDocked = !isHidden && !isFloat;
+        var zone     = (!isHidden && !isFloat) ? (state.zone || 'home') : '';
+        var zoneLbl  = (zone && zone !== 'home') ? ' (' + zone + ')' : '';
+        // Three-state buttons — active state is highlighted; clicking any state also unhides
+        function btn(label, active, onclick) {
+            return '<button class="btn btn-sm py-0 px-2 ' + (active ? 'btn-primary' : 'btn-outline-secondary') + '"'
+                + ' style="font-size:0.68rem;" onclick="' + onclick + '">' + label + '</button>';
+        }
+        return '<div class="d-flex align-items-center gap-1 mb-1 small flex-wrap">'
+            + '<span class="me-1" style="min-width:110px;">' + w.title + '</span>'
+            + btn('🏠 Docked' + zoneLbl, isDocked, '_widgetDockToZone(\'' + w.id + '\',\'home\')')
+            + btn('⊡ Float',  isFloat,  '_widgetDetach(\'' + w.id + '\',\'' + w.title.replace(/'/g,"&#39;") + '\')')
+            + btn('× Hide',   isHidden, '_widgetClose(\'' + w.id + '\')')
             + '</div>';
     }).join('');
 }

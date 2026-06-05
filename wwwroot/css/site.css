@@ -971,6 +971,10 @@ body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
 }
 .wgt-float { position: relative; overflow: visible; min-width: 160px; }
 
+/* AE10: hide duplicate "Controls" title in first control-group when collapse header is present */
+.controls-collapse-header ~ .wgt-dock-zone ~ .control-group > .control-title:first-child,
+.controls-collapse-header ~ .control-group > .control-title:first-child { display: none; }
+
 /* AK1: controls panel collapse toggle */
 .controls-collapse-header {
   display: flex;
