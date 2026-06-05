@@ -1126,6 +1126,16 @@ body.wgt-dragging .room-layout {
 /* AE10: hide the duplicate "Controls" title (JS tags just the first control-group's title) */
 .wgt-hide-dup-title { display: none !important; }
 
+/* ── Layout lock: body.wgt-locked disables all drag/float interactions ─── */
+body.wgt-locked .wgt-float-grip,
+body.wgt-locked .wgt-float-title     { cursor: default !important; pointer-events: none !important; }
+body.wgt-locked .wgt-detach-btn      { pointer-events: none !important; opacity: 0.25 !important; }
+body.wgt-locked .wgt-resize-handle,
+body.wgt-locked .sidebar-resize-handle,
+body.wgt-locked #sidebar-resize-handle,
+body.wgt-locked #controls-resize-handle { pointer-events: none !important; cursor: default !important; }
+body.wgt-locked .wgt-zone-rzh        { pointer-events: none !important; cursor: default !important; }
+
 /* ── Panel Layout Preview (Settings → Other → Panels) ──────────────────── */
 .wgt-pv { font-size: 0.68rem; margin-bottom: 8px; }
 .wgt-pv-grid {

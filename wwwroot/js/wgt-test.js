@@ -43,7 +43,8 @@
     function panelIsInZone(id, zone) {
         var zoneIds = { 'L-top':'wgt-zone-L-top','L-bot':'wgt-zone-L-bot',
                         'C-top':'wgt-zone-C-top','C-bot':'wgt-zone-C-bot',
-                        'R-top':'wgt-zone-R-top','R-bot':'wgt-zone-R-bot' };
+                        'R-top':'wgt-zone-R-top','R-bot':'wgt-zone-R-bot',
+                        'Bot':  'wgt-zone-Bot' };
         var el     = document.getElementById(id);
         var zoneEl = document.getElementById(zoneIds[zone]);
         return !!(el && zoneEl && zoneEl.contains(el));

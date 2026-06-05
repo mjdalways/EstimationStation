@@ -1608,6 +1608,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/5/2026 (123)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 Widget system overhaul (code review findings) — <strong>Bug fixes:</strong> (1) Bot zone now covered by the widget test suite's <code>panelIsInZone</code>. (2) Resizing a zone then moving the last panel out no longer leaves an invisible blank gap — the saved min-height is cleared when the zone empties. (3) Hiding a panel now saves its previous zone/float location; the settings dropdown shows a <em>↩ Restore to …</em> option at the top so you can get it back in one click. <strong>New features:</strong> (4) Each panel row in Settings → Panels has an ↺ per-panel reset button. (5) <strong>📐 Bring into view</strong> button clamps all floating panels back on-screen without resetting their zones. (6) <strong>🔒 Lock layout</strong> toggle disables all dragging, floating, and resize handles. (7) Mobile now shows all panels at their home positions — desktop dock/hide state is preserved in storage but not applied on small screens. (8) Four <strong>layout presets</strong>: 🏠 Default, 🃏 Focus Voting, 🎮 Facilitator, 💬 Chat Focus.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/5/2026 (122)</strong></p>
                         <ul class="mb-2">
                             <li>🪟 Stories collapse + panel fixes — added a <strong>⟨ / ⟩ collapse toggle</strong> to the 📋 Stories left sidebar (mirrors the existing Controls toggle). Fixed the sidebar resize handle not working: <code>.stories-panel</code> was missing <code>position: relative</code>, so the absolutely-positioned drag handle anchored to the viewport instead of the panel. Fixed Controls resize handle covering the expand button when collapsed: the 8px drag strip now hides when the panel is in its collapsed state. Fixed the Controls <strong>missing scrollbar</strong>: <code>.room-col</code> was missing <code>min-height: 0</code>, preventing the flex height constraint that makes <code>overflow-y: auto</code> show a scrollbar. <strong>Settings → Panels</strong> now shows a collapse toggle and a width slider for Stories and Controls columns.</li>
@@ -2384,10 +2388,33 @@
                         <!-- AE10: Panel / Widget manager -->
                         <div class="d-flex align-items-center border-bottom pb-1 mb-2">
                             <h6 class="text-muted mb-0 me-auto">🪟 Panels</h6>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 me-1" style="font-size:0.7rem;"
+                                    onclick="_wgtBringIntoView()" title="Clamp all floating panels back inside the visible viewport">📐 Bring into view</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.7rem;"
                                     onclick="_wgtResetAll()" title="Dock all panels back to their home positions and make them all visible">↩ Reset all</button>
                         </div>
-                        <p class="small text-muted mb-2">Use the dropdown next to each panel below to move it to any zone, float it, or hide it. The preview diagram shows the current layout at a glance — click any panel chip to jump to its row.</p>
+                        <p class="small text-muted mb-2">Use the dropdown next to each panel below to move it to any zone, float it, or hide it. ↺ resets a single panel. The preview diagram shows the current layout at a glance — click any panel chip to jump to its row.</p>
+
+                        <!-- Layout presets -->
+                        <div class="d-flex align-items-center gap-1 mb-2 flex-wrap">
+                            <span class="small text-muted me-1">Presets:</span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.68rem;"
+                                    onclick="_wgtApplyPreset('default')" title="All panels at home positions">🏠 Default</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.68rem;"
+                                    onclick="_wgtApplyPreset('focus-voting')" title="Minimal UI for voting — hide controls, vibe, chat; collapse stories">🃏 Focus Voting</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.68rem;"
+                                    onclick="_wgtApplyPreset('facilitator')" title="All panels visible and expanded">🎮 Facilitator</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:0.68rem;"
+                                    onclick="_wgtApplyPreset('chat-focus')" title="Chat in bottom strip, controls collapsed">💬 Chat Focus</button>
+                        </div>
+
+                        <div class="form-check form-switch mb-1">
+                            <input class="form-check-input" type="checkbox" id="wgt-lock-toggle"
+                                   onchange="_wgtSetLocked(this.checked)">
+                            <label class="form-check-label small" for="wgt-lock-toggle">
+                                🔒 Lock layout (prevent accidental drags and floats)
+                            </label>
+                        </div>
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="wgt-infinite-canvas-toggle"
                                    onchange="_wgtSetInfiniteCanvas(this.checked)">

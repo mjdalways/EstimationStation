@@ -1962,6 +1962,8 @@ function _populateRoomOtherSettings() {
     if (typeof _wgtRenderSettingsPanel === 'function') _wgtRenderSettingsPanel();
     var icEl = document.getElementById('wgt-infinite-canvas-toggle');
     if (icEl) icEl.checked = _wgtInfiniteCanvas();
+    var lockEl = document.getElementById('wgt-lock-toggle');
+    if (lockEl) lockEl.checked = _wgtLocked();
     var kbEl = document.getElementById('kb-shortcuts-toggle');
     if (kbEl) kbEl.checked = _kbShortcutsEnabled;
     var rEnEl = document.getElementById('reaction-enabled-toggle');
@@ -3254,6 +3256,8 @@ function _wgtSyncChatBar() {
 }
 window._wgtSyncChatBar = _wgtSyncChatBar;
 // Add/remove the .wgt-zone-occupied class on each zone based on whether it holds a panel.
+// Also clears any saved min-height for zones that just became empty, so they don't leave
+// an invisible reserved gap after all panels are removed (Finding 2).
 function _wgtRefreshZoneClasses() {
     Object.keys(_WGT_ZONE_IDS).forEach(function(k) {
         var el = document.getElementById(_WGT_ZONE_IDS[k]);
@@ -3262,13 +3266,25 @@ function _wgtRefreshZoneClasses() {
             var p = document.getElementById(w.id);
             return p && el.contains(p) && p.style.display !== 'none';
         });
+        var wasOccupied = el.classList.contains('wgt-zone-occupied');
         el.classList.toggle('wgt-zone-occupied', occupied);
+        // When the last panel leaves a zone, clear its saved min-height so the zone
+        // collapses completely and doesn't leave a transparent gap.
+        if (wasOccupied && !occupied) {
+            el.style.minHeight = '';
+            var sizes = JSON.parse(localStorage.getItem('es_wgtZoneSizes') || '{}');
+            if (sizes[k] !== undefined) {
+                delete sizes[k];
+                localStorage.setItem('es_wgtZoneSizes', JSON.stringify(sizes));
+            }
+        }
     });
 }
 
 // Detach element into a floating panel
 function _widgetDetach(srcId, title) {
     if (window.innerWidth < 768) return;
+    if (_wgtLocked()) return;
     var src = document.getElementById(srcId);
     if (!src || document.getElementById('wft_' + srcId)) return;
     // If the controls panel is collapsed, expand it before floating — a collapsed float
@@ -3353,6 +3369,7 @@ function _widgetDetach(srcId, title) {
     // Offsets are in canvas-space: clientX + canvas.scrollLeft gives the canvas coordinate.
     topRow.addEventListener('mousedown', function(e) {
         if (e.target.tagName === 'BUTTON') return;
+        if (_wgtLocked()) return; // layout lock: prevent drag when locked
         var csl = _wgtCanvas.scrollLeft, cst = _wgtCanvas.scrollTop;
         _wgtDrag = { wrap: wrap, srcId: srcId,
                      ox: e.clientX - wrap.offsetLeft + csl,
@@ -3545,12 +3562,18 @@ function _widgetDock(srcId) {
     _widgetDockToZone(srcId, 'home');
 }
 
-// Hide the panel (dock home first if floating, then hide)
+// Hide the panel. Captures current location first so settings can offer a one-click restore.
 function _widgetClose(srcId) {
+    // Snapshot location BEFORE docking home so we can offer "↩ Restore" in settings (Finding 3)
+    var prevSt   = _wgtGetLayout()[srcId] || {};
+    var prevZone = prevSt.floating ? 'float' : (prevSt.zone && prevSt.zone !== 'home' ? prevSt.zone : null);
     _widgetDock(srcId);  // returns to home placeholder, sets state to home/visible
     var src = document.getElementById(srcId);
     if (src) src.style.display = 'none';
-    _wgtSaveState(srcId, { floating: false, hidden: true });
+    _wgtSaveState(srcId, { floating: false, hidden: true,
+                           prevZone: prevZone,          // last zone or 'float'
+                           x: prevSt.x, y: prevSt.y,   // float position preserved for re-float
+                           w: prevSt.w, h: prevSt.h });
     _wgtSyncAllGrids();
     _wgtRefreshZoneClasses();
     _wgtRenderSettingsPanel();
@@ -3708,6 +3731,111 @@ function _wgtAddDetachBtn(srcId, title) {
     }
 }
 
+// Reset a single panel to its default home state — clears saved layout entry, un-hides,
+// removes float wrapper and zone placement, returns to original home anchor position.
+function _wgtResetPanel(id) {
+    var all = _wgtGetLayout();
+    delete all[id];
+    localStorage.setItem('es_widgetLayout', JSON.stringify(all));
+    _widgetDockToZone(id, 'home');
+    var src = document.getElementById(id);
+    if (src) { src.style.display = ''; src.style.opacity = ''; }
+    _wgtSyncGrid(id);
+    _wgtRefreshZoneClasses();
+    _wgtRenderSettingsPanel();
+}
+window._wgtResetPanel = _wgtResetPanel;
+
+// Clamp every floating panel back inside the visible viewport and scroll canvas to origin.
+// Useful when panels have drifted off-screen after a resize or layout change.
+function _wgtBringIntoView() {
+    _wgtCanvas.scrollLeft = 0;
+    _wgtCanvas.scrollTop  = 0;
+    _wgtRegistry.forEach(function(w) {
+        var wrap = document.getElementById('wft_' + w.id);
+        if (!wrap) return;
+        var mw = Math.max(80,  wrap.offsetWidth);
+        var mh = Math.max(40,  wrap.offsetHeight);
+        var nx = Math.max(0, Math.min(window.innerWidth  - mw, wrap.offsetLeft));
+        var ny = Math.max(0, Math.min(window.innerHeight - mh, wrap.offsetTop));
+        wrap.style.left = nx + 'px'; wrap.style.top = ny + 'px';
+        _wgtSaveState(w.id, { x: nx, y: ny });
+    });
+}
+window._wgtBringIntoView = _wgtBringIntoView;
+
+// ── Layout presets ──────────────────────────────────────────────────────────────────────
+// Each preset is a snapshot: panel locations (zone/hidden), collapse states.
+// Applying a preset calls _wgtResetAll first so every panel returns to a clean home state,
+// then each entry is applied in sequence.
+var _WGT_PRESETS = {
+    'default': {
+        label: '🏠 Default', desc: 'Everything visible at home positions',
+        panels: {} // empty → reset-all is sufficient
+    },
+    'focus-voting': {
+        label: '🃏 Focus Voting', desc: 'Minimise distractions during a vote',
+        panels: {
+            'roomControlsPanel':   { hidden: true },
+            'vibeCheckPanel':      { hidden: true },
+            'session-tc-bar':      { hidden: true },
+            'chatPanel':           { hidden: true }
+        },
+        storiesCollapsed: true, controlsCollapsed: false
+    },
+    'facilitator': {
+        label: '🎮 Facilitator', desc: 'All panels visible, controls expanded',
+        panels: {},
+        storiesCollapsed: false, controlsCollapsed: false
+    },
+    'chat-focus': {
+        label: '💬 Chat Focus', desc: 'Chat pinned in bottom strip, controls minimal',
+        panels: {
+            'chatPanel':           { zone: 'Bot' },
+            'vibeCheckPanel':      { hidden: true },
+            'session-tc-bar':      { hidden: true }
+        },
+        storiesCollapsed: true, controlsCollapsed: true
+    }
+};
+
+function _wgtApplyPreset(key) {
+    var preset = _WGT_PRESETS[key];
+    if (!preset) return;
+    _wgtResetAll(); // bring every panel home first
+    // Give the DOM one tick to settle after reset
+    requestAnimationFrame(function() {
+        Object.keys(preset.panels || {}).forEach(function(id) {
+            var cfg = preset.panels[id];
+            if (cfg.hidden) {
+                _widgetClose(id);
+            } else if (cfg.zone) {
+                _widgetDockToZone(id, cfg.zone);
+            }
+        });
+        if (preset.storiesCollapsed  !== undefined) _setStoriesCollapsed(preset.storiesCollapsed);
+        if (preset.controlsCollapsed !== undefined) _setControlsCollapsed(preset.controlsCollapsed);
+        _wgtRenderSettingsPanel();
+    });
+}
+window._wgtApplyPreset = _wgtApplyPreset;
+
+// ── Layout lock ─────────────────────────────────────────────────────────────────────────
+// When locked, dragging, floating, and resize handles are disabled.  A body class drives
+// CSS pointer-event suppression; JS guards in _widgetDetach and the drag mousedown check it.
+function _wgtLocked() { return localStorage.getItem('es_wgtLocked') === '1'; }
+function _wgtSetLocked(on) {
+    localStorage.setItem('es_wgtLocked', on ? '1' : '0');
+    document.body.classList.toggle('wgt-locked', !!on);
+    var el = document.getElementById('wgt-lock-toggle');
+    if (el) el.checked = !!on;
+}
+window._wgtSetLocked = _wgtSetLocked;
+// Apply lock state on load
+(function() {
+    if (_wgtLocked()) document.body.classList.add('wgt-locked');
+})();
+
 // Dock a panel from the settings UI — handles all three cases: zone, float, hide.
 function _wgtDockFromSettings(id, val) {
     if (val === 'float') {
@@ -3848,7 +3976,16 @@ function _wgtRenderSettingsPanel() {
         var isFloat  = !isHidden && !!st.floating;
         var curVal   = isFloat ? 'float' : (isHidden ? 'hidden' : (st.zone || 'home'));
 
-        var opts = ZONE_OPTS.map(function(o) {
+        // For hidden panels that have a saved previous location, prepend a one-click restore
+        // option so the user doesn't have to hunt for the zone they were in (Finding 3).
+        var restoreOpt = '';
+        if (isHidden && st.prevZone) {
+            var prevOpt = ZONE_OPTS.find(function(o) { return o.v === st.prevZone; });
+            var prevLbl = prevOpt ? prevOpt.l : st.prevZone;
+            restoreOpt = '<option value="' + st.prevZone + '">↩ Restore to ' + prevLbl + '</option>'
+                       + '<option disabled>──────────</option>';
+        }
+        var opts = restoreOpt + ZONE_OPTS.map(function(o) {
             var dis = (o.v === 'float' && isMob) ? ' disabled' : '';
             return '<option value="' + o.v + '"' + (curVal === o.v ? ' selected' : '') + dis + '>'
                  + o.l + '</option>';
@@ -3900,6 +4037,9 @@ function _wgtRenderSettingsPanel() {
                 + '<span style="font-size:0.65rem;min-width:28px;">' + curW + 'px</span>';
         }
 
+        var resetBtn = '<button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.68rem;" '
+            + 'onclick="_wgtResetPanel(\'' + w.id + '\')" title="Reset this panel to its default home position">↺</button>';
+
         return '<div id="wgt-row-' + w.id + '" class="d-flex align-items-center gap-1 mb-1 small flex-wrap" '
              + 'style="border-radius:4px;padding:2px 4px;transition:background 0.15s;">'
              + '<span style="min-width:120px;font-size:0.75rem;">' + w.title + '</span>'
@@ -3907,6 +4047,7 @@ function _wgtRenderSettingsPanel() {
              + 'onchange="_wgtDockFromSettings(\'' + w.id + '\',this.value)">'
              + opts + '</select>'
              + reorderHtml
+             + resetBtn
              + colCtrlHtml
              + '</div>';
     }).join('');
@@ -4035,9 +4176,14 @@ window.addEventListener('resize', function() {
     });
 
     var all = _wgtGetLayout();
+    // On mobile (<768px) skip all dock-zone and hidden restore — the stacked home layout
+    // is the only sensible layout on a small screen.  Desktop state is preserved in storage
+    // and resumes when the user next visits on a desktop browser (Finding 1).
+    var isMobileViewport = window.innerWidth < 768;
     widgets.forEach(function(w) {
         var state = all[w.id];
         if (!state) return;
+        if (isMobileViewport) return; // skip zone/hidden/float restore on mobile
         if (state.hidden) {
             var el = document.getElementById(w.id); if (el) el.style.display = 'none';
             _wgtSyncGrid(w.id);  // collapse column if a hidden sidebar panel
