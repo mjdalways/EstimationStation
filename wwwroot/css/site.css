@@ -942,6 +942,25 @@ body.wgt-dragging .wgt-dock-zone.wgt-zone-hover {
   border-color: rgba(91,141,238,0.85);
   background: rgba(91,141,238,0.18);
 }
+/* Dock zone resize handle (bottom edge of each zone) */
+.wgt-zone-rzh {
+  display: none;  /* shown only when zone is occupied or hovered */
+  height: 6px;
+  cursor: ns-resize;
+  background: transparent;
+  border-top: 2px solid transparent;
+  margin-top: 2px;
+  border-radius: 0 0 4px 4px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.wgt-dock-zone:not(:empty) .wgt-zone-rzh,
+.wgt-dock-zone:hover .wgt-zone-rzh { display: block; }
+.wgt-zone-rzh:hover,
+.wgt-zone-rzh:active {
+  border-color: var(--accent, #5b8dee);
+  background: rgba(91,141,238,0.12);
+}
+
 /* Resize handle (bottom-right corner of float) */
 .wgt-resize-handle {
   position: absolute; bottom: 0; right: 0;

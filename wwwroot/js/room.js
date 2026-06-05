@@ -2973,6 +2973,55 @@ function _wgtSaveState(id, patch) {
 // Named zones map to dedicated <div class="wgt-dock-zone"> elements in the HTML.
 // Panels docked to a zone sit inside that zone div (stacked vertically).
 // 'home' is special: returns element to its original placeholder position.
+
+// Zone size persistence
+function _wgtGetZoneSizes() {
+    try { return JSON.parse(localStorage.getItem('es_wgtZoneSizes') || '{}'); } catch(e) { return {}; }
+}
+function _wgtSaveZoneSize(zoneKey, h) {
+    var all = _wgtGetZoneSizes();
+    all[zoneKey] = h;
+    localStorage.setItem('es_wgtZoneSizes', JSON.stringify(all));
+}
+function _wgtApplyZoneSizes() {
+    var all = _wgtGetZoneSizes();
+    Object.keys(all).forEach(function(k) {
+        var zoneId = (_WGT_ZONE_IDS || {})[k];
+        if (!zoneId) return;
+        var el = document.getElementById(zoneId);
+        if (el && all[k]) el.style.minHeight = all[k] + 'px';
+    });
+}
+
+// Attach a resize handle to a dock zone element
+function _wgtInitZoneResize(zoneKey, zoneEl) {
+    if (zoneEl.querySelector('.wgt-zone-rzh')) return; // already attached
+    var rzh = document.createElement('div');
+    rzh.className = 'wgt-zone-rzh';
+    rzh.title = 'Drag to resize dock zone';
+    zoneEl.appendChild(rzh);
+
+    var resizing = false, startY = 0, startH = 0;
+    rzh.addEventListener('mousedown', function(e) {
+        resizing = true;
+        startY = e.clientY;
+        startH = zoneEl.offsetHeight;
+        e.preventDefault(); e.stopPropagation();
+        document.body.style.cursor = 'ns-resize';
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!resizing) return;
+        var newH = Math.max(32, startH + (e.clientY - startY));
+        zoneEl.style.minHeight = newH + 'px';
+    });
+    document.addEventListener('mouseup', function() {
+        if (!resizing) return;
+        resizing = false;
+        document.body.style.cursor = '';
+        _wgtSaveZoneSize(zoneKey, zoneEl.offsetHeight);
+    });
+}
+
 var _WGT_ZONE_IDS = {
     'L-top': 'wgt-zone-L-top',
     'L-bot': 'wgt-zone-L-bot',
@@ -3182,7 +3231,7 @@ function _widgetShow(srcId) {
     _wgtRenderSettingsPanel();
 }
 
-// Reset all panels to home + visible
+// Reset all panels to home + visible + clear zone sizes
 function _wgtResetAll() {
     _wgtRegistry.forEach(function(w) {
         var wrap = document.getElementById('wft_' + w.id);
@@ -3193,6 +3242,12 @@ function _wgtResetAll() {
         }
     });
     localStorage.removeItem('es_widgetLayout');
+    // Reset zone sizes
+    localStorage.removeItem('es_wgtZoneSizes');
+    Object.keys(_WGT_ZONE_IDS).forEach(function(k) {
+        var el = document.getElementById(_WGT_ZONE_IDS[k]);
+        if (el) el.style.minHeight = '';
+    });
     _wgtRenderSettingsPanel();
 }
 window._wgtResetAll = _wgtResetAll;
@@ -3245,6 +3300,13 @@ window._wgtRenderSettingsPanel = _wgtRenderSettingsPanel;
         { id: 'roomControlsPanel',   title: '🎮 Controls' }
     ];
     _wgtRegistry.push.apply(_wgtRegistry, widgets);
+
+    // Init resize handles on all dock zones + apply persisted sizes
+    Object.keys(_WGT_ZONE_IDS).forEach(function(k) {
+        var el = document.getElementById(_WGT_ZONE_IDS[k]);
+        if (el) _wgtInitZoneResize(k, el);
+    });
+    _wgtApplyZoneSizes();
 
     var all = _wgtGetLayout();
     widgets.forEach(function(w) {
