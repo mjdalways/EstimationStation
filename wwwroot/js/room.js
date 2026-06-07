@@ -49,6 +49,12 @@ let roomState = {
 };
 window.roomState = roomState;
 
+function _syncRoomScene() {
+    if (window.RoomScene && typeof window.RoomScene.syncRoom === 'function') {
+        window.RoomScene.syncRoom(roomState);
+    }
+}
+
 // ============================================================
 // SignalR Connection
 // ============================================================
@@ -635,6 +641,7 @@ function renderParticipants() {
             div.appendChild(confEl);
         }
     });
+    _syncRoomScene();
 }
 
 function renderStories() {
@@ -808,6 +815,7 @@ function updateCurrentStoryDisplay() {
         document.title = 'EstimationStation';
     }
     _updateCurrentStoryNote();
+    _syncRoomScene();
 }
 
 function _updateCurrentStoryNote() {
@@ -4147,6 +4155,7 @@ window.addEventListener('resize', function() {
         { id: 'session-tc-bar',      title: '⏱️ Timer & Clock'   },
         { id: 'votingSection',       title: '🃏 Your Vote'        },
         { id: 'participantsSection', title: '👥 Participants'     },
+        { id: 'roomScenePanel',      title: '🏠 Room Scene'       },
         { id: 'storiesPanel',        title: '📋 Stories'          },
         { id: 'roomControlsPanel',   title: '🎮 Controls'         },
         { id: 'currentStoryBar',     title: '📌 Current Story'    },

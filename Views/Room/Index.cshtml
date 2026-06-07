@@ -98,6 +98,24 @@
         </div>
         <div id="currentStoryNote" class="current-story-note" style="display:none;"></div>
 
+        <!-- Configurable room scene widget (defaults to a floating window on desktop) -->
+        <div class="room-scene-panel" id="roomScenePanel">
+            <div class="room-scene-header">
+                <div>
+                    <h6 class="section-label mb-0">Room Scene</h6>
+                    <div class="room-scene-subtitle">Table view, participants, whiteboard, and room decor</div>
+                </div>
+                <div class="room-scene-mode-toggle" role="group" aria-label="Room scene mode">
+                    <button type="button" data-rs-mode="2d"    onclick="RoomScene.setMode('2d')"    title="Top-down 2D table view">2D</button>
+                    <button type="button" data-rs-mode="3d"    onclick="RoomScene.setMode('3d')"    title="Perspective CSS 3D room view">3D</button>
+                    <button type="button" data-rs-mode="3d-gl" onclick="RoomScene.setMode('3d-gl')" title="WebGL 3D room — robot avatars, interactive orbit camera">3D GL</button>
+                </div>
+                <button type="button" class="rs-setup-btn" title="Configure table, chairs, colours and furniture"
+                        onclick="openSettingsModal('room')">⚙️ Setup Room</button>
+            </div>
+            <div id="roomSceneStage" class="room-scene-stage" aria-label="Room scene"></div>
+        </div>
+
         <!-- Stats Bar (shown when votes revealed) -->
         <div id="statsBar" class="stats-bar" style="display:none;">
             <div class="stat-item">
@@ -349,6 +367,11 @@
         roomName: @Json.Serialize(Model.RoomName),
         playerName: @Json.Serialize(Model.PlayerName)
     };
+    // Expose on window: a top-level `const` does NOT create a window property,
+    // and room-scene-3d.js reads window.ROOM_CONFIG for the per-room claim key
+    // and the local player's name. Without this the claim key resolved to
+    // "es_rs3d_claims_undefined" (shared across all rooms).
+    window.ROOM_CONFIG = ROOM_CONFIG;
 
     // Mobile panel toggling
     function toggleMobilePanel(panel) {
@@ -369,6 +392,38 @@
         setTimeout(() => el.classList.remove('card-flash'), 700);
     }
 
+    // ── Room Scene config (Settings → 🏠 Room tab) ───────────
+    var _ROOM_PRESETS = {
+        huddle:    { preset:'skyline',     tableShape:'round', tableSize:'small',  chairType:'office',  chairCount:6  },
+        standard:  { preset:'conference',  tableShape:'round', tableSize:'medium', chairType:'office',  chairCount:8  },
+        boardroom: { preset:'war-room',    tableShape:'rect',  tableSize:'large',  chairType:'office',  chairCount:12 },
+        gaming:    { preset:'skyline',     tableShape:'round', tableSize:'medium', chairType:'gaming',  chairCount:6  },
+        lounge:    { preset:'cozy',        tableShape:'round', tableSize:'small',  chairType:'beanbag', chairCount:4  }
+    };
+
+    // Apply a quick preset directly to the live scene, then refresh the tab fields.
+    function _applyRoomPreset(key) {
+        var p = _ROOM_PRESETS[key];
+        if (!p || !window.RoomScene) return;
+        RoomScene.updateConfig({
+            preset: p.preset, tableShape: p.tableShape, tableSize: p.tableSize,
+            chairType: p.chairType, chairCount: p.chairCount || 0
+        });
+        if (RoomScene.syncControls) RoomScene.syncControls();
+    }
+
+    // Reveal the 🏠 Room settings tab (only present where the Room Scene exists)
+    // and sync its fields whenever the Settings modal is opened.
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!window.RoomScene) return;
+        var li = document.getElementById('tab-room-li');
+        if (li) li.style.display = '';
+        var sm = document.getElementById('settingsModal');
+        if (sm) sm.addEventListener('show.bs.modal', function() {
+            if (RoomScene.syncControls) RoomScene.syncControls();
+        });
+    });
+
     async function copyInviteLink() {
         const inviteUrl = `${window.location.origin}/room/${encodeURIComponent(ROOM_CONFIG.roomName)}`;
         try {
@@ -380,5 +435,11 @@
     }
 </script>
 <script src="~/js/shame.js" asp-append-version="true"></script>
+<script src="~/js/room-scene.js" asp-append-version="true"></script>
 <script src="~/js/room.js" asp-append-version="true"></script>
+<!-- Three.js r145 (UMD globals) + WebGL room scene — served locally -->
+<script src="~/lib/three/three.min.js"></script>
+<script src="~/lib/three/OrbitControls.js"></script>
+<script src="~/lib/three/CSS2DRenderer.js"></script>
+<script src="~/js/room-scene-3d.js" asp-append-version="true"></script>
 }

@@ -144,6 +144,9 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-jira-btn" data-bs-toggle="tab" data-bs-target="#tab-jira" type="button" role="tab">🔗 <span class="tab-label">Jira</span></button>
                     </li>
+                    <li class="nav-item" role="presentation" id="tab-room-li" style="display:none;">
+                        <button class="nav-link settings-tab-btn" id="tab-room-btn" data-bs-toggle="tab" data-bs-target="#tab-room" type="button" role="tab">🏠 <span class="tab-label">Room</span></button>
+                    </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link settings-tab-btn" id="tab-other-btn" data-bs-toggle="tab" data-bs-target="#tab-other" type="button" role="tab">⚙️ <span class="tab-label">Other</span></button>
                     </li>
@@ -1608,6 +1611,43 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/6/2026 (132)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>2D ↔ 3D GL seat-claim parity</strong>: the 2D and CSS-3D views now read the <em>same</em> chair-claim data as 3D GL, so a participant who claimed a specific chair appears in the <strong>exact same seat index</strong> across all three views. Matching 3D GL's model: claimed chairs seat their owner, unclaimed chairs stay empty (pulsing ➕ ring), and anyone who hasn't claimed a seat <strong>stands</strong>. A new shared <code>RS3D.getSeatingPlan()</code> is the single source of truth for placement.</li>
+                            <li>🐛 <strong>Fixed per-room claim persistence</strong>: <code>ROOM_CONFIG</code> was declared as a top-level <code>const</code>, which (unlike <code>var</code>) does not create a <code>window.ROOM_CONFIG</code> property — so the 3D claim key resolved to <code>es_rs3d_claims_undefined</code> and chair claims leaked between rooms. <code>ROOM_CONFIG</code> is now exposed on <code>window</code>, so claims are correctly keyed per room.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/6/2026 (131)</strong></p>
+                        <ul class="mb-2">
+                            <li>🧹 <strong>Room Scene cleanup</strong>: removed the temporary <code>RS3D_DEBUG</code> drag-logging and the <code>RS3D.version</code> cache-check marker now that furniture drag, chair claiming and 2D/3D chair parity are all confirmed working. Also pruned dead CSS left over from the Settings consolidation (the old on-panel <code>.room-scene-toolbar</code>, furniture-button and preset-chip styles). No functional change — lighter code.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/6/2026 (130)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>2D / CSS-3D chair parity</strong>: the top-down <strong>2D</strong> and perspective <strong>3D</strong> Room Scene views now honour the same chair settings as 3D GL. They draw the configured <strong>chair count</strong> (leave blank to match participants), show <strong>empty / unclaimed chairs</strong> with a pulsing blue "available" ring and a ➕ marker, and render the selected <strong>chair-type silhouette</strong> (Office / Gaming / Bean bag / Stool / Throne / Random) per seat. When there are more participants than chairs, the overflow appears as <strong>standing</strong> avatars along the front edge — mirroring the 3D GL "standing robots near the wall" behaviour.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/6/2026 (129)</strong></p>
+                        <ul class="mb-2">
+                            <li>🏠 <strong>Room config moved into Settings</strong>: all Room Scene configuration now lives in a dedicated <strong>🏠 Room</strong> tab in the ⚙️ Settings dialog — quick presets, colour theme, window view, table shape/size, chair style/count, drag mode, room features and the add-furniture buttons, all in one place. The cramped on-panel toolbar and the separate "Setup Room" popup were removed; the panel header now just has the 2D / 3D / 3D GL view switch and a ⚙️ button that jumps straight to Settings → Room. The Room tab only appears on the room page.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/6/2026 (128)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 <strong>Window views + colour theme split</strong>: the old single "Preset" control is now two independent settings — <strong>Colour theme</strong> (Conference / War room / Cozy / Skyline) controls the wall, floor and ceiling palette, while a new <strong>Window view</strong> selector chooses what you see through the window in 3D GL: 🏙️ City skyline, 🏖️ Beach, 🏔️ Mountains, 🌃 Night city, 🌲 Forest, or 🚪 No view. Each view is built procedurally from Three.js primitives (sun, sea &amp; sailboat; snow-capped peaks; a moon with stars and lit windows; layered pine trees). The redundant "Skyline" checkbox was removed (use Window view → No view instead). Both the toolbar and the ⚙️ Setup Room modal expose the new controls.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/6/2026 (127)</strong></p>
+                        <ul class="mb-2">
+                            <li>🛋️ <strong>3D GL fixes &amp; Setup Room modal</strong>: Fixed a crash (<code>Cannot assign to read only property 'position'</code>) that prevented the 3D GL room from rendering. All toolbar controls (Preset, Table, Size, Chairs, Chair type) now update the 3D scene <em>in place</em> via a new <code>refreshScene</code> path — no more camera reset on every tweak. Three.js is now served locally (no CDN dependency). Added a <strong>⚙️ Setup Room</strong> button that opens a modal with five quick-start presets (Huddle 6, Standard 8, Boardroom 12, Gaming 6, Lounge 4) plus full custom settings for style, table shape/size, chair type/count, and room features — all in one place.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/6/2026 (126)</strong></p>
+                        <ul class="mb-2">
+                            <li>🏠 <strong>3D GL Room Scene — Phase 3 &amp; 4</strong>: <em>Phase 3 — Movable furniture:</em> four draggable items — 🌿 Plant, ☕ Coffee table, 📽️ Projector screen, and 📋 Standing whiteboard — can be placed anywhere on the floor. Click-drag them to any position (snaps to 0.5-unit grid); the layout is persisted per room in localStorage. Use the "+ Furniture" toolbar buttons to add new items or ↺ to reset to defaults. <em>Phase 4 — Polish &amp; animation:</em> all robots now have a gentle idle <strong>head bob</strong>; standing robots have a subtle arm <strong>sway</strong>; a soft ambient-occlusion <strong>shadow disc</strong> appears under every robot. On vote reveal, seated robots perform a quick arm-raise 🃏 animation. Click any floating <strong>name label</strong> to smoothly fly the camera to that participant.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/6/2026 (125)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>3D GL Room Scene — Phase 2</strong>: five <strong>chair types</strong> (🪑 Office, 🎮 Gaming, 🛋️ Bean bag, 🪵 Stool, 👑 Throne) with full procedural 3D meshes and matching 2D top-down silhouettes. New toolbar controls: <strong>Table Size</strong> (Small / Medium / Large), <strong>Chair Count</strong> (0 = match participants), and <strong>Chair Type</strong> selector. Participants without a claimed chair appear as <strong>standing robots</strong> near the front wall. <strong>Chair claiming</strong>: click any empty chair directly in the 2D or 3D view to select it (highlighted in green), then confirm with <em>Sit Here</em> or dismiss with ✕. Unclaimed chairs pulse with a blue glow ring. Chair selections are persisted per room in localStorage and restored on reload.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/6/2026 (124)</strong></p>
+                        <ul class="mb-2">
+                            <li>🏠 <strong>3D GL Room Scene</strong> — the Room Scene widget now has a <strong>3D GL</strong> mode powered by Three.js WebGL. It renders a realistic conference room (floor, walls, ceiling, window with city skyline, whiteboard, plants, ceiling lamp) with a round or rectangular table matching the existing config. Each participant appears as a <strong>robot avatar</strong> — a procedural mesh with colour-matched body, glowing LED eyes, and an antenna. Robots sit in chairs with arms resting on the table. Vote state is shown as a coloured halo ring above the head (grey = no vote, amber = voted, green = revealed). Labels float above each robot showing name and, when votes are revealed, the card value. The camera can be orbited, zoomed, and panned with the mouse. All participant and vote updates sync in real time. No external model files — everything is built from Three.js primitives.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/5/2026 (123)</strong></p>
                         <ul class="mb-2">
                             <li>🪟 Widget system overhaul (code review findings) — <strong>Bug fixes:</strong> (1) Bot zone now covered by the widget test suite's <code>panelIsInZone</code>. (2) Resizing a zone then moving the last panel out no longer leaves an invisible blank gap — the saved min-height is cleared when the zone empties. (3) Hiding a panel now saves its previous zone/float location; the settings dropdown shows a <em>↩ Restore to …</em> option at the top so you can get it back in one click. <strong>New features:</strong> (4) Each panel row in Settings → Panels has an ↺ per-panel reset button. (5) <strong>📐 Bring into view</strong> button clamps all floating panels back on-screen without resetting their zones. (6) <strong>🔒 Lock layout</strong> toggle disables all dragging, floating, and resize handles. (7) Mobile now shows all panels at their home positions — desktop dock/hide state is preserved in storage but not applied on small screens. (8) Four <strong>layout presets</strong>: 🏠 Default, 🃏 Focus Voting, 🎮 Facilitator, 💬 Chat Focus.</li>
@@ -2433,6 +2473,115 @@
                         <p class="small text-muted mt-2 mb-0">Button only appears when your browser supports installation.</p>
 
                     </div><!-- end tab-other -->
+
+                    <!-- ══════════════════════════════════════════
+                         TAB: 🏠 Room  (revealed only on the room page)
+                         ══════════════════════════════════════════ -->
+                    <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-room" role="tabpanel">
+                        <p class="small text-muted mb-3">Configure the <strong>🏠 Room Scene</strong> widget. Switch between <strong>2D</strong>, <strong>3D</strong> and <strong>3D GL</strong> views with the buttons in the Room Scene panel header — these settings apply to every view that supports them.</p>
+
+                        <!-- Quick presets -->
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-presets-section">
+                            🎯 Quick presets <span class="settings-section-chevron">▾</span>
+                        </div>
+                        <div id="room-presets-section" class="collapse show mb-3">
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('huddle')"    title="6 office chairs, small round table">🤝 Huddle (6)</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('standard')"  title="8 office chairs, medium round table">📋 Standard (8)</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('boardroom')" title="12 office chairs, large rect table">🏛️ Boardroom (12)</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('gaming')"    title="6 gaming chairs, medium round table">🎮 Gaming (6)</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('lounge')"    title="4 bean bags, small round table">🛋️ Lounge (4)</button>
+                            </div>
+                        </div>
+
+                        <!-- Appearance & layout -->
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-layout-section">
+                            🎨 Appearance &amp; layout <span class="settings-section-chevron">▾</span>
+                        </div>
+                        <div id="room-layout-section" class="collapse show mb-3">
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="form-label mb-1" for="rs-preset">Colour theme</label>
+                                    <select id="rs-preset" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ preset: this.value })">
+                                        <option value="conference">Conference</option>
+                                        <option value="war-room">War room</option>
+                                        <option value="cozy">Cozy</option>
+                                        <option value="skyline">Skyline</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label mb-1" for="rs-window-view">Window view <span class="text-muted" style="font-weight:normal;">(3D GL)</span></label>
+                                    <select id="rs-window-view" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ windowView: this.value })">
+                                        <option value="skyline">🏙️ City skyline</option>
+                                        <option value="beach">🏖️ Beach</option>
+                                        <option value="mountains">🏔️ Mountains</option>
+                                        <option value="night">🌃 Night city</option>
+                                        <option value="forest">🌲 Forest</option>
+                                        <option value="none">🚪 No view</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label mb-1" for="rs-table-shape">Table shape</label>
+                                    <select id="rs-table-shape" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableShape: this.value })">
+                                        <option value="round">⭕ Round</option>
+                                        <option value="rect">▬ Rect</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label mb-1" for="rs-table-size">Table size</label>
+                                    <select id="rs-table-size" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableSize: this.value })">
+                                        <option value="small">Small</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="large">Large</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label mb-1" for="rs-chair-count">Chairs</label>
+                                    <input id="rs-chair-count" type="number" min="1" max="16" placeholder="auto" class="form-control form-control-sm"
+                                           onchange="RoomScene.updateConfig({ chairCount: parseInt(this.value)||0 })" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label mb-1" for="rs-chair-type">Chair style</label>
+                                    <select id="rs-chair-type" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ chairType: this.value })">
+                                        <option value="office">🪑 Office</option>
+                                        <option value="gaming">🎮 Gaming</option>
+                                        <option value="beanbag">🛋️ Bean bag</option>
+                                        <option value="stool">🪵 Stool</option>
+                                        <option value="throne">👑 Throne</option>
+                                        <option value="random">🎲 Random</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label mb-1" for="rs-dragmode">3D move / orbit control</label>
+                                    <select id="rs-dragmode" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ dragMode: this.value })">
+                                        <option value="select">Click to select, then drag</option>
+                                        <option value="doubleselect">Double-click to select, then drag</option>
+                                        <option value="direct">Drag item to move (Shift+drag orbits)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="text-muted mt-2" style="font-size:0.68rem;">In every mode: drag empty space to orbit the camera, and <strong>Shift+drag</strong> always orbits. When an item is selected, <strong>Delete</strong> removes it and <strong>Esc</strong> deselects.</div>
+                        </div>
+
+                        <!-- Features & furniture -->
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-features-section">
+                            🪴 Features &amp; furniture <span class="settings-section-chevron">▾</span>
+                        </div>
+                        <div id="room-features-section" class="collapse show">
+                            <div class="d-flex gap-3 mt-2 mb-3">
+                                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="rs-whiteboard" onchange="RoomScene.updateConfig({ whiteboard: this.checked })" /><label class="form-check-label small" for="rs-whiteboard">Whiteboard</label></div>
+                                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="rs-plants" onchange="RoomScene.updateConfig({ plants: this.checked })" /><label class="form-check-label small" for="rs-plants">Plants</label></div>
+                            </div>
+                            <label class="form-label mb-1">Add furniture <span class="text-muted" style="font-weight:normal;">(3D GL — drag items to reposition)</span></label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.addFurniture('plant')">🌿 Plant</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.addFurniture('coffee_table')">☕ Coffee table</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.addFurniture('projector')">📽️ Projector</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.addFurniture('whiteboard')">📋 Whiteboard</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.resetFurniture()" title="Reset furniture to default positions">↺ Reset</button>
+                            </div>
+                        </div>
+                    </div><!-- end tab-room -->
 
                 </div><!-- end tab-content -->
             </div>

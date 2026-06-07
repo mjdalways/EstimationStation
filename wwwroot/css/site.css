@@ -948,13 +948,19 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
   z-index: 1049;
   background: transparent;
-  /* pointer-events:auto so scrollbar works; background clicks are forwarded in JS */
+  /* Click-through by default: docked content UNDERNEATH this overlay (including the
+     WebGL room canvas with its OrbitControls + furniture drag, and native <select>
+     dropdowns) must receive real pointer events. Floating panels re-enable
+     pointer-events on themselves (.wgt-float below). Infinite-canvas mode restores
+     pointer-events:auto so its scrollbar works. */
+  pointer-events: none;
 }
 /* Infinite-canvas mode: enable scrollbars so panels off-screen can be reached */
-body.wgt-infinite-canvas #wgt-float-canvas { overflow: auto; }
+body.wgt-infinite-canvas #wgt-float-canvas { overflow: auto; pointer-events: auto; }
 
 .wgt-float {
   position: absolute; /* relative to #wgt-float-canvas — enables scroll overflow */
+  pointer-events: auto; /* re-enable interaction (parent overlay is click-through) */
   z-index: 1050;
   background: var(--panel-bg, #fff);
   border: 1px solid var(--panel-border, #dee2e6);
@@ -1266,6 +1272,512 @@ body.wgt-dragging #wgt-zone-Bot.wgt-zone-hover {
     margin-right: 4px;
     flex-shrink: 0;
     opacity: 0.65;
+}
+
+/* ============================================================
+   Room Scene widget
+   ============================================================ */
+.room-scene-panel {
+  margin-bottom: 10px;
+  background: var(--panel-bg, #fff);
+  border: 1px solid var(--panel-border, #dee2e6);
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 360px;
+}
+.room-scene-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px 7px;
+  background: var(--bg-secondary, #f8f9fa);
+  border-bottom: 1px solid var(--panel-border, #dee2e6);
+}
+.room-scene-subtitle {
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: var(--text-secondary, #6c757d);
+}
+.room-scene-mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--panel-border, #dee2e6);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.room-scene-mode-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary, #6c757d);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.room-scene-mode-toggle button + button { border-left: 1px solid var(--panel-border, #dee2e6); }
+.room-scene-mode-toggle button.active {
+  background: var(--accent, #0d6efd);
+  color: #fff;
+}
+.room-scene-stage {
+  position: relative;
+  height: 320px;
+  min-height: 240px;
+  overflow: hidden;
+  background: #e8eef4;
+}
+.wgt-float-body .room-scene-panel {
+  margin: 0;
+  min-height: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.wgt-float-body .room-scene-stage { height: 360px; }
+.wgt-dock-zone .room-scene-panel { margin: 0; }
+
+/* ── 3D GL (WebGL) mode ─────────────────────────────────── */
+.room-scene-stage canvas {
+  display: block;
+}
+/* CSS2DRenderer overlay needs overflow visible to show labels at edges */
+.room-scene-stage > div[style*="position: absolute"] {
+  overflow: visible !important;
+}
+/* Name-tag labels rendered by CSS2DRenderer */
+.rs3d-label {
+  font-size: 0.63rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0,0,0,0.58);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  user-select: none;
+}
+/* Standing participant label — subtle teal tint to distinguish from seated */
+.rs3d-label-standing {
+  background: rgba(6,60,72,0.72);
+  border: 1px solid rgba(34,211,238,0.35);
+}
+/* Labels are now clickable (fly-to camera) — pointer-events handled inline */
+.rs3d-label:hover {
+  background: rgba(40,60,90,0.82);
+  text-decoration: underline;
+}
+
+/* Setup Room button in header */
+.rs-setup-btn {
+  background: transparent;
+  border: 1px solid var(--panel-border, #dee2e6);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary, #6c757d);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.rs-setup-btn:hover { background: var(--accent, #0d6efd); color: #fff; border-color: var(--accent, #0d6efd); }
+
+/* ── 2D chair-type visual variants ───────────────────────── */
+/* office: default style already set on .rs-chair */
+/* gaming: dark with red accent notch */
+.rs-seat-chair-gaming .rs-chair {
+  background: #1a0a22;
+  border-top: 3px solid #cc1111;
+  border-radius: 8px 8px 14px 14px;
+}
+/* bean bag: round blob, no hard back */
+.rs-seat-chair-beanbag .rs-chair {
+  background: #5b2d8e;
+  border-radius: 50%;
+  width: 42px;
+  height: 34px;
+  top: 12px;
+  box-shadow: 0 3px 8px rgba(91,45,142,0.55);
+}
+/* stool: minimal circle */
+.rs-seat-chair-stool .rs-chair {
+  background: #8a5a20;
+  border-radius: 50%;
+  width: 36px;
+  height: 28px;
+  top: 14px;
+  box-shadow: none;
+  border: 2px solid #5a3a10;
+}
+/* throne: tall back, gold accent */
+.rs-seat-chair-throne .rs-chair {
+  background: #5a1a9a;
+  border-top: 4px solid #d4af37;
+  border-radius: 6px 6px 14px 14px;
+  box-shadow: inset 0 -6px 0 rgba(212,175,55,0.20);
+}
+
+.rs-room {
+  position: absolute;
+  inset: 0;
+  font-size: 0.75rem;
+  color: #1f2937;
+  isolation: isolate;
+}
+.rs-preset-conference { --rs-wall: #dce7ef; --rs-floor: #eef4f8; --rs-table: #7b4f34; --rs-accent: #3478c7; }
+.rs-preset-war-room   { --rs-wall: #d6d1c8; --rs-floor: #e9e2d6; --rs-table: #3f3b35; --rs-accent: #b45309; }
+.rs-preset-cozy       { --rs-wall: #eaded2; --rs-floor: #f2e8dc; --rs-table: #8a5a44; --rs-accent: #2f855a; }
+.rs-preset-skyline    { --rs-wall: #d9e7f7; --rs-floor: #eaf1f8; --rs-table: #4f6f82; --rs-accent: #2563eb; }
+
+.rs-room-2d {
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.26) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.28) 1px, transparent 1px),
+    var(--rs-floor);
+  background-size: 28px 28px;
+}
+.rs-rug {
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  top: 21%;
+  bottom: 13%;
+  border-radius: 45%;
+  background: radial-gradient(circle, rgba(255,255,255,0.62), rgba(52,120,199,0.12));
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.rs-table {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  width: 36%;
+  height: 27%;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--rs-table) 82%, white), var(--rs-table));
+  border: 4px solid rgba(0,0,0,0.18);
+  box-shadow: 0 12px 22px rgba(33,37,41,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.85);
+  font-weight: 800;
+}
+.rs-table-round { border-radius: 999px; }
+.rs-table-rect { border-radius: 18px; width: 45%; height: 24%; }
+.rs-seat {
+  position: absolute;
+  width: 74px;
+  min-height: 66px;
+  margin-left: -37px;
+  margin-top: -33px;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  z-index: 4;
+}
+.rs-chair {
+  position: absolute;
+  top: 10px;
+  width: 54px;
+  height: 38px;
+  border-radius: 12px 12px 16px 16px;
+  background: #43566b;
+  box-shadow: inset 0 -8px 0 rgba(0,0,0,0.14);
+  z-index: -1;
+}
+.rs-avatar {
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: white;
+  background: var(--rs-accent);
+  border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.rs-seat.voted .rs-avatar { background: #198754; }
+.rs-seat.observer .rs-avatar { background: #6c757d; }
+.rs-seat.ghost .rs-avatar { background: #7c3aed; }
+.rs-seat.host .rs-avatar { box-shadow: 0 0 0 3px rgba(255,193,7,0.75), 0 2px 8px rgba(0,0,0,0.18); }
+.rs-name {
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-align: center;
+}
+.rs-vote {
+  min-width: 34px;
+  max-width: 64px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.82);
+  border: 1px solid rgba(0,0,0,0.08);
+  font-size: 0.6rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Empty / unclaimed chair — dim chair with a pulsing "available" ring */
+.rs-seat-empty { z-index: 3; }
+.rs-seat-empty .rs-chair {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+.rs-seat-plus {
+  margin-top: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #2563eb;
+  background: rgba(255,255,255,0.55);
+  border: 2px dashed rgba(37,99,235,0.7);
+  box-shadow: 0 0 0 0 rgba(37,99,235,0.45);
+  animation: rs-seat-pulse 1.9s ease-out infinite;
+}
+@keyframes rs-seat-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(37,99,235,0.45); }
+  70%  { box-shadow: 0 0 0 9px rgba(37,99,235,0); }
+  100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rs-seat-plus { animation: none; }
+}
+
+/* Standing participants (overflow when there are more people than chairs) */
+.rs-standing {
+  position: absolute;
+  left: 50%;
+  bottom: 2%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 12px;
+  max-width: 92%;
+  z-index: 6;
+}
+.rs-stand {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+}
+.rs-stand .rs-avatar { width: 27px; height: 27px; font-size: 0.74rem; }
+.rs-stand.voted .rs-avatar { background: #198754; }
+.rs-stand.observer .rs-avatar { background: #6c757d; }
+.rs-stand.ghost .rs-avatar { background: #7c3aed; }
+.rs-stand.host .rs-avatar { box-shadow: 0 0 0 3px rgba(255,193,7,0.75), 0 2px 8px rgba(0,0,0,0.18); }
+.rs-whiteboard {
+  position: absolute;
+  left: 5%;
+  top: 6%;
+  width: 25%;
+  min-width: 120px;
+  height: 74px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: rgba(255,255,255,0.9);
+  border: 2px solid rgba(31,41,55,0.18);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  z-index: 3;
+}
+.rs-whiteboard-title {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 800;
+}
+.rs-whiteboard-story {
+  margin-top: 3px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rs-whiteboard-line,
+.rs-whiteboard-line.short {
+  height: 3px;
+  margin-top: 8px;
+  border-radius: 99px;
+  background: rgba(37,99,235,0.25);
+}
+.rs-whiteboard-line.short { width: 58%; margin-top: 5px; }
+.rs-window {
+  position: absolute;
+  right: 5%;
+  top: 6%;
+  width: 28%;
+  min-width: 126px;
+  height: 76px;
+  border-radius: 9px;
+  background: linear-gradient(#9ed5ff, #eef8ff 62%, #dce7ef 63%);
+  border: 4px solid rgba(255,255,255,0.72);
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+  z-index: 2;
+}
+.rs-skyline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38px;
+  display: flex;
+  align-items: end;
+  justify-content: space-around;
+  padding: 0 8px;
+}
+.rs-skyline i {
+  display: block;
+  width: 15%;
+  height: 22px;
+  background: rgba(37,67,95,0.72);
+  border-radius: 2px 2px 0 0;
+}
+.rs-skyline i:nth-child(2) { height: 32px; }
+.rs-skyline i:nth-child(3) { height: 17px; }
+.rs-skyline i:nth-child(4) { height: 29px; }
+.rs-skyline i:nth-child(5) { height: 24px; }
+.rs-plant {
+  position: absolute;
+  width: 30px;
+  height: 56px;
+  z-index: 3;
+  background: linear-gradient(to bottom, transparent 36px, #8b5a2b 37px);
+  border-radius: 0 0 8px 8px;
+}
+.rs-plant::before,
+.rs-plant::after,
+.rs-plant span {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 24px;
+  height: 28px;
+  border-radius: 50% 50% 45% 45%;
+  background: #2f855a;
+  transform-origin: 50% 100%;
+}
+.rs-plant::before { transform: translateX(-75%) rotate(-24deg); }
+.rs-plant::after { transform: translateX(-25%) rotate(24deg); }
+.rs-plant span { transform: translateX(-50%); background: #38a169; }
+.rs-plant-a { left: 7%; bottom: 8%; }
+.rs-plant-b { right: 8%; bottom: 9%; transform: scale(0.9); }
+
+.rs-room-3d {
+  perspective: 780px;
+  background: var(--rs-wall);
+}
+.rs-scene3d {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.rs-back-wall {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 43%;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--rs-wall) 78%, white), var(--rs-wall));
+  transform: translateZ(-170px);
+  transform-style: preserve-3d;
+}
+.rs-floor {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -12%;
+  height: 76%;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.28) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.28) 1px, transparent 1px),
+    var(--rs-floor);
+  background-size: 42px 42px;
+  border-radius: 20px;
+  transform: rotateX(64deg);
+  transform-origin: center bottom;
+  transform-style: preserve-3d;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.12);
+}
+.rs-table3d {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 160px;
+  height: 116px;
+  margin-left: -80px;
+  margin-top: -58px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--rs-table) 80%, white), var(--rs-table));
+  border: 4px solid rgba(0,0,0,0.18);
+  box-shadow: 0 16px 25px rgba(0,0,0,0.22);
+  transform: translateZ(22px);
+  transform-style: preserve-3d;
+}
+.rs-table3d.rs-table-round { border-radius: 999px; }
+.rs-table3d.rs-table-rect { border-radius: 16px; width: 190px; margin-left: -95px; }
+.rs-table3d span {
+  position: absolute;
+  inset: 12px;
+  border-radius: inherit;
+  border: 1px solid rgba(255,255,255,0.25);
+}
+.rs-seat-ring {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 1px;
+  height: 1px;
+  transform-style: preserve-3d;
+}
+.rs-room-3d .rs-seat {
+  left: 0;
+  top: 0;
+  transform-style: preserve-3d;
+}
+.rs-room-3d .rs-chair {
+  transform: translateZ(7px) rotateX(-12deg);
+}
+.rs-room-3d .rs-avatar,
+.rs-room-3d .rs-name,
+.rs-room-3d .rs-vote {
+  transform: rotateX(-64deg) translateZ(44px);
+}
+.rs-room-3d .rs-whiteboard {
+  left: 8%;
+  top: 18%;
+  transform: translateZ(18px);
+}
+.rs-room-3d .rs-window {
+  top: 12%;
+  right: 7%;
+  transform: translateZ(12px);
+}
+.rs-room-3d .rs-plant {
+  transform: rotateX(-64deg) translateZ(48px);
+}
+
+@media (max-width: 767px) {
+  .room-scene-panel { min-height: 310px; }
+  .room-scene-stage { height: 280px; }
+  .rs-seat { width: 62px; margin-left: -31px; }
+  .rs-name { max-width: 58px; }
 }
 
 /* AK1: controls panel collapse toggle */
