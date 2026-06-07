@@ -66,7 +66,9 @@
       "Bash(curl -s \"http://localhost:5288/css/site.css\")",
       "Bash(node --check \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/room.js\")",
       "Bash(curl -s \"http://localhost:5288/js/room.js\")",
-      "Bash(node --check \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/room-scene.js\")"
+      "Bash(node --check \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/room-scene.js\")",
+      "PowerShell($pids = Get-NetTCPConnection -LocalPort 5288 -State Listen | Select-Object -ExpandProperty OwningProcess -Unique; \"Distinct PIDs: $\\($pids -join ','\\)\"; try { $r = Invoke-WebRequest -Uri \"http://localhost:5288/\" -UseBasicParsing -TimeoutSec 10; \"HTTP $\\($r.StatusCode\\)\" } catch { \"ERR $\\($_.Exception.Message\\)\" })",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

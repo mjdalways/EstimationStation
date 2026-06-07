@@ -1333,17 +1333,31 @@ body.wgt-dragging #wgt-zone-Bot.wgt-zone-hover {
   height: 100%;
   border: 0;
   border-radius: 0;
+  display: flex;
+  flex-direction: column;
 }
-.wgt-float-body .room-scene-stage { height: 360px; }
+/* In float mode the stage fills the remaining panel height so resizing the float widget
+   also resizes the WebGL canvas. ResizeObserver in RS3D picks up the new dimensions. */
+.wgt-float-body .room-scene-stage {
+  flex: 1;
+  height: auto !important;
+  min-height: 200px;
+}
 .wgt-dock-zone .room-scene-panel { margin: 0; }
+
+/* The Room Scene widget is exempt from the 440px float cap — the 2D/3D room benefits
+   from extra width, so it can be dragged out to (nearly) the full screen width.
+   JS already clamps the resize handle to the viewport, so this just lifts the CSS cap. */
+.wgt-float:has(.room-scene-panel) { max-width: 96vw; }
 
 /* ── 3D GL (WebGL) mode ─────────────────────────────────── */
 .room-scene-stage canvas {
   display: block;
 }
-/* CSS2DRenderer overlay needs overflow visible to show labels at edges */
+/* CSS2DRenderer overlay: clipped to the canvas bounds so labels never escape the room panel.
+   (Previously was overflow:visible which caused emoji labels to appear outside the room.) */
 .room-scene-stage > div[style*="position: absolute"] {
-  overflow: visible !important;
+  overflow: hidden !important;
 }
 /* Name-tag labels rendered by CSS2DRenderer */
 .rs3d-label {
@@ -1533,6 +1547,12 @@ body.wgt-dragging #wgt-zone-Bot.wgt-zone-hover {
   opacity: 0.5;
   filter: grayscale(0.5);
 }
+/* 2D chair claiming affordances (parity with 3D click-to-sit). */
+.rs-seat-claimable { cursor: pointer; }
+.rs-seat-claimable:hover .rs-chair { opacity: 0.9; filter: none; }
+.rs-seat-claimable:hover .rs-seat-plus { transform: scale(1.15); }
+.rs-seat-mine { cursor: pointer; }
+.rs-seat-mine .rs-avatar { box-shadow: 0 0 0 2px #22c55e, 0 2px 8px rgba(0,0,0,0.18); }
 .rs-seat-plus {
   margin-top: 14px;
   width: 26px;
@@ -2502,11 +2522,16 @@ body.wgt-dragging #wgt-zone-Bot.wgt-zone-hover {
     display: inline-flex;
     align-items: center;
 }
-/* AE11c: constrain analog SVG in the story bar so it doesn't blow out row height */
+/* AE11c: constrain the analog SVG in the story bar so a large configured clock size
+   (up to 120px in settings) can't blow out the navbar row height. Capped to a compact
+   inline size here; the settings preview still renders at the user's chosen size. */
 #stc-clock .ac-analog {
-    max-width: 52px;
-    max-height: 52px;
+    max-width: 40px;
+    max-height: 40px;
+    width: auto;
+    height: auto;
     vertical-align: middle;
+    flex-shrink: 0;
 }
 .stc-sep {
     opacity: 0.4;

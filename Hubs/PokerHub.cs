@@ -136,6 +136,7 @@ public class PokerHub : Hub
         string participantName = string.Empty;
         string? newHostId = null;
         bool wasHost = false;
+        var releasedChairs = new List<int>();
         lock (room)
         {
             var participant = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
@@ -143,6 +144,12 @@ public class PokerHub : Hub
             {
                 participantName = participant.Name;
                 room.Participants.Remove(participant);
+            }
+            // Free any chair this connection had claimed so the seat reopens.
+            foreach (var kv in room.ChairClaims.Where(kv => kv.Value.ConnectionId == Context.ConnectionId).ToList())
+            {
+                room.ChairClaims.Remove(kv.Key);
+                releasedChairs.Add(kv.Key);
             }
             // AD1 — Transfer host if the host left
             if (room.HostConnectionId == Context.ConnectionId && room.Participants.Any())
@@ -161,9 +168,228 @@ public class PokerHub : Hub
         {
             await Clients.Group(roomName).SendAsync("ParticipantLeft", Context.ConnectionId, participantName);
         }
+        foreach (var idx in releasedChairs)
+        {
+            await Clients.Group(roomName).SendAsync("ChairReleased", idx);
+        }
         if (newHostId != null)
         {
             await Clients.Group(roomName).SendAsync("HostChanged", newHostId);
+        }
+    }
+
+    // ── Room Scene: race-safe chair claiming ──────────────────────────────
+    // First-confirm-wins. The server holds the authoritative chair->participant map
+    // and broadcasts ChairClaimed/ChairReleased; the loser of a race gets ChairClaimFailed.
+    public async Task ClaimChair(int chairIdx, string? color)
+    {
+        if (chairIdx < 0 || chairIdx > 63) return;
+        if (RateLimited("claimChair", TimeSpan.FromMilliseconds(150))) return;
+
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        string claimerName = string.Empty;
+        int? releasedIdx = null;
+        bool claimed = false;
+        string winnerName = string.Empty;
+
+        lock (room)
+        {
+            var p = room.Participants.FirstOrDefault(x => x.ConnectionId == Context.ConnectionId);
+            if (p == null) return;
+            claimerName = p.Name;
+
+            // Taken by another *present* participant → race lost.
+            if (room.ChairClaims.TryGetValue(chairIdx, out var existing)
+                && existing.ConnectionId != Context.ConnectionId
+                && room.Participants.Any(x => x.ConnectionId == existing.ConnectionId))
+            {
+                winnerName = existing.Name;
+            }
+            else
+            {
+                // Release any other chair this connection already held (moving seats).
+                foreach (var kv in room.ChairClaims
+                    .Where(kv => kv.Value.ConnectionId == Context.ConnectionId && kv.Key != chairIdx).ToList())
+                {
+                    room.ChairClaims.Remove(kv.Key);
+                    releasedIdx = kv.Key;
+                }
+                room.ChairClaims[chairIdx] = new ChairClaim
+                {
+                    ConnectionId = Context.ConnectionId,
+                    Name = p.Name,
+                    Color = color
+                };
+                claimed = true;
+            }
+        }
+
+        if (claimed)
+        {
+            _roomService.SaveRoom(room);
+            if (releasedIdx != null)
+                await Clients.Group(roomName).SendAsync("ChairReleased", releasedIdx.Value);
+            await Clients.Group(roomName).SendAsync("ChairClaimed", chairIdx, claimerName, color, Context.ConnectionId);
+        }
+        else
+        {
+            await Clients.Caller.SendAsync("ChairClaimFailed", chairIdx, winnerName);
+        }
+    }
+
+    // Room Scene: whole-layout furniture sync. Any add/move/remove/reset sends the full
+    // layout; we store it and broadcast to everyone else so the room stays in sync.
+    public async Task SetRoomLayout(string layoutJson)
+    {
+        if (string.IsNullOrEmpty(layoutJson) || layoutJson.Length > 8000) return;
+        if (RateLimited("roomLayout", TimeSpan.FromMilliseconds(120))) return;
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        lock (room) { room.RoomLayoutJson = layoutJson; }
+        _roomService.SaveRoom(room);
+        // Originator already shows its own change live — only update the others.
+        await Clients.OthersInGroup(roomName).SendAsync("RoomLayoutChanged", layoutJson);
+    }
+
+    // AQ5: collaborative whiteboard. Each completed stroke is broadcast as a delta and
+    // appended to room state so late joiners can replay the board.
+    public async Task WhiteboardDraw(string strokeJson)
+    {
+        if (string.IsNullOrEmpty(strokeJson) || strokeJson.Length > 20000) return;
+        if (RateLimited("wbDraw", TimeSpan.FromMilliseconds(20))) return;
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        lock (room)
+        {
+            room.WhiteboardStrokes.Add(strokeJson);
+            // Bound memory: keep the most recent strokes.
+            if (room.WhiteboardStrokes.Count > 4000)
+                room.WhiteboardStrokes.RemoveRange(0, room.WhiteboardStrokes.Count - 4000);
+        }
+        await Clients.OthersInGroup(roomName).SendAsync("WhiteboardStroke", strokeJson);
+    }
+
+    // AP1: host sets the room identity icon (emoji glyph or a data: URL image).
+    public async Task SetRoomIcon(string? icon)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || room.HostConnectionId != Context.ConnectionId) return;
+        if (icon != null)
+        {
+            if (icon.Length > 280_000) return;                       // ~200 KB image cap
+            if (!icon.StartsWith("data:") && icon.Length > 16) return; // emoji glyph only otherwise
+        }
+        lock (room) { room.RoomIcon = string.IsNullOrEmpty(icon) ? null : icon; }
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("RoomIconChanged", room.RoomIcon);
+    }
+
+    public async Task WhiteboardClear()
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        lock (room) { room.WhiteboardStrokes.Clear(); }
+        _roomService.SaveRoom(room);
+        await Clients.Group(roomName).SendAsync("WhiteboardCleared");
+    }
+
+    // Host-only: free a specific chair (evict whoever's sitting there). Reassignment is
+    // free-then-claim. Broadcasts ChairReleased so all views update.
+    public async Task HostFreeChair(int chairIdx)
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null || room.HostConnectionId != Context.ConnectionId) return;
+
+        bool removed;
+        lock (room) { removed = room.ChairClaims.Remove(chairIdx); }
+        if (removed)
+        {
+            _roomService.SaveRoom(room);
+            await Clients.Group(roomName).SendAsync("ChairReleased", chairIdx);
+        }
+    }
+
+    // Spatial presence: relay a participant's live position/heading so everyone sees them
+    // roam the room. High-frequency + ephemeral → no SaveRoom; just update memory + relay.
+    public async Task AvatarMove(double x, double z, double yaw, string pose)
+    {
+        if (RateLimited("avatarMove", TimeSpan.FromMilliseconds(40))) return;
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        // Clamp to a sane room-sized range to ignore garbage.
+        if (double.IsNaN(x) || double.IsNaN(z) || double.IsNaN(yaw)) return;
+        x = Math.Max(-12, Math.Min(12, x)); z = Math.Max(-12, Math.Min(12, z));
+        var p = room.Participants.FirstOrDefault(q => q.ConnectionId == Context.ConnectionId);
+        if (p == null) return;
+        p.PosX = x; p.PosZ = z; p.Yaw = yaw; p.Pose = (pose == "walk" || pose == "idle") ? pose : "idle";
+        await Clients.OthersInGroup(roomName).SendAsync("AvatarMoved", Context.ConnectionId, x, z, yaw, p.Pose);
+    }
+
+    // Stop roaming (e.g. sat down / left the room) — clear pose so the avatar returns to
+    // its seat/standing slot for everyone.
+    public async Task AvatarStop()
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        var p = room.Participants.FirstOrDefault(q => q.ConnectionId == Context.ConnectionId);
+        if (p == null) return;
+        p.Pose = null; p.PosX = null; p.PosZ = null; p.Yaw = null;
+        await Clients.OthersInGroup(roomName).SendAsync("AvatarStopped", Context.ConnectionId);
+    }
+
+    // Room Scene: chairs dragged off their default ring. Whole-map sync (idx -> {x,z}).
+    public async Task SetChairPositions(string json)
+    {
+        if (string.IsNullOrEmpty(json) || json.Length > 6000) return;
+        if (RateLimited("chairPos", TimeSpan.FromMilliseconds(120))) return;
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        lock (room) { room.ChairPositionsJson = json; }
+        _roomService.SaveRoom(room);
+        await Clients.OthersInGroup(roomName).SendAsync("ChairPositionsChanged", json);
+    }
+
+    public async Task ReleaseChair()
+    {
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        var released = new List<int>();
+        lock (room)
+        {
+            foreach (var kv in room.ChairClaims.Where(kv => kv.Value.ConnectionId == Context.ConnectionId).ToList())
+            {
+                room.ChairClaims.Remove(kv.Key);
+                released.Add(kv.Key);
+            }
+        }
+        if (released.Count > 0)
+        {
+            _roomService.SaveRoom(room);
+            foreach (var idx in released)
+                await Clients.Group(roomName).SendAsync("ChairReleased", idx);
         }
     }
 
@@ -1144,7 +1370,8 @@ public class PokerHub : Hub
                 hasVoted = p.Vote != null,
                 vote = room.VotesRevealed ? p.Vote : null,
                 avatarData = p.AvatarData,
-                confidence = room.VotesRevealed ? p.Confidence : null
+                confidence = room.VotesRevealed ? p.Confidence : null,
+                posX = p.PosX, posZ = p.PosZ, yaw = p.Yaw, pose = p.Pose
             }),
             stories = room.Stories.Select(s => new
             {
@@ -1158,7 +1385,19 @@ public class PokerHub : Hub
                 description = s.Description,
                 notes = s.Notes,
                 issueType = s.IssueType
-            })
+            }),
+            // Room Scene seating so a joiner immediately sees who sits where.
+            chairClaims = room.ChairClaims.Select(kv => new
+            {
+                idx = kv.Key,
+                name = kv.Value.Name,
+                color = kv.Value.Color,
+                connectionId = kv.Value.ConnectionId
+            }),
+            roomLayout = room.RoomLayoutJson,
+            whiteboardStrokes = room.WhiteboardStrokes,
+            roomIcon = room.RoomIcon,
+            chairPositions = room.ChairPositionsJson
         };
     }
 

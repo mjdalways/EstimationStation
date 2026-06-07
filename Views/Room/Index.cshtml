@@ -107,9 +107,10 @@
                 </div>
                 <div class="room-scene-mode-toggle" role="group" aria-label="Room scene mode">
                     <button type="button" data-rs-mode="2d"    onclick="RoomScene.setMode('2d')"    title="Top-down 2D table view">2D</button>
-                    <button type="button" data-rs-mode="3d"    onclick="RoomScene.setMode('3d')"    title="Perspective CSS 3D room view">3D</button>
-                    <button type="button" data-rs-mode="3d-gl" onclick="RoomScene.setMode('3d-gl')" title="WebGL 3D room — robot avatars, interactive orbit camera">3D GL</button>
+                    <button type="button" data-rs-mode="3d-gl" onclick="RoomScene.setMode('3d-gl')" title="Interactive 3D room — robot avatars, walk around, orbit camera">3D</button>
                 </div>
+                <button type="button" class="rs-setup-btn" title="Open the shared whiteboard"
+                        onclick="window.Whiteboard && Whiteboard.open()">🖊️ Whiteboard</button>
                 <button type="button" class="rs-setup-btn" title="Configure table, chairs, colours and furniture"
                         onclick="openSettingsModal('room')">⚙️ Setup Room</button>
             </div>
@@ -442,4 +443,5 @@
 <script src="~/lib/three/OrbitControls.js"></script>
 <script src="~/lib/three/CSS2DRenderer.js"></script>
 <script src="~/js/room-scene-3d.js" asp-append-version="true"></script>
+<script src="~/js/whiteboard.js" asp-append-version="true"></script>
 }

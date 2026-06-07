@@ -18,14 +18,14 @@ Carries forward all unimplemented items from v5.0. Completed groups have been mo
 | — | [AL](./plans/FEATURE-PLAN-6.0-AL.md) | 🚩 Local flag pack (~250, MIT) + country dropdown, no CDN | Medium | ✅ Done |
 | — | [AJ](./plans/FEATURE-PLAN-6.0-AJ.md) | 🃏 Additional Card Animations — explode, tardis, hide, run-away, fly-away | Hard | ✅ Done |
 | — | [AK2](./plans/FEATURE-PLAN-6.0-AK.md) | ✋ Story drag-reorder + drag-handle cursor | Medium | ✅ Done |
-| 1 | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System (rest of AE) — AE10 infra + Vibe Check float in progress | Hard | 🔄 **In progress** |
-| 2 | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — background colour, custom hands, number style, digital font/12h–24h | Hard | ⏳ Pending |
+| — | [AE](./plans/FEATURE-PLAN-6.0-AE.md) | 🪟 Widget Panel System — AE10 dock/float system shipped; AE11b (timer "ready" hint) + AE11c (analog clock row-height cap) done | Hard | ✅ Done (2026-06-07) |
+| — | [AI](./plans/FEATURE-PLAN-6.0-AI.md) | 🕐 Custom Clock Face — bg colour, digital font + 12/24h, analog number style, per-hand width/length/style (solid/dashed/arrow) | Hard | ✅ Done (2026-06-07) |
 | — | [AB](./plans/FEATURE-PLAN-6.0-AB.md) | ✂️ Image Upload with Crop/Pan/Zoom — shared crop dialog for avatars, card backs, season sprites | Hard | ⏸ Deferred |
 | — | [J](./plans/FEATURE-PLAN-6.0-J.md) | 📱 Mobile Experience — stories bottom sheet, vote tap targets, lite mode | Medium-Hard | ⏸ Deferred |
 | — | [K](./plans/FEATURE-PLAN-6.0-K.md) | 💾 Room Persistence — JSON file per room, survive server restart, 7-day TTL | Hard | ⏸ Deferred |
-| — | [AK](./plans/FEATURE-PLAN-6.0-AK.md) | 🔧 UX Polish Backlog — AK1/AK3/AK4/AK5/AK6 done (AK2 split out as #3 above) | Medium | 🟡 Mostly done |
-| — | [AP](./plans/FEATURE-PLAN-6.0-AP.md) | 🏷️ Room Identity & Custom Icon — upload/pick room icon; collaborative pixel-art icon designer | Medium | 🔮 Future |
-| — | [AQ](./plans/FEATURE-PLAN-6.0-AQ.md) | 🪑 Room Visualization — 2D table view → seat choice → 3D room → whiteboard + configurable window views (Kumospace-style) | Very Hard (phased) | 🔮 Future |
+| — | [AK](./plans/FEATURE-PLAN-6.0-AK.md) | 🔧 UX Polish Backlog — AK1–AK6 all shipped | Medium | ✅ Done |
+| — | [AP](./plans/FEATURE-PLAN-6.0-AP.md) | 🏷️ Room Identity & Custom Icon — AP1 upload/pick room icon ✅; AP2 collaborative pixel-art designer future | Medium | ✅ AP1 Done (2026-06-07) |
+| — | [AQ](./plans/FEATURE-PLAN-6.0-AQ.md) | 🪑 Room Visualization — 2D table, seat claim, 3D room, walk mode, whiteboard (pen/shapes/text/notes), window views, materials/lighting | Very Hard (phased) | ✅ Done (2026-06-07) |
 
 ---
 

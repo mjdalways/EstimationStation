@@ -49,6 +49,80 @@ let roomState = {
 };
 window.roomState = roomState;
 
+// Room Scene → SignalR facade. room-scene-3d.js calls these to claim/release a chair
+// through the hub (race-safe, server-authoritative). Falls back to local-only when absent.
+window.RoomSceneNet = {
+    claimChair: function (idx, color) {
+        if (connection) connection.invoke('ClaimChair', idx, color || null).catch(function(e){ console.error('ClaimChair failed', e); });
+    },
+    releaseChair: function () {
+        if (connection) connection.invoke('ReleaseChair').catch(function(e){ console.error('ReleaseChair failed', e); });
+    },
+    setLayout: function (layoutJson) {
+        if (connection) connection.invoke('SetRoomLayout', layoutJson).catch(function(e){ console.error('SetRoomLayout failed', e); });
+    },
+    setChairPositions: function (json) {
+        if (connection) connection.invoke('SetChairPositions', json).catch(function(e){ console.error('SetChairPositions failed', e); });
+    },
+    avatarMove: function (x, z, yaw, pose) {
+        if (connection) connection.invoke('AvatarMove', x, z, yaw, pose).catch(function(){});
+    },
+    avatarStop: function () {
+        if (connection) connection.invoke('AvatarStop').catch(function(){});
+    },
+    hostFreeChair: function (idx) {
+        if (connection) connection.invoke('HostFreeChair', idx).catch(function(e){ console.error('HostFreeChair failed', e); });
+    }
+};
+
+// AP1: room identity icon. Host sets; everyone applies to the navbar badge + favicon.
+window.setRoomIcon = function (icon) {
+    if (connection) connection.invoke('SetRoomIcon', icon || '').catch(function(e){ console.error('SetRoomIcon failed', e); });
+};
+function _applyRoomIcon(icon) {
+    var badge = document.getElementById('roomIconBadge');
+    if (badge) {
+        if (icon) {
+            badge.classList.remove('d-none'); badge.classList.add('d-inline-flex');
+            badge.innerHTML = (typeof icon === 'string' && icon.indexOf('data:') === 0)
+                ? '<img src="' + icon + '" alt="Room icon" style="height:26px;width:26px;object-fit:cover;border-radius:5px;">'
+                : _escIcon(icon);
+        } else {
+            badge.classList.add('d-none'); badge.classList.remove('d-inline-flex'); badge.innerHTML = '';
+        }
+    }
+    _setFavicon(icon);
+}
+function _escIcon(s){ return String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _setFavicon(icon) {
+    try {
+        var href;
+        if (!icon) return;
+        if (icon.indexOf('data:') === 0) { href = icon; }
+        else {
+            // Render the emoji to a 64×64 canvas → data URL.
+            var c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            var x = c.getContext('2d');
+            x.font = '52px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+            x.fillText(icon, 32, 36);
+            href = c.toDataURL('image/png');
+        }
+        var link = document.querySelector('link[rel="icon"]');
+        if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+        link.href = href;
+    } catch (e) {}
+}
+
+// AQ5: whiteboard → SignalR facade. whiteboard.js calls these to sync strokes.
+window.WhiteboardNet = {
+    draw: function (strokeJson) {
+        if (connection) connection.invoke('WhiteboardDraw', strokeJson).catch(function(e){ console.error('WhiteboardDraw failed', e); });
+    },
+    clear: function () {
+        if (connection) connection.invoke('WhiteboardClear').catch(function(e){ console.error('WhiteboardClear failed', e); });
+    }
+};
+
 function _syncRoomScene() {
     if (window.RoomScene && typeof window.RoomScene.syncRoom === 'function') {
         window.RoomScene.syncRoom(roomState);
@@ -69,6 +143,8 @@ async function initSignalR() {
     try {
         await connection.start();
         myConnectionId = connection.connectionId;
+        // Room Scene reads window.ROOM_CONFIG.connectionId to know which seat is "mine".
+        if (window.ROOM_CONFIG) ROOM_CONFIG.connectionId = myConnectionId;
         const _savedPin = sessionStorage.getItem('es_roomPin_' + ROOM_CONFIG.roomName) || null;
         await connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver, _savedPin);
         if (typeof initVoiceRecognition === 'function') initVoiceRecognition();
@@ -137,6 +213,13 @@ function registerHandlers() {
 
         // AC1: Start timer for any story already active when user joins/reconnects
         acStartStoryTimer(state.currentStoryId || null);
+
+        // Room Scene: load the authoritative seating so we immediately see who sits where.
+        if (window.RS3D && RS3D.setClaimsFromServer) RS3D.setClaimsFromServer(state.chairClaims || []);
+        if (window.RS3D && RS3D.applyRemoteLayout && state.roomLayout) RS3D.applyRemoteLayout(state.roomLayout);
+        if (window.RS3D && RS3D.applyChairPositions && state.chairPositions) RS3D.applyChairPositions(state.chairPositions);
+        if (window.Whiteboard && Whiteboard.loadStrokes) Whiteboard.loadStrokes(state.whiteboardStrokes || []);
+        _applyRoomIcon(state.roomIcon || null);
     });
 
     connection.on('ParticipantJoined', (p) => {
@@ -148,6 +231,9 @@ function registerHandlers() {
     connection.on('ParticipantLeft', (connectionId, name) => {
         roomState.participants = roomState.participants.filter(p => p.connectionId !== connectionId);
         renderParticipants();
+        // Free any Room Scene chair they were sitting in + remove their roaming avatar.
+        if (window.RS3D && RS3D.releaseByConnection) RS3D.releaseByConnection(connectionId);
+        if (window.RS3D && RS3D.clearRoamer) RS3D.clearRoamer(connectionId);
         appendChat('System', `${name} left the room`, null);
     });
 
@@ -428,7 +514,10 @@ function registerHandlers() {
     });
 
     connection.on('VibeUpdated', (counts) => { renderVibeDisplay(counts); });
-    connection.on('ReceiveReaction', (senderCid, emoji) => { _reactionFloatFromBadge(senderCid, emoji); });
+    connection.on('ReceiveReaction', (senderCid, emoji) => {
+        _reactionFloatFromBadge(senderCid, emoji);
+        if (window.RS3D && RS3D.showEmote) RS3D.showEmote(senderCid, emoji);   // spatial emote over avatar
+    });
     connection.on('SoundTriggered', (soundId, senderName) => {
         const sr = _getSoundReceiveSettings();
         if (sr.receive !== false) {
@@ -450,7 +539,42 @@ function registerHandlers() {
         if (p) { p.confidence = level; renderParticipants(); }
     });
 
+    // ── Room Scene: chair-claim sync ──────────────────────────────────────
+    connection.on('ChairClaimed', (idx, name, color, cid) => {
+        if (window.RS3D && RS3D.applyClaim) RS3D.applyClaim(idx, name, color, cid);
+    });
+    connection.on('ChairReleased', (idx) => {
+        if (window.RS3D && RS3D.applyRelease) RS3D.applyRelease(idx);
+    });
+    connection.on('ChairClaimFailed', (idx, winnerName) => {
+        if (window.RS3D && RS3D.claimFailed) RS3D.claimFailed(idx, winnerName);
+    });
+    connection.on('RoomLayoutChanged', (layoutJson) => {
+        if (window.RS3D && RS3D.applyRemoteLayout) RS3D.applyRemoteLayout(layoutJson);
+    });
+    connection.on('ChairPositionsChanged', (json) => {
+        if (window.RS3D && RS3D.applyChairPositions) RS3D.applyChairPositions(json);
+    });
+    // Spatial presence: peers roaming the room
+    connection.on('AvatarMoved', (cid, x, z, yaw, pose) => {
+        if (window.RS3D && RS3D.applyAvatarMove) RS3D.applyAvatarMove(cid, x, z, yaw, pose);
+    });
+    connection.on('AvatarStopped', (cid) => {
+        if (window.RS3D && RS3D.applyAvatarStop) RS3D.applyAvatarStop(cid);
+    });
+    // AQ5: whiteboard sync
+    connection.on('WhiteboardStroke', (strokeJson) => {
+        if (window.Whiteboard && Whiteboard.onStroke) Whiteboard.onStroke(strokeJson);
+    });
+    connection.on('WhiteboardCleared', () => {
+        if (window.Whiteboard && Whiteboard.onClear) Whiteboard.onClear();
+    });
+    // AP1: room icon
+    connection.on('RoomIconChanged', (icon) => { _applyRoomIcon(icon); });
+
     connection.onreconnected(() => {
+        myConnectionId = connection.connectionId;
+        if (window.ROOM_CONFIG) ROOM_CONFIG.connectionId = myConnectionId;
         const _rPin = sessionStorage.getItem('es_roomPin_' + ROOM_CONFIG.roomName) || null;
         connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver, _rPin);
     });
@@ -1683,9 +1807,12 @@ function _acTick() {
 
     var timerActive  = showTimer && hasStory && !!_acTimerStart && !sessionHideTimer;
     var clockActive  = showClock && !sessionHideClock;
+    // AE11b: timer enabled but no story yet → keep the bar up to show the "ready" hint,
+    // even when the clock is off (otherwise the hint would never appear).
+    var timerWaiting = showTimer && !sessionHideTimer && !hasStory;
 
     // Hide whole bar if nothing will show
-    if (!timerActive && !clockActive) { bar.style.display = 'none'; return; }
+    if (!timerActive && !clockActive && !timerWaiting) { bar.style.display = 'none'; return; }
     // AH2: use explicit 'flex' — inline style overrides, no d-flex class needed
     bar.style.display = 'flex';
 
@@ -1712,9 +1839,9 @@ function _acTick() {
         }
     }
 
-    // Separator — only show when both visible
+    // Separator — only show when a timer segment (active or waiting hint) AND the clock show
     var sep = document.getElementById('stc-sep');
-    if (sep) sep.style.display = (timerActive && clockActive) ? '' : 'none';
+    if (sep) sep.style.display = ((timerActive || timerWaiting) && clockActive) ? '' : 'none';
 
     // Clock segment (AI3: controlled via stc-clock-wrap container)
     var clockEl = document.getElementById('stc-clock');
@@ -1747,13 +1874,14 @@ function _acRenderClock(clockEl) {
             existing.setAttribute('height', sz);
         }
         _acUpdateAnalogHands(clockEl, now, tz, styleData);
+        if (window._acStyleAnalog) _acStyleAnalog(clockEl, styleData);   // AI: bg, hands, numbers
         clockEl.style.display = '';
         return;
     }
 
     // Digital
     clockEl.innerHTML = '';
-    var options = { hour: '2-digit', minute: '2-digit', hour12: false };
+    var options = { hour: '2-digit', minute: '2-digit', hour12: (styleData.h24 === false) };  // AI4: 12h/24h
     var tzName = '';
     if (tz) {
         options.timeZone = tz;
@@ -1769,6 +1897,8 @@ function _acRenderClock(clockEl) {
     var size = styleData.fontSize ? styleData.fontSize + 'px' : '';
     clockEl.style.color = color;
     clockEl.style.fontSize = size;
+    clockEl.style.fontFamily = styleData.fontFamily || '';   // AI4
+    clockEl.style.background = (styleData.bgColor && styleData.bgColor !== 'transparent') ? styleData.bgColor : '';  // AI1
     clockEl.style.display = '';
 }
 
@@ -2010,6 +2140,31 @@ function _populateRoomOtherSettings() {
     if (secEl) secEl.value = styleData.secColor || '#dc3545';
     var analogSizeEl = document.getElementById('tc-analog-size');
     if (analogSizeEl) analogSizeEl.value = styleData.analogSize || 52;
+
+    // AI — custom clock face controls
+    var bgTrans = (styleData.bgColor || 'transparent') === 'transparent';
+    var bgTransEl = document.getElementById('tc-bg-transparent');
+    if (bgTransEl) bgTransEl.checked = bgTrans;
+    var bgEl = document.getElementById('tc-bg-color');
+    if (bgEl) bgEl.value = bgTrans ? '#ffffff' : styleData.bgColor;
+    var ffEl = document.getElementById('tc-font-family');
+    if (ffEl) ffEl.value = styleData.fontFamily || 'monospace';
+    var h24El = document.getElementById('tc-24h');
+    if (h24El) h24El.checked = styleData.h24 !== false;
+    var nsEl = document.getElementById('tc-number-style');
+    if (nsEl) nsEl.value = styleData.numberStyle || 'none';
+    var hands = styleData.hands || {};
+    ['hour', 'min', 'sec'].forEach(function (k) {
+        var h = hands[k] || {};
+        var st = document.getElementById('tc-hand-' + k + '-style');
+        var wd = document.getElementById('tc-hand-' + k + '-width');
+        var ln = document.getElementById('tc-hand-' + k + '-length');
+        var defW = { hour: 5, min: 3, sec: 1.5 }[k], defL = { hour: 50, min: 77, sec: 86 }[k];
+        if (st) st.value = h.style || 'solid';
+        if (wd) wd.value = h.width || defW;
+        if (ln) ln.value = h.length || defL;
+    });
+
     var prev = document.getElementById('tc-clock-preview');
     if (prev) _acRenderClock(prev);
 
@@ -2089,6 +2244,16 @@ function initReactionPanel() {
         panel.appendChild(btn);
     });
 }
+
+// Room-Scene interactive props call these (defined here so they reach the SignalR connection).
+window._rsRoomConfetti = function () {
+    if (typeof triggerCelebration === 'function') triggerCelebration();
+    if (typeof castReaction === 'function') castReaction('🎉');
+};
+window._rsRoomSound = function (id) {
+    if (typeof _playSoundLocal === 'function') _playSoundLocal(id);
+    if (connection) connection.invoke('TriggerSound', id).catch(function () {});
+};
 
 async function castReaction(emoji) {
     var now = Date.now();

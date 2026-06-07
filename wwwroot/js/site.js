@@ -116,6 +116,8 @@ function openSettingsModal(tab) {
     applyVoteCardBackDesign();
     if (typeof _epAutoAttach === 'function') _epAutoAttach();
     if (typeof _populateRoomOtherSettings === 'function') _populateRoomOtherSettings();
+    if (typeof _rsRenderKeyBinds === 'function') _rsRenderKeyBinds();
+    if (typeof _updateWalkShortcutsTable === 'function') _updateWalkShortcutsTable();
     _updateSoundDefaultLabel();
     var ct = document.getElementById('show-confidence-toggle');
     if (ct) ct.checked = localStorage.getItem('es_showConfidence') !== '0';
@@ -1897,6 +1899,21 @@ function saveTimerClockSettings() {
     // AG3: delegate room-internal timer-start logic to room.js hook (no-op on non-room pages)
     if (typeof _acOnTimerEnabled === 'function') _acOnTimerEnabled(showTimerEl);
 
+    // AI — custom clock face extras
+    var bgEl     = document.getElementById('tc-bg-color');
+    var bgTransEl= document.getElementById('tc-bg-transparent');
+    var ffEl     = document.getElementById('tc-font-family');
+    var h24El    = document.getElementById('tc-24h');
+    var nsEl     = document.getElementById('tc-number-style');
+    function _hand(h) {
+        var st = document.getElementById('tc-hand-' + h + '-style');
+        var wd = document.getElementById('tc-hand-' + h + '-width');
+        var ln = document.getElementById('tc-hand-' + h + '-length');
+        return { style: st ? st.value : 'solid',
+                 width: wd ? (parseFloat(wd.value) || 0) : 0,
+                 length: ln ? (parseInt(ln.value, 10) || 0) : 0 };
+    }
+
     var styleData = {
         mode:       modeEl       ? modeEl.value                      : 'digital',
         color:      colorEl      ? colorEl.value                     : '#6c757d',
@@ -1905,7 +1922,13 @@ function saveTimerClockSettings() {
         hourColor:  hourEl       ? hourEl.value                      : '#212529',
         minColor:   minEl        ? minEl.value                       : '#495057',
         secColor:   secEl        ? secEl.value                       : '#dc3545',
-        analogSize: analogSizeEl ? (parseInt(analogSizeEl.value, 10) || 52) : 52
+        analogSize: analogSizeEl ? (parseInt(analogSizeEl.value, 10) || 52) : 52,
+        // AI1 background, AI4 digital font + 12/24h, AI3 number style, AI2 per-hand
+        bgColor:    (bgTransEl && bgTransEl.checked) ? 'transparent' : (bgEl ? bgEl.value : 'transparent'),
+        fontFamily: ffEl ? ffEl.value : '',
+        h24:        h24El ? h24El.checked : true,
+        numberStyle: nsEl ? nsEl.value : 'none',
+        hands:      { hour: _hand('hour'), min: _hand('min'), sec: _hand('sec') }
     };
     localStorage.setItem('es_clockStyle', JSON.stringify(styleData));
     if (typeof _acTick === 'function') _acTick();
@@ -2003,18 +2026,87 @@ function _acRenderClockBasic(el) {
             setRot('.ac-min',  m2 * 6  + s2 * 0.1);
             setRot('.ac-sec',  s2 * 6);
         }
+        if (window._acStyleAnalog) _acStyleAnalog(el, styleData);
         return;
     }
 
     var color  = styleData.color || '#6c757d';
     var fs     = (styleData.fontSize || 13) + 'px';
+    var ff     = styleData.fontFamily || 'monospace';
     var h24    = styleData.h24 !== false; // default 24h
     var now    = new Date();
     var opts   = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !h24 };
     if (tz) opts.timeZone = tz;
     var timeStr = '';
     try { timeStr = now.toLocaleTimeString([], opts); } catch(e) { timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: !h24 }); }
-    el.innerHTML = '<span style="color:' + color + ';font-size:' + fs + ';font-family:monospace;white-space:nowrap;">🕐 ' + timeStr + '</span>';
+    el.style.background = (styleData.bgColor && styleData.bgColor !== 'transparent') ? styleData.bgColor : '';
+    el.innerHTML = '<span style="color:' + color + ';font-size:' + fs + ';font-family:' + ff + ';white-space:nowrap;">🕐 ' + timeStr + '</span>';
 }
 window._acRenderClockBasic = _acRenderClockBasic;
+
+// AI — shared clock-face styling, applied by BOTH the room.js and site.js renderers so the
+// story-bar clock and the settings preview stay consistent. Additive: it sets attributes on
+// the existing SVG / container rather than rebuilding the renderers.
+function _acStyleAnalog(container, styleData) {
+    if (!container) return;
+    var svg = container.querySelector('svg'); if (!svg) return;
+    var d = styleData || {};
+    var NS = 'http://www.w3.org/2000/svg';
+    // AI1 — background
+    container.style.background = (d.bgColor && d.bgColor !== 'transparent') ? d.bgColor : '';
+    // AI2 — per-hand width / length / dash / arrow tip
+    var defs = { hour: { w: 5, len: 50 }, min: { w: 3, len: 77 }, sec: { w: 1.5, len: 86 } };
+    ['hour', 'min', 'sec'].forEach(function (k) {
+        var ln = svg.querySelector('.ac-' + k); if (!ln) return;
+        var h = (d.hands && d.hands[k]) || {};
+        var w = h.width || defs[k].w;
+        if (h.width) ln.setAttribute('stroke-width', h.width);
+        var lenPct = h.length || defs[k].len;
+        var y2 = 50 - (lenPct / 100) * 44;
+        ln.setAttribute('y2', y2.toFixed(1));
+        ln.setAttribute('stroke-dasharray', h.style === 'dashed' ? '4 3' : '');
+        // Arrow tip: a small triangle at the hand end, sharing the hand's rotation.
+        var arrow = svg.querySelector('.ac-arrow-' + k);
+        if (h.style === 'arrow') {
+            if (!arrow) { arrow = document.createElementNS(NS, 'polygon'); arrow.setAttribute('class', 'ac-arrow-' + k); svg.appendChild(arrow); }
+            var aw = w * 1.3 + 1, tip = y2 - aw * 1.7;
+            arrow.setAttribute('points', (50 - aw).toFixed(1) + ',' + y2.toFixed(1) + ' ' +
+                (50 + aw).toFixed(1) + ',' + y2.toFixed(1) + ' 50,' + tip.toFixed(1));
+            arrow.setAttribute('fill', ln.getAttribute('stroke') || 'currentColor');
+            arrow.setAttribute('transform', ln.getAttribute('transform') || '');
+        } else if (arrow) {
+            arrow.parentNode.removeChild(arrow);
+        }
+    });
+    // AI3 — number markings (digits / roman / ticks / none)
+    svg.querySelectorAll('.ac-num').forEach(function (n) { n.parentNode.removeChild(n); });
+    var ns = d.numberStyle || 'none';
+    if (ns !== 'none') {
+        var roman = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+        for (var i = 0; i < 12; i++) {
+            var ang = (i * 30) * Math.PI / 180;
+            if (ns === 'ticks') {
+                var t = document.createElementNS(NS, 'line');
+                t.setAttribute('class', 'ac-num');
+                t.setAttribute('x1', (50 + 42 * Math.sin(ang)).toFixed(1));
+                t.setAttribute('y1', (50 - 42 * Math.cos(ang)).toFixed(1));
+                t.setAttribute('x2', (50 + 46 * Math.sin(ang)).toFixed(1));
+                t.setAttribute('y2', (50 - 46 * Math.cos(ang)).toFixed(1));
+                t.setAttribute('stroke', 'currentColor'); t.setAttribute('stroke-width', '1.5');
+                svg.insertBefore(t, svg.firstChild);
+            } else {
+                var tx = document.createElementNS(NS, 'text');
+                tx.setAttribute('class', 'ac-num');
+                tx.setAttribute('x', (50 + 37 * Math.sin(ang)).toFixed(1));
+                tx.setAttribute('y', (50 - 37 * Math.cos(ang)).toFixed(1));
+                tx.setAttribute('text-anchor', 'middle');
+                tx.setAttribute('dominant-baseline', 'central');
+                tx.setAttribute('font-size', '11'); tx.setAttribute('fill', 'currentColor');
+                tx.textContent = (ns === 'roman') ? roman[i] : (i === 0 ? 12 : i);
+                svg.appendChild(tx);
+            }
+        }
+    }
+}
+window._acStyleAnalog = _acStyleAnalog;
 

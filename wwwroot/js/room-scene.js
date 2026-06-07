@@ -16,8 +16,21 @@
         chairCount: 0,        // 0 = match participant count
         tableSize: 'medium',  // small | medium | large
         chairType: 'office',  // office | gaming | beanbag | stool | throne | random
-        windowView: 'skyline',// skyline | beach | mountains | night | forest | none (3D GL window scene)
-        dragMode: 'select'    // select | doubleselect | direct (3D GL furniture move model)
+        windowView: 'skyline',// skyline | beach | mountains | night | forest | space | custom | none
+        windowAnimated: true, // animate the window scene (clouds drift, stars twinkle, sea shimmers)
+        windowTimeOfDay: 'day', // day | dusk | night | auto — tints daylight scenes (auto follows local clock)
+        windowImage: null,    // data URL for the 🎨 custom window view
+        floorMaterial: 'preset', // preset | wood | carpet | tile | concrete
+        wallColor: 'preset',  // 'preset' or a #hex
+        tableMaterial: 'wood',// wood | glass | marble
+        lighting: 'normal',   // normal | warm | cool | neon
+        twoDStyle: 'topdown', // topdown = overhead orthographic view of the real 3D scene; flat = CSS diagram
+        dragMode: 'select',   // select | doubleselect | direct (3D GL furniture move model)
+        walkCameraMode: 'first', // first = first-person | third = third-person follow camera
+        // Walk controls (3D). Values are KeyboardEvent.code strings.
+        // Defaults use arrow keys + Ctrl/Alt so they don't conflict with page shortcuts (Space=reveal, C=chat, etc.)
+        keyBindings: { forward:'ArrowUp', back:'ArrowDown', left:'ArrowLeft', right:'ArrowRight',
+                       jump:'AltLeft', crouch:'ControlLeft', interact:'KeyE', walk:'KeyT' }
     };
 
     var state = {
@@ -27,10 +40,14 @@
         participants: [],
         roomState: null
     };
+    var _glActive = false;   // true while the WebGL renderer (RS3D) owns the stage
 
     function loadConfig() {
         try {
-            return Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
+            var cfg = Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
+            // Migrate the retired CSS-3D mode onto the WebGL room.
+            if (cfg.mode === '3d') cfg.mode = '3d-gl';
+            return cfg;
         } catch (e) {
             return Object.assign({}, DEFAULT_CONFIG);
         }
@@ -114,24 +131,75 @@
             : participantSeatStyle(i, count, 36, 31, 50, 52);
     }
 
+    // Is this participant the local user? (connectionId-first, name fallback.)
+    function _isMe(p) {
+        if (!p) return false;
+        var myCid = window.ROOM_CONFIG && window.ROOM_CONFIG.connectionId;
+        var myName = window.ROOM_CONFIG && window.ROOM_CONFIG.playerName;
+        return (myCid && p.connectionId === myCid) || (!myCid && p.name === myName);
+    }
+
     // p may be null → render an empty (unclaimed) chair of the slot's type.
+    // Every seat carries data-seat-idx so the delegated click handler can claim it.
     function renderSeat(p, i, count, mode) {
         var chairCls = ' rs-seat-chair-' + chairTypeFor2d(i);
         var style = seatPosStyle(i, count, mode);
         if (!p) {
-            return '<div class="rs-seat rs-seat-empty' + chairCls + '" style="' + style + '" title="Empty seat — unclaimed">'
+            return '<div class="rs-seat rs-seat-empty rs-seat-claimable' + chairCls + '" data-seat-idx="' + i + '" style="' + style + '" title="Click to sit here">'
                 + '<div class="rs-chair"></div>'
                 + '<div class="rs-seat-plus">+</div>'
                 + '</div>';
         }
         var isHost = state.roomState && p.connectionId === state.roomState.hostConnectionId;
-        var cls = 'rs-seat' + chairCls + (p.hasVoted ? ' voted' : '') + (p.isObserver ? ' observer' : '') + (p.isGhost ? ' ghost' : '') + (isHost ? ' host' : '');
-        return '<div class="' + cls + '" style="' + style + '" title="' + esc(p.name) + '">'
+        var mine = _isMe(p);
+        var cls = 'rs-seat' + chairCls + (p.hasVoted ? ' voted' : '') + (p.isObserver ? ' observer' : '') + (p.isGhost ? ' ghost' : '') + (isHost ? ' host' : '') + (mine ? ' rs-seat-mine' : '');
+        return '<div class="' + cls + '" data-seat-idx="' + i + '" style="' + style + '" title="' + esc(p.name) + (mine ? ' — click to stand up' : '') + '">'
             + '<div class="rs-chair"></div>'
             + '<div class="rs-avatar">' + esc(participantInitial(p.name)) + '</div>'
             + '<div class="rs-name">' + esc(p.name || 'Guest') + '</div>'
             + '<div class="rs-vote">' + esc(voteLabel(p)) + '</div>'
             + '</div>';
+    }
+
+    // 2D chair claiming — parity with 3D. Click an empty chair to claim it (server
+    // arbitrates the race), or click your own chair to stand up. Goes through the
+    // same RoomSceneNet path as 3D, so 2D and 3D stay in lockstep.
+    function claimSeat2d(idx) {
+        var plan = seatPlan();
+        var occupant = plan.slots[idx] || null;
+        if (occupant) {
+            if (_isMe(occupant)) {
+                if (window.RS3D && RS3D.releaseMySeat) RS3D.releaseMySeat();
+            } else if (window.roomState && window.roomState.isHost) {
+                // AQ2: host can free someone else's seat.
+                if (window.confirm('Free ' + (occupant.name || 'this person') + "'s seat?")) {
+                    if (window.RoomSceneNet && RoomSceneNet.hostFreeChair) RoomSceneNet.hostFreeChair(idx);
+                }
+            }
+            return;
+        }
+        if (window.RoomSceneNet && RoomSceneNet.claimChair) {
+            RoomSceneNet.claimChair(idx, null);   // server echo → RS3D.applyClaim → re-render
+        } else if (window.RS3D && RS3D.applyClaim) {
+            // Offline fallback (no socket): claim locally.
+            var myCid = window.ROOM_CONFIG && window.ROOM_CONFIG.connectionId;
+            var myName = (window.ROOM_CONFIG && window.ROOM_CONFIG.playerName) || 'Guest';
+            RS3D.applyClaim(idx, myName, null, myCid);
+        }
+    }
+
+    function _onStageClick(e) {
+        if (state.config.mode === '3d-gl') return;   // 3D handles its own picking
+        if (!e.target.closest) return;
+        // Click the flat-diagram whiteboard → open the shared whiteboard.
+        if (e.target.closest('.rs-whiteboard-clickable')) {
+            if (window.Whiteboard && Whiteboard.open) Whiteboard.open();
+            return;
+        }
+        var seat = e.target.closest('.rs-seat');
+        if (!seat || !state.stage.contains(seat)) return;
+        var idx = parseInt(seat.getAttribute('data-seat-idx'), 10);
+        if (!isNaN(idx)) claimSeat2d(idx);
     }
 
     // Render the chair ring: each slot is the participant who claimed that
@@ -163,8 +231,8 @@
     function renderWhiteboard() {
         if (!state.config.whiteboard) return '';
         var title = currentStoryTitle();
-        return '<div class="rs-whiteboard">'
-            + '<div class="rs-whiteboard-title">Whiteboard</div>'
+        return '<div class="rs-whiteboard rs-whiteboard-clickable" title="Click to open the shared whiteboard" style="cursor:pointer;">'
+            + '<div class="rs-whiteboard-title">Whiteboard ✏️</div>'
             + '<div class="rs-whiteboard-story">' + esc(title) + '</div>'
             + '<div class="rs-whiteboard-line"></div>'
             + '<div class="rs-whiteboard-line short"></div>'
@@ -199,27 +267,6 @@
             + '</div>';
     }
 
-    function render3d() {
-        var shape = state.config.tableShape === 'rect' ? 'rect' : 'round';
-        var plan = seatPlan();
-        return '<div class="rs-room rs-room-3d rs-preset-' + esc(state.config.preset) + '">'
-            + '<div class="rs-scene3d">'
-            + '<div class="rs-back-wall">'
-            + renderSkyline()
-            + renderWhiteboard()
-            + '</div>'
-            + '<div class="rs-floor">'
-            + renderPlants()
-            + '<div class="rs-table3d rs-table-' + shape + '"><span></span></div>'
-            + '<div class="rs-seat-ring">'
-            + renderSeatRing(plan, '3d')
-            + '</div>'
-            + '</div>'
-            + '</div>'
-            + renderStanding(plan.standing)
-            + '</div>';
-    }
-
     function syncControls() {
         var modeButtons = document.querySelectorAll('[data-rs-mode]');
         modeButtons.forEach(function(btn) {
@@ -234,6 +281,13 @@
         var chairCount = document.getElementById('rs-chair-count');
         var chairType  = document.getElementById('rs-chair-type');
         var windowView = document.getElementById('rs-window-view');
+        var windowAnim = document.getElementById('rs-window-anim');
+        var windowTime = document.getElementById('rs-window-time');
+        var floorMat   = document.getElementById('rs-floor-mat');
+        var tableMat   = document.getElementById('rs-table-mat');
+        var wallColor  = document.getElementById('rs-wall-color');
+        var lighting   = document.getElementById('rs-lighting');
+        var twoDStyle  = document.getElementById('rs-2d-style');
         var dragMode   = document.getElementById('rs-dragmode');
         if (preset)     preset.value          = state.config.preset;
         if (tableShape) tableShape.value      = state.config.tableShape;
@@ -244,19 +298,22 @@
         if (chairCount) chairCount.value      = state.config.chairCount || '';
         if (chairType)  chairType.value       = state.config.chairType  || 'office';
         if (windowView) windowView.value      = state.config.windowView || 'skyline';
+        if (windowAnim) windowAnim.checked     = state.config.windowAnimated !== false;
+        if (windowTime) windowTime.value       = state.config.windowTimeOfDay || 'day';
+        if (floorMat)   floorMat.value         = state.config.floorMaterial || 'preset';
+        if (tableMat)   tableMat.value         = state.config.tableMaterial || 'wood';
+        if (wallColor)  wallColor.value        = (state.config.wallColor && state.config.wallColor !== 'preset') ? state.config.wallColor : '#cfd3da';
+        if (lighting)   lighting.value         = state.config.lighting || 'normal';
+        if (twoDStyle)  twoDStyle.value        = state.config.twoDStyle  || 'topdown';
         if (dragMode)   dragMode.value         = state.config.dragMode   || 'select';
     }
 
+    // Public re-render hook (also called by RS3D after claim changes). When WebGL owns the
+    // stage, RS3D already repainted — just keep the controls in sync; otherwise redraw CSS.
     function render() {
         if (!state.stage) return;
-        // 3d-gl mode: WebGL canvas managed by room-scene-3d.js — don't overwrite it
-        if (state.config.mode === '3d-gl') {
-            state.root.classList.remove('room-scene-3d-active');
-            syncControls();
-            return;
-        }
-        state.root.classList.toggle('room-scene-3d-active', state.config.mode === '3d');
-        state.stage.innerHTML = state.config.mode === '3d' ? render3d() : render2d();
+        if (_glActive) { syncControls(); return; }
+        _renderCss();
         syncControls();
     }
 
@@ -264,7 +321,13 @@
         state.root = document.getElementById(rootId || 'roomScenePanel');
         state.stage = document.getElementById('roomSceneStage');
         if (!state.root || !state.stage) return;
-        render();
+        // Delegated click for 2D chair claiming in the CSS diagram (the stage element
+        // persists across re-renders). Top-down WebGL handles its own picking.
+        if (!state.stage._rsClaimBound) {
+            state.stage.addEventListener('click', _onStageClick);
+            state.stage._rsClaimBound = true;
+        }
+        _applyMode();
     }
 
     function _showGlError(msg) {
@@ -279,71 +342,89 @@
             '</div>';
     }
 
-    function setMode(mode) {
-        var prev = state.config.mode;
-        state.config.mode = (mode === '3d' || mode === '3d-gl') ? mode : '2d';
-        saveConfig();
+    // Whether the WebGL renderer should be active for the current config.
+    // 3D always uses it; 2D uses it too unless the user picked the flat CSS diagram.
+    function _wantGl() {
+        var m = state.config.mode;
+        if (m === '3d-gl') return true;
+        if (m === '2d' && (state.config.twoDStyle || 'topdown') !== 'flat') return true;
+        return false;
+    }
 
-        if (mode === '3d-gl') {
-            // Tear down any CSS content and hand stage to RS3D
-            state.stage.innerHTML = '';
-            if (!window.RS3D) {
-                _showGlError('room-scene-3d.js not loaded');
-            } else if (!window.THREE) {
-                _showGlError('Three.js not loaded — check browser console');
-            } else {
-                try {
-                    var ok = RS3D.init(state.stage, state.config);
-                    if (ok === false) {
-                        _showGlError('WebGL not available in this browser');
-                    } else {
-                        RS3D.syncParticipants(state.participants, state.roomState);
-                    }
-                } catch (e) {
+    function _renderCss() {
+        state.root.classList.remove('room-scene-3d-active');
+        state.stage.innerHTML = render2d();
+    }
+
+    // Single orchestrator: pick the WebGL view (top-down for 2D, orbit for 3D) or the
+    // CSS diagram, initialising / disposing RS3D as needed.
+    function _applyMode() {
+        if (!state.stage) return;
+        var view = (state.config.mode === '2d') ? 'top' : 'persp';
+        if (_wantGl() && window.RS3D && window.THREE) {
+            if (!_glActive) {
+                state.stage.innerHTML = '';
+                var ok;
+                try { ok = RS3D.init(state.stage, state.config); }
+                catch (e) {
                     console.error('[RS3D] init error:', e);
-                    _showGlError(e.message || 'Unknown error — see console');
+                    if (state.config.mode === '2d') { _renderCss(); syncControls(); return; }
+                    _showGlError(e.message || 'init error'); return;
                 }
+                if (ok === false) {
+                    if (state.config.mode === '2d') { _renderCss(); syncControls(); return; }
+                    _showGlError('WebGL not available in this browser'); return;
+                }
+                _glActive = true;
+                RS3D.syncParticipants(state.participants, state.roomState);
             }
-        } else if (prev === '3d-gl' && window.RS3D) {
-            // Leaving WebGL mode — dispose renderer
-            RS3D.dispose();
+            if (RS3D.setView) RS3D.setView(view);
+            syncControls();
+        } else {
+            if (_glActive && window.RS3D) { RS3D.dispose(); _glActive = false; }
+            _renderCss();
+            syncControls();
         }
-        render();
+    }
+
+    function setMode(mode) {
+        // Only two modes: '2d' (top-down or flat) and '3d-gl' (orbit room). Legacy '3d' → 3D.
+        if (mode === '3d') mode = '3d-gl';
+        state.config.mode = (mode === '3d-gl') ? '3d-gl' : '2d';
+        saveConfig();
+        _applyMode();
     }
 
     function updateConfig(patch) {
         state.config = Object.assign({}, state.config, patch || {});
         saveConfig();
-        // In 3d-gl mode, refresh the scene geometry in-place (preserves camera position)
-        if (state.config.mode === '3d-gl' && window.RS3D) {
-            try {
-                RS3D.refreshScene(state.config);
-                RS3D.syncParticipants(state.participants, state.roomState);
-            } catch (e) {
-                console.error('[RS3D] refreshScene error:', e);
-                _showGlError(e.message || 'Scene refresh error — see console');
+        var wantGl = _wantGl();
+        if (wantGl === _glActive) {
+            // Renderer unchanged — just apply the new config to whatever is showing.
+            if (_glActive && window.RS3D) {
+                try {
+                    RS3D.refreshScene(state.config);
+                    RS3D.syncParticipants(state.participants, state.roomState);
+                    if (RS3D.setView) RS3D.setView(state.config.mode === '2d' ? 'top' : 'persp');
+                } catch (e) { console.error('[RS3D] refreshScene error:', e); }
+                syncControls();
+            } else {
+                _renderCss(); syncControls();
             }
-            syncControls();
-            return;
+        } else {
+            _applyMode();   // the patch flipped which renderer should be active
         }
-        render();
     }
 
     function syncParticipants(participants) {
         state.participants = (participants || []).slice(0, 16);
-        if (state.config.mode === '3d-gl' && window.RS3D) {
-            RS3D.syncParticipants(state.participants, state.roomState);
-            return;
-        }
-        render();
+        if (_glActive && window.RS3D) { RS3D.syncParticipants(state.participants, state.roomState); return; }
+        _renderCss();
     }
 
     function syncRoom(roomState) {
         state.roomState = roomState || null;
-        if (state.config.mode === '3d-gl' && window.RS3D) {
-            RS3D.syncRoom(state.roomState);
-            return;
-        }
+        if (_glActive && window.RS3D) { RS3D.syncRoom(state.roomState); return; }
         syncParticipants((roomState && roomState.participants) || state.participants || []);
     }
 

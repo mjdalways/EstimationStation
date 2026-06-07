@@ -50,6 +50,8 @@
                 <img src="/images/estimationStation_logo.png" alt="Estimation Station" style="height:28px;width:auto;" />
                 EstimationStation
             </a>
+            <!-- AP1: room identity icon (populated on the room page) -->
+            <span id="roomIconBadge" class="d-none align-items-center" style="font-size:1.4rem;line-height:1;margin-left:6px;" title="Room icon"></span>
 
             <!-- Bootstrap hamburger toggler -->
             <button class="navbar-toggler ms-auto me-2" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavContent" aria-controls="mainNavContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -1596,7 +1598,7 @@
 
                         <!-- Keyboard shortcuts -->
                         <h6 class="fw-bold mb-2">⌨️ Keyboard Shortcuts</h6>
-                        <table class="table table-sm table-borderless mb-4" style="max-width:360px;">
+                        <table class="table table-sm table-borderless mb-2" style="max-width:360px;">
                             <tbody>
                                 <tr><td><kbd>Space</kbd> / <kbd>Enter</kbd></td><td>Reveal votes</td></tr>
                                 <tr><td><kbd>R</kbd></td><td>Reset votes</td></tr>
@@ -1608,9 +1610,150 @@
                                 <tr><td><kbd>?</kbd></td><td>Open this shortcuts help</td></tr>
                             </tbody>
                         </table>
+                        <h6 class="fw-semibold mb-1" style="font-size:0.82rem;">🚶 Walk Mode (3D Room)</h6>
+                        <p class="text-muted mb-1" style="font-size:0.70rem;">Keys shown are your current bindings — change them in ⚙️ Room → Walk controls.</p>
+                        <table class="table table-sm table-borderless mb-4" id="kb-walk-shortcuts" style="max-width:360px;">
+                            <tbody>
+                                <tr><td id="kb-walk-toggle"><kbd>T</kbd></td><td>Enter / exit walk mode</td></tr>
+                                <tr><td id="kb-walk-forward"><kbd>↑</kbd></td><td>Walk forward</td></tr>
+                                <tr><td id="kb-walk-back"><kbd>↓</kbd></td><td>Walk backward</td></tr>
+                                <tr><td id="kb-walk-left"><kbd>←</kbd></td><td>Strafe left</td></tr>
+                                <tr><td id="kb-walk-right"><kbd>→</kbd></td><td>Strafe right</td></tr>
+                                <tr><td id="kb-walk-jump"><kbd>Alt</kbd></td><td>Jump</td></tr>
+                                <tr><td id="kb-walk-crouch"><kbd>Ctrl</kbd></td><td>Crouch</td></tr>
+                                <tr><td id="kb-walk-interact"><kbd>E</kbd></td><td>Interact (sit in chair / open whiteboard / play jukebox)</td></tr>
+                                <tr><td><kbd>Drag</kbd></td><td>Look around (in walk mode)</td></tr>
+                                <tr><td><kbd>Esc</kbd></td><td>Exit walk mode</td></tr>
+                            </tbody>
+                        </table>
+                        <script>
+                        (function(){
+                            function _updateWalkShortcutsTable() {
+                                if (!window.RoomScene || !RoomScene.getConfig) return;
+                                var kb = (RoomScene.getConfig().keyBindings) || {};
+                                var lbl = window._rsKeyLabel || function(c){ return c; };
+                                var map = { 'kb-walk-toggle':'walk','kb-walk-forward':'forward','kb-walk-back':'back',
+                                    'kb-walk-left':'left','kb-walk-right':'right','kb-walk-jump':'jump',
+                                    'kb-walk-crouch':'crouch','kb-walk-interact':'interact' };
+                                Object.keys(map).forEach(function(id){
+                                    var el = document.getElementById(id);
+                                    if (el) el.innerHTML = '<kbd>' + lbl(kb[map[id]] || '—') + '</kbd>';
+                                });
+                            }
+                            // Update table whenever the about tab is shown or the modal opens.
+                            document.addEventListener('DOMContentLoaded', function() {
+                                var aboutBtn = document.getElementById('tab-about-btn');
+                                if (aboutBtn) aboutBtn.addEventListener('shown.bs.tab', _updateWalkShortcutsTable);
+                                _updateWalkShortcutsTable();
+                            });
+                            // Expose so openSettingsModal can trigger a refresh.
+                            window._updateWalkShortcutsTable = _updateWalkShortcutsTable;
+                        }());
+                        </script>
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/7/2026 (150)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>Chair duplicate fix</strong>: fixed a critical bug where chairs would visually stack on every seating rebuild — chairs now properly clear from the scene before being re-placed.</li>
+                            <li>🎨 <strong>Gray avatar fix</strong>: your roaming avatar now correctly shows your colour even before your connection ID is synced to the participant list.</li>
+                            <li>🪑 <strong>Click to stand up</strong>: click your own claimed chair (in non-walk mode) to stand up and free your seat instantly.</li>
+                            <li>⬆️ <strong>Bigger jump</strong>: jump height tripled (vy 4.2 → 7.5) and gravity tuned — much more noticeable leap.</li>
+                            <li>📐 <strong>Canvas resize fixed</strong>: resizing the floating Room Scene panel now correctly resizes the 3D canvas in real time.</li>
+                            <li>🚫 <strong>Label overflow fixed</strong>: confetti / jukebox emoji labels no longer appear outside the room canvas.</li>
+                            <li>🖱️ <strong>Click-to-walk toggle</strong>: new <em>🖱️ Click-walk</em> button on the canvas — turn off if you don't want floor clicks to move your avatar.</li>
+                            <li>🪑 <strong>Furniture HUD on canvas</strong>: new <em>+ Furniture</em> button directly on the 3D room — quickly add whiteboard, plant, lamp, sofa, etc. without opening Settings.</li>
+                            <li>⌨️ <strong>Dynamic keyboard shortcuts</strong>: the ⌨️ Shortcuts table in About now shows your current walk-mode key bindings in real time.</li>
+                            <li>🔄 <strong>Key-bind highlight fix</strong>: opening Settings now immediately refreshes the walk-key binding display.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (149)</strong></p>
+                        <ul class="mb-2">
+                            <li>🦾 <strong>Jointed avatar redesign</strong>: avatars now have full arm and leg segments — upper arm, forearm, thigh, shin, and foot — with joint spheres. They <strong>walk</strong> with a leg-swing cycle, <strong>crouch</strong> with bent knees (Ctrl), and go into a <strong>jump pose</strong> (Alt). Seated avatars have thighs horizontal and shins hanging.</li>
+                            <li>🔒 <strong>Walk key capture fixed</strong>: walk-mode keys (including Alt/Ctrl/Arrow) are now intercepted before any page-level handler, so Space no longer triggers vote reveal while walking.</li>
+                            <li>🪑 <strong>No more accidental sitting</strong>: proximity auto-sit is disabled in walk mode — press <kbd>E</kbd> facing a chair, or click it, to sit.</li>
+                            <li>🎯 <strong>Interact range improved</strong>: pressing <kbd>E</kbd> now reaches the whiteboard, confetti, and jukebox from across the room (5.5 m range).</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (148)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎥 <strong>Third-person walk mode</strong>: choose <strong>First person</strong> or <strong>Third person</strong> camera in Room → Walk controls. Third person follows your avatar from behind so you can see yourself walking. Your self-avatar is shown to others in both modes.</li>
+                            <li>⌨️ <strong>Walk key defaults changed</strong>: default walk controls are now <strong>Arrow keys</strong> to move, <strong>Alt</strong> to jump, <strong>Ctrl</strong> to crouch — avoiding conflicts with Space (reveal votes), C, and other page shortcuts. Update yours in Room → Walk controls.</li>
+                            <li>🧱 <strong>Walk collision</strong>: you can no longer walk through the table or get stuck in corners — smooth sliding collision pushes you along surfaces.</li>
+                            <li>🔒 <strong>Walk key priority</strong>: while in walk mode, walk keys are captured first so Space/Ctrl/Alt no longer accidentally trigger page shortcuts.</li>
+                            <li>⚠️ <strong>Key conflict warning</strong>: rebinding a walk key that's already used or is a page shortcut now shows a warning before applying.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (147)</strong></p>
+                        <ul class="mb-2">
+                            <li>🗺️ <strong>Room minimap</strong>: a small overhead map in the corner of the 3D room shows where everyone is, with your own dot highlighted — handy for finding people in a busy room.</li>
+                            <li>💤 <strong>Away dimming</strong>: avatars who've been idle for a while have their name tag fade, so you can tell who's actively around.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (146)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>Walk up and sit</strong>: just walk your avatar onto an empty chair and pause — you'll sit down automatically (no need to press a key). Walk away to get up again.</li>
+                            <li>🎉 <strong>Interactive room props</strong>: the 3D room now has a <strong>confetti</strong> and a <strong>music</strong> prop — click them (or press interact while facing them in walk mode) to celebrate or play a sound for the whole room.</li>
+                            <li>📋 <strong>Story screen</strong>: a screen on the room wall shows the <strong>current story</strong> being estimated, updating as you change stories.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (145)</strong></p>
+                        <ul class="mb-2">
+                            <li>🖱️ <strong>Click-to-walk</strong>: in the 3D room you can now just <strong>click a spot on the floor</strong> and your avatar walks there — no need to enter first-person mode. Everyone sees you glide over.</li>
+                            <li>😀 <strong>Spatial emojis</strong>: emoji reactions now <strong>pop above your avatar in the room</strong> and float up, so reactions have a place in space (Kumospace-style).</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (144)</strong></p>
+                        <ul class="mb-2">
+                            <li>🧍 <strong>Walk around together (live presence)</strong>: the 3D room is now a real shared space — when you enter <strong>🚶 Walk</strong> mode and move around, <strong>everyone sees your avatar moving in real time</strong>, with your name tag following you. You see everyone else roam too, and you stay where you stopped. Sit in a chair and your avatar takes the seat; get up and you're roaming again. (The first step toward a Kumospace-style room.)</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (143)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>Move chairs around</strong>: in the 3D room (and top-down view) you can now <strong>drag your own chair and any empty chair</strong> to reposition it — they no longer have to sit in a fixed ring. Moves sync to everyone and persist with the room. (Other people's occupied chairs stay put; a quick click on an empty chair still claims it.)</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (142)</strong></p>
+                        <ul class="mb-2">
+                            <li>🖊️ <strong>The in-room whiteboard is now the real one</strong>: the whiteboard on the wall in the 3D room shows the <strong>live shared drawing</strong>, and <strong>clicking it</strong> (in 3D, or pressing the interact key while facing it in walk mode) opens it to draw. In the 2D diagram, clicking the whiteboard panel opens it too. Same board everywhere — draw in one place, everyone sees it.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (141)</strong></p>
+                        <ul class="mb-2">
+                            <li>🖊️ <strong>Whiteboard shapes, text &amp; sticky notes</strong>: the shared whiteboard now has a full tool set — pen, eraser, <strong>line</strong>, <strong>rectangle</strong>, <strong>ellipse</strong>, <strong>text</strong>, and <strong>sticky notes</strong> — all synced live to everyone in the room.</li>
+                            <li>🕐 <strong>Arrow clock hands</strong>: analog clock hands can now be styled as <strong>arrows</strong> (in addition to solid and dashed), with an arrowhead at the tip.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (140)</strong></p>
+                        <ul class="mb-2">
+                            <li>⏱ <strong>Timer &amp; clock bar polish</strong>: the count-up timer now shows a subtle <em>"⏱ —:—— · ready, pick a story"</em> hint when it's enabled but no story is active yet (previously the whole bar could vanish), and the analog clock is size-capped in the top bar so a large configured clock no longer stretches the navbar row.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (139)</strong></p>
+                        <ul class="mb-2">
+                            <li>🕐 <strong>Custom clock face</strong>: the story-bar clock is now deeply customisable — <strong>background colour</strong> (or transparent), <strong>digital font</strong> &amp; <strong>12/24-hour</strong> toggle, analog <strong>number style</strong> (none / 1–12 / Roman / ticks), and per-hand <strong>width, length and solid/dashed</strong> styling for the hour, minute and second hands.</li>
+                            <li>🏷️ <strong>Room identity icon</strong>: the host can give the room an icon — pick from a built-in set (🃏 🚀 🎯 🧠 ☕ …) or upload your own image. It shows in the navbar and the browser tab for everyone in the room.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (138)</strong></p>
+                        <ul class="mb-2">
+                            <li>🖊️ <strong>Shared whiteboard</strong>: a new <strong>🖊️ Whiteboard</strong> button opens a collaborative drawing surface — draw freehand together in real time (strokes sync over SignalR), pick colour &amp; size, erase, <strong>Clear</strong> for everyone, and <strong>export to PNG</strong>. Late joiners see the existing drawing.</li>
+                            <li>🌌 <strong>More window views</strong>: added <strong>Space</strong> (twinkling stars, drifting nebula, a distant planet) and <strong>Custom image</strong> (upload your own photo for the view), plus a <strong>Time of day</strong> control (Day / Dusk / Night / Auto) that tints the scenery.</li>
+                            <li>🎨 <strong>Room materials &amp; lighting</strong>: choose <strong>floor</strong> (wood / carpet / tile / concrete), <strong>table top</strong> (wood / glass / marble), <strong>wall colour</strong>, and <strong>lighting mood</strong> (normal / warm / cool / neon).</li>
+                            <li>👑 <strong>Host seat control</strong>: the host can click an occupied chair (2D or 3D) to <strong>free that seat</strong>, so people can be reseated.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (137)</strong></p>
+                        <ul class="mb-2">
+                            <li>🌥️ <strong>Living window views</strong>: the 3D room's window scenes now move — <strong>clouds drift</strong> across the skyline / mountains / forest, <strong>stars twinkle</strong> and city windows flicker at night, the <strong>sea shimmers</strong> and a sailboat drifts at the beach, and forest trees <strong>sway</strong> in the breeze. Toggle it under Settings → 🏠 Room → Appearance → <strong>Animate</strong> (respects your system's reduced-motion setting).</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (136)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔀 <strong>2D and 3D are now one world</strong>: the 2D view can be a true <strong>top-down camera looking straight down into the same 3D room</strong> — same chairs, robots and furniture, just seen from above. Move a chair or piece of furniture, claim a seat, or rearrange in either view and it's the <em>same object</em>, so the two views always mirror each other. Choose it under Settings → 🏠 Room → Appearance → <strong>2D view style</strong> (<em>Top-down 3D</em> by default, or switch back to the classic <em>Flat diagram</em>). The overhead view hides the ceiling and pans/zooms (no rotation).</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (135)</strong></p>
+                        <ul class="mb-2">
+                            <li>🚶 <strong>Walk around the 3D room (first-person)</strong>: click <strong>🚶 Walk</strong> in the 3D room (or press its key) to drop into first-person — <strong>WASD/arrows</strong> to move, <strong>Space</strong> to jump, <strong>C</strong> to crouch, <strong>drag to look</strong>, and the <strong>interact</strong> key (E) to sit in the chair you're facing or pick up / drop furniture. <strong>Esc</strong> or the toggle returns to orbit. All keys are <strong>rebindable</strong> in Settings → 🏠 Room → Walk controls.</li>
+                            <li>🪑 <strong>Claim chairs in 2D too</strong>: the 2D top-down view now lets you <strong>click an empty chair to sit</strong> (or click your own to stand up), going through the same race-safe multiplayer path as 3D — so 2D and 3D stay perfectly in sync.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (134)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 <strong>Real window views, full back wall</strong>: the Room Scene's back wall is now a floor-to-ceiling window spanning the whole wall, and the chosen view (skyline / beach / mountains / night / forest) is actually <strong>visible</strong> behind it. Previously an opaque wall sat in front of the scenery and hid it — now the outdoor scene shows through the glass and the "space outside" matches your pick. The whiteboard moved to the side wall so it no longer covers the view.</li>
+                            <li>🎮 <strong>One 3D room</strong>: the old CSS-3D "3D" view has been retired and the WebGL room (formerly "3D GL") is now simply <strong>3D</strong>. The mode toggle is just <strong>2D</strong> / <strong>3D</strong>; any saved CSS-3D preference auto-migrates to the WebGL room.</li>
+                            <li>🪑 <strong>Furniture moves are shared live</strong>: dragging, adding, removing or resetting furniture now broadcasts over SignalR, so everyone in the room sees the same layout in real time (and joiners get the current layout). Saved with the room.</li>
+                            <li>↔️ <strong>Full-width Room Scene</strong>: the Room Scene widget can now be resized out to (almost) the entire screen width when floating — handy for the 3D room.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/7/2026 (133)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>Live multiplayer chair claiming</strong>: claiming a seat in the Room Scene now goes through SignalR, so <strong>everyone in the room sees seat choices update in real time</strong> — no more localStorage-only, per-browser claims. The server holds the authoritative chair&rarr;participant map and is <strong>race-safe</strong>: if two people confirm the same chair, first-confirm-wins and the loser gets a toast — <em>"😅 [name] grabbed that chair first! Pick another."</em> Seats free automatically when someone leaves, and a joiner immediately sees the current seating. New hub methods <code>ClaimChair</code>/<code>ReleaseChair</code> with <code>ChairClaimed</code>/<code>ChairReleased</code>/<code>ChairClaimFailed</code> broadcasts; seating now matches by <code>connectionId</code> (robust against duplicate names). Falls back to local-only when offline.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/6/2026 (132)</strong></p>
                         <ul class="mb-2">
                             <li>🪑 <strong>2D ↔ 3D GL seat-claim parity</strong>: the 2D and CSS-3D views now read the <em>same</em> chair-claim data as 3D GL, so a participant who claimed a specific chair appears in the <strong>exact same seat index</strong> across all three views. Matching 3D GL's model: claimed chairs seat their owner, unclaimed chairs stay empty (pulsing ➕ ring), and anyone who hasn't claimed a seat <strong>stands</strong>. A new shared <code>RS3D.getSeatingPlan()</code> is the single source of truth for placement.</li>
@@ -2394,9 +2537,15 @@
                             <label class="me-3"><input type="radio" name="tc-mode" value="digital" onchange="saveTimerClockSettings();_tcToggleMode('digital')"> Digital</label>
                             <label><input type="radio" name="tc-mode" value="analog" onchange="saveTimerClockSettings();_tcToggleMode('analog')"> Analog</label>
                         </div>
+                        <div class="mb-2 small d-flex flex-wrap gap-3 align-items-center">
+                            <label>Background <input type="color" id="tc-bg-color" value="#ffffff" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                            <label><input type="checkbox" id="tc-bg-transparent" checked onchange="saveTimerClockSettings()"> Transparent</label>
+                        </div>
                         <div id="tc-digital-opts" class="mb-3 flex-wrap gap-3 align-items-center small" style="display:flex;">
                             <label>Color <input type="color" id="tc-color" value="#6c757d" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                             <label>Size <input type="number" id="tc-font-size" value="13" min="10" max="22" style="width:50px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()">px</label>
+                            <label>Font <select id="tc-font-family" class="form-select form-select-sm d-inline-block" style="width:130px;" onchange="saveTimerClockSettings()"><option value="monospace">Monospace</option><option value="Consolas, monospace">Consolas</option><option value="'Courier New', monospace">Courier New</option><option value="'Cascadia Code', monospace">Cascadia Code</option></select></label>
+                            <label><input type="checkbox" id="tc-24h" checked onchange="saveTimerClockSettings()"> 24-hour</label>
                         </div>
                         <div id="tc-analog-opts" class="mb-3 small" style="display:none;">
                             <div class="d-flex flex-wrap gap-3 align-items-center mb-2">
@@ -2405,6 +2554,24 @@
                                 <label>Hour <input type="color" id="tc-hour-color" value="#212529" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                                 <label>Min <input type="color" id="tc-min-color" value="#495057" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
                                 <label>Sec <input type="color" id="tc-sec-color" value="#dc3545" oninput="saveTimerClockSettings()" onchange="saveTimerClockSettings()" style="width:36px;height:22px;padding:1px;border:none;cursor:pointer;vertical-align:middle;"></label>
+                                <label>Numbers <select id="tc-number-style" class="form-select form-select-sm d-inline-block" style="width:110px;" onchange="saveTimerClockSettings()"><option value="none">None</option><option value="digits">1–12</option><option value="roman">Roman</option><option value="ticks">Ticks</option></select></label>
+                            </div>
+                            <div class="mt-1" style="font-size:0.72rem;">
+                                <div class="d-flex align-items-center gap-2 mb-1"><span style="width:40px;">Hour</span>
+                                    <select id="tc-hand-hour-style" class="form-select form-select-sm d-inline-block" style="width:80px;" onchange="saveTimerClockSettings()"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="arrow">Arrow</option></select>
+                                    <label>W <input type="number" id="tc-hand-hour-width" value="5" min="1" max="8" step="0.5" style="width:52px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()"></label>
+                                    <label>Len <input type="number" id="tc-hand-hour-length" value="50" min="30" max="100" step="5" style="width:56px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()">%</label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 mb-1"><span style="width:40px;">Min</span>
+                                    <select id="tc-hand-min-style" class="form-select form-select-sm d-inline-block" style="width:80px;" onchange="saveTimerClockSettings()"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="arrow">Arrow</option></select>
+                                    <label>W <input type="number" id="tc-hand-min-width" value="3" min="1" max="8" step="0.5" style="width:52px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()"></label>
+                                    <label>Len <input type="number" id="tc-hand-min-length" value="77" min="30" max="100" step="5" style="width:56px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()">%</label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2"><span style="width:40px;">Sec</span>
+                                    <select id="tc-hand-sec-style" class="form-select form-select-sm d-inline-block" style="width:80px;" onchange="saveTimerClockSettings()"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="arrow">Arrow</option></select>
+                                    <label>W <input type="number" id="tc-hand-sec-width" value="1.5" min="0.5" max="6" step="0.5" style="width:52px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()"></label>
+                                    <label>Len <input type="number" id="tc-hand-sec-length" value="86" min="30" max="100" step="5" style="width:56px;" class="form-control form-control-sm d-inline-block" onchange="saveTimerClockSettings()">%</label>
+                                </div>
                             </div>
                         </div>
                         <!-- Clock preview -->
@@ -2517,7 +2684,36 @@
                                         <option value="mountains">🏔️ Mountains</option>
                                         <option value="night">🌃 Night city</option>
                                         <option value="forest">🌲 Forest</option>
+                                        <option value="space">🌌 Space</option>
+                                        <option value="custom">🎨 Custom image</option>
                                         <option value="none">🚪 No view</option>
+                                    </select>
+                                    <div class="form-check mt-1"><input class="form-check-input" type="checkbox" id="rs-window-anim" onchange="RoomScene.updateConfig({ windowAnimated: this.checked })" /><label class="form-check-label small" for="rs-window-anim">Animate (clouds, stars, sea)</label></div>
+                                    <div class="d-flex align-items-center gap-2 mt-1">
+                                        <label class="form-label mb-0 small" for="rs-window-time" style="white-space:nowrap;">Time</label>
+                                        <select id="rs-window-time" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ windowTimeOfDay: this.value })">
+                                            <option value="day">☀️ Day</option>
+                                            <option value="dusk">🌇 Dusk</option>
+                                            <option value="night">🌙 Night</option>
+                                            <option value="auto">🕒 Auto (local clock)</option>
+                                        </select>
+                                    </div>
+                                    <div class="mt-1"><input type="file" id="rs-window-image" accept="image/*" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Upload a custom window image" /></div>
+                                </div>
+                                <script>
+                                window._rsWindowImageUpload = function(input){
+                                    var f = input.files && input.files[0]; if(!f) return;
+                                    if(f.size > 600*1024){ alert('Please pick an image under 600 KB.'); input.value=''; return; }
+                                    var rd = new FileReader();
+                                    rd.onload = function(){ if(window.RoomScene) RoomScene.updateConfig({ windowImage: rd.result, windowView: 'custom' }); var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom'; };
+                                    rd.readAsDataURL(f);
+                                };
+                                </script>
+                                <div class="col-6">
+                                    <label class="form-label mb-1" for="rs-2d-style">2D view style</label>
+                                    <select id="rs-2d-style" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ twoDStyle: this.value })">
+                                        <option value="topdown">⬇️ Top-down 3D (mirrors the 3D room)</option>
+                                        <option value="flat">🗺️ Flat diagram</option>
                                     </select>
                                 </div>
                                 <div class="col-4">
@@ -2559,6 +2755,38 @@
                                         <option value="direct">Drag item to move (Shift+drag orbits)</option>
                                     </select>
                                 </div>
+                                <div class="col-3">
+                                    <label class="form-label mb-1" for="rs-floor-mat">Floor</label>
+                                    <select id="rs-floor-mat" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ floorMaterial: this.value })">
+                                        <option value="preset">Preset</option>
+                                        <option value="wood">🪵 Wood</option>
+                                        <option value="carpet">🧶 Carpet</option>
+                                        <option value="tile">⬜ Tile</option>
+                                        <option value="concrete">🧱 Concrete</option>
+                                    </select>
+                                </div>
+                                <div class="col-3">
+                                    <label class="form-label mb-1" for="rs-table-mat">Table top</label>
+                                    <select id="rs-table-mat" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableMaterial: this.value })">
+                                        <option value="wood">🪵 Wood</option>
+                                        <option value="glass">🪟 Glass</option>
+                                        <option value="marble">⬜ Marble</option>
+                                    </select>
+                                </div>
+                                <div class="col-3">
+                                    <label class="form-label mb-1" for="rs-lighting">Lighting</label>
+                                    <select id="rs-lighting" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ lighting: this.value })">
+                                        <option value="normal">Normal</option>
+                                        <option value="warm">🔆 Warm</option>
+                                        <option value="cool">❄️ Cool</option>
+                                        <option value="neon">🌈 Neon</option>
+                                    </select>
+                                </div>
+                                <div class="col-3">
+                                    <label class="form-label mb-1" for="rs-wall-color">Walls</label>
+                                    <input type="color" id="rs-wall-color" class="form-control form-control-sm form-control-color" value="#cfd3da"
+                                           title="Wall colour (overrides preset)" onchange="RoomScene.updateConfig({ wallColor: this.value })" />
+                                </div>
                             </div>
                             <div class="text-muted mt-2" style="font-size:0.68rem;">In every mode: drag empty space to orbit the camera, and <strong>Shift+drag</strong> always orbits. When an item is selected, <strong>Delete</strong> removes it and <strong>Esc</strong> deselects.</div>
                         </div>
@@ -2581,6 +2809,119 @@
                                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.resetFurniture()" title="Reset furniture to default positions">↺ Reset</button>
                             </div>
                         </div>
+
+                        <!-- Walk controls (first / third person) -->
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-walk-section">
+                            🚶 Walk controls <span class="text-muted" style="font-weight:normal;">(3D room)</span> <span class="settings-section-chevron">▾</span>
+                        </div>
+                        <div id="room-walk-section" class="collapse">
+                            <div class="text-muted mt-2 mb-2" style="font-size:0.68rem;">In <strong>3D</strong>, click <strong>🚶 Walk</strong> (or press its key) to walk around. Move with the arrow keys, <strong>Alt</strong> to jump, <strong>Ctrl</strong> to crouch, <strong>E</strong> facing a chair to sit / furniture to grab. Drag to look around. Esc to exit. To rebind, click an action then press the new key.</div>
+                            <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                                <label class="form-label mb-0" style="font-size:.76rem;min-width:80px;">Camera mode</label>
+                                <select class="form-select form-select-sm" style="max-width:190px;" id="rs-walk-cam-mode"
+                                    onchange="window.RoomScene && RoomScene.updateConfig({ walkCameraMode: this.value })">
+                                    <option value="first">👁️ First person</option>
+                                    <option value="third">🎥 Third person</option>
+                                </select>
+                            </div>
+                            <div id="rs-keybinds" class="d-flex flex-wrap gap-2"></div>
+                            <button type="button" class="btn btn-sm btn-link p-0 mt-2" onclick="_rsResetKeyBinds && _rsResetKeyBinds()">Reset to defaults</button>
+                        </div>
+                        <!-- AP1: Room identity icon -->
+                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-icon-section">
+                            🏷️ Room icon <span class="text-muted" style="font-weight:normal;">(host only)</span> <span class="settings-section-chevron">▾</span>
+                        </div>
+                        <div id="room-icon-section" class="collapse">
+                            <div class="text-muted mt-2 mb-2" style="font-size:0.68rem;">Give this room a visual identity — shown in the navbar and browser tab for everyone.</div>
+                            <div class="d-flex flex-wrap gap-1 mb-2" id="rs-icon-grid"></div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <input type="file" id="rs-icon-image" accept="image/*" class="form-control form-control-sm" style="max-width:230px;" onchange="_rsRoomIconUpload && _rsRoomIconUpload(this)" title="Upload a room icon (≤200 KB)" />
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.setRoomIcon && setRoomIcon('')">Clear</button>
+                            </div>
+                        </div>
+                        <script>
+                        (function(){
+                            var icons = ['🃏','🚀','🎯','🧠','☕','🌊','🎲','🏆','🔥','⚡','🦄','🐝','🍕','🛸','🎸','🌟','🧩','📈'];
+                            var grid = document.getElementById('rs-icon-grid');
+                            if (grid && !grid._built) {
+                                grid._built = true;
+                                grid.innerHTML = icons.map(function(e){
+                                    return '<button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:1.1rem;line-height:1.3;padding:2px 7px;" onclick="window.setRoomIcon && setRoomIcon(\'' + e + '\')">' + e + '</button>';
+                                }).join('');
+                            }
+                            window._rsRoomIconUpload = function(input){
+                                var f = input.files && input.files[0]; if(!f) return;
+                                if(f.size > 200*1024){ alert('Please pick an image under 200 KB.'); input.value=''; return; }
+                                var rd = new FileReader();
+                                rd.onload = function(){ if(window.setRoomIcon) setRoomIcon(rd.result); };
+                                rd.readAsDataURL(f);
+                            };
+                        }());
+                        </script>
+                        <script>
+                        (function(){
+                            window._rsKeyActions = [['forward','Forward'],['back','Back'],['left','Left'],['right','Right'],['jump','Jump'],['crouch','Crouch'],['interact','Interact'],['walk','Toggle walk']];
+                            // Keys that are reserved by the page and will conflict with walk bindings.
+                            var _RS_PAGE_KEYS = { Space:'Reveal votes', Enter:'Reveal votes / confirm', KeyC:'(may conflict with page)', KeyV:'(may conflict)', Tab:'(browser)' };
+                            window._rsKeyLabel = function(code){
+                                if(!code) return '—';
+                                var MAP = { Space:'Space', AltLeft:'Alt', AltRight:'Alt', ControlLeft:'Ctrl', ControlRight:'Ctrl',
+                                            ShiftLeft:'Shift', ShiftRight:'Shift', ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→' };
+                                return MAP[code] || code.replace(/^Key/,'').replace(/^Digit/,'');
+                            };
+                            window._rsRenderKeyBinds = function(){
+                                if(!window.RoomScene || !RoomScene.getConfig) return;
+                                var wrap=document.getElementById('rs-keybinds'); if(!wrap) return;
+                                var kb=(RoomScene.getConfig().keyBindings)||{};
+                                // Sync walk-camera select to current config.
+                                var camSel=document.getElementById('rs-walk-cam-mode');
+                                if(camSel) camSel.value = (RoomScene.getConfig().walkCameraMode)||'first';
+                                wrap.innerHTML = window._rsKeyActions.map(function(a){
+                                    return '<button type="button" class="btn btn-sm btn-outline-secondary" data-rskey="'+a[0]+'" onclick="_rsCaptureKey(\''+a[0]+'\',this)" style="min-width:82px;text-align:center;">'
+                                        +'<span style="opacity:.7;font-size:.64rem;display:block;">'+a[1]+'</span><strong>'+window._rsKeyLabel(kb[a[0]])+'</strong></button>';
+                                }).join('');
+                            };
+                            window._rsCaptureKey = function(action, btn){
+                                var s=btn.querySelector('strong'); if(s) s.textContent='press…';
+                                function onKey(e){
+                                    e.preventDefault(); e.stopPropagation();
+                                    document.removeEventListener('keydown', onKey, true);
+                                    var code = e.code;
+                                    var kb=Object.assign({}, (RoomScene.getConfig().keyBindings)||{});
+                                    // Warn if the key is already assigned to a different action.
+                                    var conflict = null;
+                                    window._rsKeyActions.forEach(function(a){
+                                        if(a[0] !== action && kb[a[0]] === code) conflict = a[1];
+                                    });
+                                    if(conflict) {
+                                        if(!confirm('"'+window._rsKeyLabel(code)+'" is already used for "'+conflict+'". Reassign it here anyway?')) {
+                                            if(s) s.textContent = window._rsKeyLabel(kb[action])||'—';
+                                            return;
+                                        }
+                                        // Clear the old binding that used this key.
+                                        window._rsKeyActions.forEach(function(a){ if(a[0]!==action && kb[a[0]]===code) kb[a[0]]=''; });
+                                    }
+                                    // Warn if the key is reserved by the page.
+                                    var pageConflict = _RS_PAGE_KEYS[code];
+                                    if(pageConflict) {
+                                        if(!confirm('"'+window._rsKeyLabel(code)+'" is a page shortcut: '+pageConflict+'. It will still fire while in walk mode — consider a different key.')) {
+                                            if(s) s.textContent = window._rsKeyLabel(kb[action])||'—';
+                                            return;
+                                        }
+                                    }
+                                    kb[action]=code;
+                                    RoomScene.updateConfig({ keyBindings: kb });
+                                    window._rsRenderKeyBinds();
+                                }
+                                document.addEventListener('keydown', onKey, true);
+                            };
+                            window._rsResetKeyBinds = function(){
+                                RoomScene.updateConfig({ keyBindings:{ forward:'ArrowUp',back:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',jump:'AltLeft',crouch:'ControlLeft',interact:'KeyE',walk:'KeyT' } });
+                                window._rsRenderKeyBinds();
+                            };
+                            document.addEventListener('DOMContentLoaded', function(){ if(window._rsRenderKeyBinds) window._rsRenderKeyBinds(); });
+                        }());
+                        </script>
                     </div><!-- end tab-room -->
 
                 </div><!-- end tab-content -->
