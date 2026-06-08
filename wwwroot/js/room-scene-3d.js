@@ -367,7 +367,10 @@
                 if (THREE.sRGBEncoding) _gTex.encoding = THREE.sRGBEncoding;
 
                 var _gImg = new Image();
-                _gImg.style.cssText = 'position:absolute;top:-9999px;opacity:0;pointer-events:none;';
+                // Position off-screen without opacity:0 — browsers suppress GIF animation on
+                // opacity-0 elements as a rendering optimisation. Off-screen + 1×1 px keeps it
+                // alive without ever being visible.
+                _gImg.style.cssText = 'position:fixed;left:-200vw;top:0;width:1px;height:1px;pointer-events:none;';
                 document.body.appendChild(_gImg);   // must be in DOM for browser GIF animation
                 _gImg.onload = function () {
                     _gCtx.drawImage(_gImg, 0, 0, _gCanvas.width, _gCanvas.height);
@@ -2231,7 +2234,8 @@
         ring.rotation.x = Math.PI / 2; _scene.add(ring);
         var label = null, labelObj = null;
         if (p && THREE.CSS2DObject) { label = _makeLabel(p, rs, true); labelObj = new THREE.CSS2DObject(label); _scene.add(labelObj); }
-        return { robot: robot, ring: ring, label: label, labelObj: labelObj, headY: headY };
+        // wasGray: robot was created with no participant data → needs body rebuild in _refreshRoamers.
+        return { robot: robot, ring: ring, label: label, labelObj: labelObj, headY: headY, wasGray: !p };
     }
     // Live position update for a roaming participant (local or remote).
     function applyAvatarMove(cid, x, z, yaw, pose) {
@@ -2297,7 +2301,28 @@
         var rs = _roomState || {};
         Object.keys(_roamers).forEach(function (cid) {
             var r = _roamers[cid], p = _participantByCid(cid);
-            if (!r || !p) return;
+            if (!r) return;
+
+            // Roamer was created before the participant was in the list (wasGray = true).
+            // Now that the participant is available, rebuild the robot body and label with the
+            // correct colour so it stops being gray.
+            if (r.wasGray && p && _scene) {
+                if (r.robot) _scene.remove(r.robot);
+                var vs2 = _voteState(p, rs);
+                r.robot = _makeRobot(_parseColor(p), vs2, false);
+                r.robot.position.set(r.x || 0, 0, r.z || 0);
+                r.robot.rotation.y = r.yaw || 0;
+                _scene.add(r.robot);
+                // Build label now that we know who this is.
+                if (!r.label && THREE.CSS2DObject) {
+                    r.label = _makeLabel(p, rs, true);
+                    r.labelObj = new THREE.CSS2DObject(r.label);
+                    _scene.add(r.labelObj);
+                }
+                delete r.wasGray;
+            }
+
+            if (!p) return;
             var vs = _voteState(p, rs), rc = VOTE_EMI[vs] || VOTE_EMI.none;
             if (r.ring && r.ring.material) { r.ring.material.color.setHex(rc); r.ring.material.emissive.setHex(rc); }
             if (r.label) r.label.textContent = (p.name || 'Guest') + (rs.votesRevealed && p.vote ? ' · ' + p.vote : '');
