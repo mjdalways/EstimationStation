@@ -331,6 +331,147 @@
     // The back wall IS a floor-to-ceiling window spanning its full width. The outdoor
     // scene lives BEHIND the wall plane (more negative z); the old bug was an opaque
     // wallB plane in front of it that hid everything. Here there's no opaque centre —
+    // ── Built-in GIF89a frame decoder ────────────────────────────────────
+    // Decodes a GIF data-URL into frames so we can drive animation ourselves,
+    // eliminating any dependency on Chrome's internal GIF animation pipeline.
+    // Returns { frames:[{imageData,delay}], width, height } or null.
+    function _gifDecode(dataUrl) {
+        try {
+            var b64 = dataUrl.split(',')[1]; if (!b64) return null;
+            var bin = atob(b64);
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            var p = 0;
+            function rb()   { return bytes[p++]; }
+            function ru16() { var v = bytes[p]|(bytes[p+1]<<8); p+=2; return v; }
+            function skipSubs() { var n; while ((n = rb()) > 0) p += n; }
+            if (bytes[0]!==71||bytes[1]!==73||bytes[2]!==70) return null; // not GIF
+            p = 6;
+            var W = ru16(), H = ru16(), flags = rb();
+            var bgIdx = rb(); rb(); // background color index + pixel aspect ratio
+            var gctBytes = (flags&0x80) ? 3*(2<<(flags&7)) : 0;
+            var gct = bytes.slice(p, p+gctBytes); p += gctBytes;
+            var frames = [], delay = 100, transIdx = -1, disposal = 0;
+            var composite = new Uint8ClampedArray(W*H*4); // compositing buffer
+            // Pre-fill composite with GIF background color so transparent areas
+            // in early frames don't bleed through as black.
+            if (gct.length > 0) {
+                var bgCo = bgIdx * 3;
+                if (bgCo + 2 < gct.length) {
+                    for (var bi = 0; bi < W*H; bi++) {
+                        composite[bi*4]   = gct[bgCo];
+                        composite[bi*4+1] = gct[bgCo+1];
+                        composite[bi*4+2] = gct[bgCo+2];
+                        composite[bi*4+3] = 255;
+                    }
+                }
+            }
+            while (p < bytes.length) {
+                var b = rb();
+                if (b === 0x3B) break; // trailer
+                if (b === 0x21) {      // extension
+                    var ext = rb();
+                    if (ext === 0xF9) { // graphics control
+                        rb();           // block size (always 4)
+                        var gcf = rb();
+                        delay = ru16() * 10; if (delay < 20) delay = 100; // ms
+                        var ti = rb(); rb(); // transparent idx + terminator
+                        transIdx = (gcf & 1) ? ti : -1;
+                        disposal = (gcf >> 3) & 7;
+                    } else { skipSubs(); }
+                    continue;
+                }
+                if (b === 0x2C) {      // image descriptor
+                    var ix=ru16(), iy=ru16(), iw=ru16(), ih=ru16(), ifl=rb();
+                    var lctBytes = (ifl&0x80) ? 3*(2<<(ifl&7)) : 0;
+                    var ct = lctBytes ? bytes.slice(p,p+lctBytes) : gct; p += lctBytes;
+                    var interlaced = !!(ifl & 0x40);
+                    var minCode = rb();
+                    var pixels = _gifLzw(bytes, p, iw*ih, minCode);
+                    skipSubs();
+                    if (!pixels) { delay=100;transIdx=-1;disposal=0; continue; }
+                    if (interlaced) pixels = _gifDeinterlace(pixels, iw, ih);
+                    var prev = (disposal===3) ? new Uint8ClampedArray(composite) : null;
+                    for (var fy=0; fy<ih; fy++) {
+                        for (var fx=0; fx<iw; fx++) {
+                            var pidx = pixels[fy*iw+fx];
+                            if (pidx === transIdx) continue;
+                            var co = pidx*3, di = ((iy+fy)*W+(ix+fx))*4;
+                            if (di+3 < composite.length && co+2 < ct.length) {
+                                composite[di]=ct[co]; composite[di+1]=ct[co+1];
+                                composite[di+2]=ct[co+2]; composite[di+3]=255;
+                            }
+                        }
+                    }
+                    frames.push({ imageData: new ImageData(new Uint8ClampedArray(composite), W, H), delay: delay });
+                    if (disposal === 2) { // restore to background color
+                        var bgR=0,bgG=0,bgB=0,bgA=0;
+                        if (gct.length>0){var bgc2=bgIdx*3;if(bgc2+2<gct.length){bgR=gct[bgc2];bgG=gct[bgc2+1];bgB=gct[bgc2+2];bgA=255;}}
+                        for (var dy=iy; dy<iy+ih&&dy<H; dy++) for (var dx=ix; dx<ix+iw&&dx<W; dx++) {
+                            var ddi=((dy)*W+(dx))*4;
+                            composite[ddi]=bgR;composite[ddi+1]=bgG;composite[ddi+2]=bgB;composite[ddi+3]=bgA;
+                        }
+                    } else if (disposal === 3 && prev) { composite.set(prev); }
+                    delay=100; transIdx=-1; disposal=0;
+                }
+            }
+            return frames.length ? { frames:frames, width:W, height:H } : null;
+        } catch(e) { console.warn('_gifDecode:',e); return null; }
+    }
+    function _gifLzw(bytes, pos, count, minCode) {
+        // Read all sub-blocks into a flat data array first.
+        var data=[], sp=pos, bl;
+        while ((bl=bytes[sp++])>0) for (var i=0;i<bl;i++) data.push(bytes[sp++]);
+
+        var clear=1<<minCode, eoi=clear+1;
+        var cLen=minCode+1, cMask=(1<<cLen)-1;
+        // Initialise code table with base entries (colour indices only — 0..clear-1).
+        // Do NOT put clear/eoi in the table so any stray lookup yields nothing.
+        var table=new Array(clear);
+        for (var t=0;t<clear;t++) table[t]=[t];
+        var next=eoi+1, out=new Uint8Array(count), op=0;
+        var bitBuf=0, bitLen=0, dp=0, prev=-1;
+        // Read the next variable-length code (LSB-first, GIF bit order).
+        // Keep bitBuf as an unsigned 32-bit value via >>>0 after every accumulation
+        // so that >>>= (unsigned right shift) works correctly when discarding used bits.
+        function rc() {
+            while (bitLen<cLen&&dp<data.length){ bitBuf=((bitBuf|(data[dp++]<<bitLen))>>>0); bitLen+=8; }
+            var c=bitBuf&cMask; bitBuf>>>=cLen; bitLen-=cLen; return c;
+        }
+        while (op<count) {
+            var code=rc();
+            if (code===eoi||dp>data.length) break;
+            if (code===clear) {
+                cLen=minCode+1; cMask=(1<<cLen)-1;
+                table.length=clear; next=eoi+1; prev=-1;
+                continue;
+            }
+            var entry;
+            if (code<table.length)          entry=table[code];
+            else if (code===next&&prev>=0)  { var pe=table[prev]; entry=pe.concat(pe[0]); }
+            else if (prev>=0)               { entry=[table[prev][0]]; }  // corrupt stream – emit one safe pixel and carry on
+            else                            { prev=-1; continue; }
+            for (var ei=0;ei<entry.length&&op<count;ei++) out[op++]=entry[ei];
+            if (prev>=0&&next<4096) {
+                table[next++]=table[prev].concat(entry[0]);
+                if (next>cMask&&cLen<12) { cLen++;cMask=(1<<cLen)-1; }
+            }
+            prev=code;
+        }
+        return out;
+    }
+    function _gifDeinterlace(pixels, w, h) {
+        var out=new Uint8Array(pixels.length);
+        var passes=[[0,8],[4,8],[2,4],[1,2]], src=0;
+        for (var pi=0;pi<4;pi++) {
+            for (var y=passes[pi][0];y<h;y+=passes[pi][1]) {
+                for (var x=0;x<w;x++) out[y*w+x]=pixels[src*w+x];
+                src++;
+            }
+        }
+        return out;
+    }
+
     // just slim frame strips around a big sheet of glass, so the view is visible and
     // the "space outside" matches the selected window view.
     function _buildWindowWall(pal, view) {
@@ -358,32 +499,54 @@
             var _src = _cfg.windowImage;
             var _isGif = _src.indexOf('data:image/gif') === 0 || _src.match(/\.gif(\?|$)/i);
             if (_isGif) {
-                // 🎞️ Animated GIF: draw the <img> element (which the browser animates) onto a
-                // canvas each tick to capture live frames, then feed that canvas as a texture.
+                // 🎞️ Animated GIF: decode all frames with our built-in GIF89a parser,
+                // then drive playback in _tick using dt. No DOM element / browser tricks.
+                var _gifData = _gifDecode(_src);
+                var _gFrames = _gifData ? _gifData.frames : null;
+                var _gW = _gifData ? _gifData.width  : 1;
+                var _gH = _gifData ? _gifData.height : 1;
+                console.log('[GIF] decoded', _gFrames ? _gFrames.length : 0,
+                            'frames, natural size:', _gW + '×' + _gH);
+
+                // Native-size canvas for putImageData; scales into the 512×512 texture canvas.
+                var _tmpC = document.createElement('canvas');
+                _tmpC.width = _gW; _tmpC.height = _gH;
+                var _tmpCtx = _tmpC.getContext('2d');
+
                 var _gCanvas = document.createElement('canvas');
-                _gCanvas.width = 512; _gCanvas.height = 288;   // 16:9, enough for a window pane
+                _gCanvas.width = 512; _gCanvas.height = 512;
                 var _gCtx = _gCanvas.getContext('2d');
+
                 var _gTex = new THREE.CanvasTexture(_gCanvas);
+                _gTex.generateMipmaps = false;
+                _gTex.wrapS = THREE.ClampToEdgeWrapping;
+                _gTex.wrapT = THREE.ClampToEdgeWrapping;
+                _gTex.minFilter = THREE.LinearFilter;
                 if (THREE.sRGBEncoding) _gTex.encoding = THREE.sRGBEncoding;
 
-                var _gImg = new Image();
-                // Position off-screen without opacity:0 — browsers suppress GIF animation on
-                // opacity-0 elements as a rendering optimisation. Off-screen + 1×1 px keeps it
-                // alive without ever being visible.
-                _gImg.style.cssText = 'position:fixed;left:-200vw;top:0;width:1px;height:1px;pointer-events:none;';
-                document.body.appendChild(_gImg);   // must be in DOM for browser GIF animation
-                _gImg.onload = function () {
-                    _gCtx.drawImage(_gImg, 0, 0, _gCanvas.width, _gCanvas.height);
-                    _gTex.needsUpdate = true;
-                };
-                _gImg.src = _src;
+                if (_gFrames && _gFrames.length > 0) {
+                    // Draw frame 0 immediately
+                    _tmpCtx.putImageData(_gFrames[0].imageData, 0, 0);
+                    _gCtx.drawImage(_tmpC, 0, 0, _gW, _gH, 0, 0, 512, 512);
+                } else {
+                    _gCtx.fillStyle = '#111'; _gCtx.fillRect(0, 0, 512, 512);
+                }
+                _gTex.needsUpdate = true;
 
                 var _gPlane = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
                     new THREE.MeshBasicMaterial({ map: _gTex }));
                 _gPlane.position.set(0, cy, zb);
                 _scene.add(_gPlane);
 
-                _gifTextures.push({ img: _gImg, canvas: _gCanvas, ctx: _gCtx, tex: _gTex });
+                // Store all fields directly — tick accesses them without closures
+                _gifTextures.push({
+                    frames: _gFrames,
+                    gifW: _gW, gifH: _gH,
+                    tmpCanvas: _tmpC, tmpCtx: _tmpCtx,
+                    canvas: _gCanvas, ctx: _gCtx, tex: _gTex,
+                    frameIdx: 0, frameTime: 0,
+                    img: null   // kept for cleanup compat (parentNode check)
+                });
             } else {
                 // 🎨 Static custom image fills the opening.
                 var tex = new THREE.TextureLoader().load(_src, function () {
@@ -2255,6 +2418,9 @@
         if (_scene) { if (r.robot) _scene.remove(r.robot); if (r.ring) _scene.remove(r.ring); if (r.labelObj) _scene.remove(r.labelObj); }
         if (r.label && r.label.parentNode) r.label.parentNode.removeChild(r.label);
         delete _roamers[cid];
+        // Keep _iAmRoaming in sync: if the local user's roamer is cleared for any reason
+        // (server stop, seat-claim, eviction) they are no longer roaming.
+        if (cid === _myCid()) _iAmRoaming = false;
         if (_scene) _rebuildSeating();
     }
     function applyAvatarStop(cid) { clearRoamer(cid); }
@@ -2458,6 +2624,21 @@
 
     function _rebuildSeating() {
         if (!_scene) return;
+        // Belt-and-suspenders: if the local user has a claimed seat and is NOT actively walking,
+        // remove any stale roamer keyed to their CID. This covers the case where _iAmRoaming
+        // got cleared (or was never set) but a roamer mesh still lingers in _roamers —
+        // without this, pRoaming would be truthy and the seated robot would never be drawn.
+        if (_myChairIdx !== null && !_walk && !_iAmRoaming) {
+            var _sc = _myCid();
+            if (_sc && _roamers[_sc]) {
+                var _sr = _roamers[_sc];
+                if (_sr.robot)    _scene.remove(_sr.robot);
+                if (_sr.ring)     _scene.remove(_sr.ring);
+                if (_sr.labelObj) _scene.remove(_sr.labelObj);
+                if (_sr.label && _sr.label.parentNode) _sr.label.parentNode.removeChild(_sr.label);
+                delete _roamers[_sc];
+            }
+        }
         _clearRobots();
         var rs    = _roomState || {};
         var count = _participants.length;
@@ -2536,6 +2717,10 @@
             var pRoaming = p && (_roamers[p.connectionId] ||
                 (_iAmRoaming && i === _myChairIdx));
             if (pRoaming) continue;
+            // Belt-and-suspenders: skip if this participant was already drawn in an earlier chair
+            // (handles stale localStorage CID leaving two claims for the same person).
+            if (p && p.connectionId && seatedIds.hasOwnProperty(p.connectionId)) continue;
+            if (p && p.name        && seatedIds.hasOwnProperty(p.name))         continue;
             if (!p) {
                 var ghost = _makeRobot(claim.color || 0x444444, 'none', true);
                 ghost.position.set(pos.x, 0, pos.z);
@@ -2885,10 +3070,18 @@
 
     // A peer (or me) successfully claimed a chair.
     function applyClaim(idx, name, color, cid) {
-        // A connection holds at most one chair — drop any stale seat it had.
+        // A connection holds at most one chair. Evict any stale claim by the same CID *or*
+        // the same name — this covers localStorage entries from a previous session where the
+        // CID has changed, which would otherwise leave the person seated in two chairs.
         Object.keys(_claimedChairs).forEach(function (k) {
-            if (_claimedChairs[k] && _claimedChairs[k].cid === cid && parseInt(k, 10) !== idx) {
-                if (_claimedChairs[k].cid === _myCid()) _myChairIdx = null;
+            var c = _claimedChairs[k]; if (!c) return;
+            var ki = parseInt(k, 10); if (ki === idx) return;
+            var sameCid  = cid  && c.cid  === cid;
+            var sameName = name && c.name === name;
+            if (sameCid || sameName) {
+                if (c.cid === _myCid() || c.name === (window.ROOM_CONFIG && window.ROOM_CONFIG.playerName)) {
+                    _myChairIdx = null;
+                }
                 delete _claimedChairs[k];
             }
         });
@@ -3062,13 +3255,29 @@
             }
         }
 
-        // Animated GIF window textures — always update (not gated by windowAnimated).
-        // The browser animates the <img> element; drawImage captures the current frame.
+        // Animated GIF window textures — decoded-frames player (no DOM element needed).
+        // Advances the frame index based on each frame's delay from the GIF header.
         if (_gifTextures.length) {
             for (var gi = 0; gi < _gifTextures.length; gi++) {
                 var _g = _gifTextures[gi];
-                if (_g.img.complete && _g.img.naturalWidth > 0) {
-                    _g.ctx.drawImage(_g.img, 0, 0, _g.canvas.width, _g.canvas.height);
+                if (!_g.frames || _g.frames.length < 2) continue; // 0 or 1 frame = static
+                _g.frameTime += dt * 1000; // dt seconds → frameTime ms
+                // Drain accumulated time — advances multiple frames if dt was large,
+                // capped at one full loop to prevent infinite spin on 0-delay GIFs.
+                var _maxAdv = _g.frames.length, _advanced = false;
+                while (_maxAdv-- > 0) {
+                    var _gfDelay = _g.frames[_g.frameIdx].delay;
+                    if (_g.frameTime < _gfDelay) break;
+                    _g.frameTime -= _gfDelay;
+                    _g.frameIdx = (_g.frameIdx + 1) % _g.frames.length;
+                    _advanced = true;
+                }
+                if (_advanced) {
+                    var _gfFrame = _g.frames[_g.frameIdx];
+                    _g.tmpCtx.putImageData(_gfFrame.imageData, 0, 0);
+                    _g.ctx.clearRect(0, 0, _g.canvas.width, _g.canvas.height);
+                    _g.ctx.drawImage(_g.tmpCanvas, 0, 0, _g.gifW, _g.gifH,
+                                     0, 0, _g.canvas.width, _g.canvas.height);
                     _g.tex.needsUpdate = true;
                 }
             }
