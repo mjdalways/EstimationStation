@@ -38,6 +38,7 @@
     var _cfg = {}, _clock = 0, _lastTime = 0;
     var _winGroup = null;   // active parent for window-scene primitives (group-local coords)
     var _winAnims = [];     // animated window elements (clouds, stars, sea…) updated in _tick
+    var _gifTextures = [];  // animated GIF window textures: { img, canvas, ctx, tex } — updated every tick
     var _wbBoard = null, _wbTex = null, _wbVer = -1;   // in-room whiteboard board mesh + live texture
     var _props = [];                 // interactive props: { mesh, action }
     var _storyScreenLabel = null;    // CSS2D label on the in-room story screen
@@ -284,6 +285,12 @@
     function _buildRoom() {
         var pal = PAL[_cfg.preset] || PAL.conference;
         _winAnims = [];   // dropped meshes from any previous build are no longer animated
+        // Dispose any live GIF textures from the previous build.
+        _gifTextures.forEach(function(g){
+            if (g.tex) g.tex.dispose();
+            if (g.img && g.img.parentNode) g.img.parentNode.removeChild(g.img);
+        });
+        _gifTextures = [];
 
         var wallCol = _wallColor(pal);
 
@@ -348,14 +355,42 @@
         var tod = _timeOfDay();
 
         if (view === 'custom' && _cfg.windowImage) {
-            // 🎨 Custom view: the uploaded image (or GIF first frame) fills the opening.
-            var tex = new THREE.TextureLoader().load(_cfg.windowImage, function () {
-                if (_renderer) _renderer.render(_scene, _camera);   // repaint once the image decodes
-            });
-            if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
-            var img = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
-                new THREE.MeshBasicMaterial({ map: tex }));
-            img.position.set(0, cy, zb); _scene.add(img);
+            var _src = _cfg.windowImage;
+            var _isGif = _src.indexOf('data:image/gif') === 0 || _src.match(/\.gif(\?|$)/i);
+            if (_isGif) {
+                // 🎞️ Animated GIF: draw the <img> element (which the browser animates) onto a
+                // canvas each tick to capture live frames, then feed that canvas as a texture.
+                var _gCanvas = document.createElement('canvas');
+                _gCanvas.width = 512; _gCanvas.height = 288;   // 16:9, enough for a window pane
+                var _gCtx = _gCanvas.getContext('2d');
+                var _gTex = new THREE.CanvasTexture(_gCanvas);
+                if (THREE.sRGBEncoding) _gTex.encoding = THREE.sRGBEncoding;
+
+                var _gImg = new Image();
+                _gImg.style.cssText = 'position:absolute;top:-9999px;opacity:0;pointer-events:none;';
+                document.body.appendChild(_gImg);   // must be in DOM for browser GIF animation
+                _gImg.onload = function () {
+                    _gCtx.drawImage(_gImg, 0, 0, _gCanvas.width, _gCanvas.height);
+                    _gTex.needsUpdate = true;
+                };
+                _gImg.src = _src;
+
+                var _gPlane = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
+                    new THREE.MeshBasicMaterial({ map: _gTex }));
+                _gPlane.position.set(0, cy, zb);
+                _scene.add(_gPlane);
+
+                _gifTextures.push({ img: _gImg, canvas: _gCanvas, ctx: _gCtx, tex: _gTex });
+            } else {
+                // 🎨 Static custom image fills the opening.
+                var tex = new THREE.TextureLoader().load(_src, function () {
+                    if (_renderer) _renderer.render(_scene, _camera);   // repaint once decoded
+                });
+                if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+                var img = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
+                    new THREE.MeshBasicMaterial({ map: tex }));
+                img.position.set(0, cy, zb); _scene.add(img);
+            }
         } else {
             // Large sky backdrop, wider/taller than the opening so the view reads as open sky.
             var sky = new THREE.Mesh(new THREE.PlaneGeometry(OW * 1.8, OH * 2.4),
@@ -3002,6 +3037,18 @@
             }
         }
 
+        // Animated GIF window textures — always update (not gated by windowAnimated).
+        // The browser animates the <img> element; drawImage captures the current frame.
+        if (_gifTextures.length) {
+            for (var gi = 0; gi < _gifTextures.length; gi++) {
+                var _g = _gifTextures[gi];
+                if (_g.img.complete && _g.img.naturalWidth > 0) {
+                    _g.ctx.drawImage(_g.img, 0, 0, _g.canvas.width, _g.canvas.height);
+                    _g.tex.needsUpdate = true;
+                }
+            }
+        }
+
         if (_walk) {
             // First-person mode: our controller owns the camera; skip orbit/fly-to.
             _updateWalk(dt);
@@ -3057,6 +3104,12 @@
         if (_furnHud && _furnHud.parentNode) { _furnHud.parentNode.removeChild(_furnHud); _furnHud = null; }
         var hint = document.getElementById('rs3d-walk-hint'); if (hint && hint.parentNode) hint.parentNode.removeChild(hint);
         if (_miniCanvas && _miniCanvas.parentNode) { _miniCanvas.parentNode.removeChild(_miniCanvas); _miniCanvas = null; _miniCtx = null; }
+        // Clean up animated GIF textures (dispose Three.js texture + remove hidden <img> from DOM).
+        _gifTextures.forEach(function(g){
+            if (g.tex) g.tex.dispose();
+            if (g.img && g.img.parentNode) g.img.parentNode.removeChild(g.img);
+        });
+        _gifTextures = [];
         _walk = null; _keys = {}; _look = null;
         if (_renderer) {
             var el = _renderer.domElement;

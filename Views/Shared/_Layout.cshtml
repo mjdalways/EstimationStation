@@ -1653,6 +1653,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/7/2026 (153)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎞️ <strong>Animated GIF window views</strong>: upload any animated GIF (up to 4 MB) as the room's window view. The browser animates the GIF natively and each frame is captured to a canvas texture every tick — the entire space gif, storm, lava, fire, or anything else plays live behind the window glass. Static images still work as before; GIFs are detected automatically from the file type.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/7/2026 (152)</strong></p>
                         <ul class="mb-2">
                             <li>👤 <strong>Duplicate remote avatar fixed</strong>: a participant could appear as both a seated robot AND a standing robot simultaneously when their chair claim was stored under one identity key but the standing filter checked a different one (CID vs name mismatch). Both the seated-ID map and the unseated filter now index by both CID and name, guaranteeing at most one robot per person regardless of reconnect history.</li>
@@ -2713,12 +2717,16 @@
                                             <option value="auto">🕒 Auto (local clock)</option>
                                         </select>
                                     </div>
-                                    <div class="mt-1"><input type="file" id="rs-window-image" accept="image/*" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Upload a custom window image" /></div>
+                                    <div class="mt-1">
+                                        <input type="file" id="rs-window-image" accept="image/*,.gif" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Upload a custom window image or animated GIF (max 4 MB)" />
+                                        <div class="form-text small mt-1">Supports still images &amp; 🎞️ animated GIFs (max 4 MB)</div>
+                                    </div>
                                 </div>
                                 <script>
                                 window._rsWindowImageUpload = function(input){
                                     var f = input.files && input.files[0]; if(!f) return;
-                                    if(f.size > 600*1024){ alert('Please pick an image under 600 KB.'); input.value=''; return; }
+                                    var maxBytes = f.type === 'image/gif' ? 4*1024*1024 : 600*1024;
+                                    if(f.size > maxBytes){ alert('Please pick an image under ' + (f.type === 'image/gif' ? '4 MB' : '600 KB') + '.'); input.value=''; return; }
                                     var rd = new FileReader();
                                     rd.onload = function(){ if(window.RoomScene) RoomScene.updateConfig({ windowImage: rd.result, windowView: 'custom' }); var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom'; };
                                     rd.readAsDataURL(f);
