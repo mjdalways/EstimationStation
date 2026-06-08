@@ -2418,11 +2418,19 @@
             return null;
         }
 
+        // seatedIds tracks which participants are drawn as seated (keyed by both CID and name).
+        // Using both keys prevents any mismatch when the claim was stored under one identity
+        // but _participants has the person under another (e.g. after a reconnect or CID change).
         var seatedIds = {};
+        function _markSeated(occ, idx) {
+            if (!occ) return;
+            if (occ.connectionId) seatedIds[occ.connectionId] = idx;
+            if (occ.name)        seatedIds[occ.name]         = idx;
+        }
         Object.keys(_claimedChairs).forEach(function(idx){
             var occ = _claimOccupant(_claimedChairs[idx]);
             // A claimant who is roaming is drawn by the roam layer, not seated here.
-            if (occ && !_roamers[occ.connectionId]) seatedIds[occ.connectionId || occ.name] = parseInt(idx, 10);
+            if (occ && !_roamers[occ.connectionId]) _markSeated(occ, parseInt(idx, 10));
         });
 
         // Place chairs + seated robots. A chair the user has dragged uses its custom
@@ -2509,12 +2517,19 @@
                 label: label, labelObj: labelObj,
                 seated: true, phase: i * 0.9, armRaiseT: -1
             };
+            // Keep seatedIds up to date using both identity forms so the unseated filter
+            // cannot produce a duplicate standing robot for the same person.
+            _markSeated(p, i);
         }
 
-        // Standing robots (roamers are drawn by the roam layer, not here)
+        // Standing robots (roamers are drawn by the roam layer, not here).
+        // Guard: exclude any participant already drawn as seated (checked by both CID and name
+        // to be resilient against CID/name mismatches that can arise on reconnect).
         var unseated = _participants.filter(function(p){
             if (_roamers[p.connectionId]) return false;
-            return !seatedIds.hasOwnProperty(p.connectionId || p.name || '');
+            if (seatedIds.hasOwnProperty(p.connectionId)) return false;
+            if (p.name && seatedIds.hasOwnProperty(p.name)) return false;
+            return true;
         });
         var standPos = _standingPositions(unseated.length);
         unseated.forEach(function(p, si){
