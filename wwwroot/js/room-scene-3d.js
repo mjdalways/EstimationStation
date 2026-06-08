@@ -821,6 +821,12 @@
             case 'coffee_table':  return _makeCoffeeTable();
             case 'projector':     return _makeProjectorScreen();
             case 'whiteboard':    return _makeStandingWhiteboard();
+            case 'sofa':          return _makeSofa();
+            case 'lamp':          return _makeFloorLamp();
+            case 'bookshelf':     return _makeBookshelf();
+            case 'monitor':       return _makeMonitor();
+            case 'jukebox':       return _makeJukeboxFurniture();
+            case 'bin':           return _makeWasteBin();
             default:              return null;
         }
     }
@@ -892,6 +898,131 @@
         var pick = new THREE.Mesh(new THREE.BoxGeometry(1.30,1.60,0.60),
             new THREE.MeshBasicMaterial({visible:false}));
         pick.position.y = 0.90; g.add(pick);
+        return { group: g, pickMesh: pick };
+    }
+
+    function _makeSofa() {
+        var g = new THREE.Group();
+        var sm = new THREE.MeshStandardMaterial({ color: 0x4a6fa5, roughness: 0.88 });
+        // Seat cushion
+        var seat = new THREE.Mesh(new THREE.BoxGeometry(1.10, 0.20, 0.55), sm);
+        seat.position.set(0, 0.32, 0); g.add(seat);
+        // Back rest
+        var back = new THREE.Mesh(new THREE.BoxGeometry(1.10, 0.45, 0.12), sm);
+        back.position.set(0, 0.61, -0.23); g.add(back);
+        // Arms
+        [[-0.55,0.08,0.45],[0.55,0.08,0.45]].forEach(function(p){
+            var arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.55), sm);
+            arm.position.set(p[0], p[1]+0.35, 0); g.add(arm);
+        });
+        // Legs (4)
+        var lm = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.65 });
+        [[-0.44,-0.24],[-0.44,0.24],[0.44,-0.24],[0.44,0.24]].forEach(function(p){
+            var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.22,6), lm);
+            leg.position.set(p[0], 0.11, p[1]); g.add(leg);
+        });
+        var pick = new THREE.Mesh(new THREE.BoxGeometry(1.20, 0.85, 0.65), new THREE.MeshBasicMaterial({ visible: false }));
+        pick.position.set(0, 0.42, 0); g.add(pick);
+        return { group: g, pickMesh: pick };
+    }
+
+    function _makeFloorLamp() {
+        var g = new THREE.Group();
+        var sm = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, roughness: 0.3, metalness: 0.7 });
+        // Pole
+        var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.60, 8), sm);
+        pole.position.y = 0.80; g.add(pole);
+        // Base
+        var base = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.22, 0.04, 10), sm);
+        base.position.y = 0.02; g.add(base);
+        // Shade
+        var shadeMat = new THREE.MeshStandardMaterial({ color: 0xffe8c0, emissive: 0xffe090, emissiveIntensity: 0.35, roughness: 0.7 });
+        var shade = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.12, 0.26, 10, 1, true), shadeMat);
+        shade.position.y = 1.62; g.add(shade);
+        var pick = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.70, 6), new THREE.MeshBasicMaterial({ visible: false }));
+        pick.position.y = 0.85; g.add(pick);
+        return { group: g, pickMesh: pick };
+    }
+
+    function _makeBookshelf() {
+        var g = new THREE.Group();
+        var wm = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.75 });
+        // Body
+        var body = new THREE.Mesh(new THREE.BoxGeometry(0.80, 1.40, 0.28), wm);
+        body.position.y = 0.70; g.add(body);
+        // Shelves
+        for (var s = 0; s < 3; s++) {
+            var shelf = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.04, 0.26), wm);
+            shelf.position.set(0, 0.30 + s * 0.40, 0); g.add(shelf);
+        }
+        // Books (colourful small boxes)
+        var bookCols = [0xd63031, 0x0984e3, 0x00b894, 0xfdcb6e, 0x6c5ce7, 0xe17055];
+        for (var b = 0; b < 6; b++) {
+            var bk = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, 0.20),
+                new THREE.MeshStandardMaterial({ color: bookCols[b], roughness: 0.8 }));
+            bk.position.set(-0.28 + b * 0.11, 0.64, 0); g.add(bk);
+        }
+        var pick = new THREE.Mesh(new THREE.BoxGeometry(0.82, 1.42, 0.30), new THREE.MeshBasicMaterial({ visible: false }));
+        pick.position.y = 0.71; g.add(pick);
+        return { group: g, pickMesh: pick };
+    }
+
+    function _makeMonitor() {
+        var g = new THREE.Group();
+        var dm = new THREE.MeshStandardMaterial({ color: 0x1a1c24, roughness: 0.4, metalness: 0.3 });
+        // Screen bezel
+        var bezel = new THREE.Mesh(new THREE.BoxGeometry(1.00, 0.62, 0.06), dm);
+        bezel.position.y = 1.35; g.add(bezel);
+        // Screen glow
+        var scrMat = new THREE.MeshStandardMaterial({ color: 0x0d2a4a, emissive: 0x1a4a7a, emissiveIntensity: 0.6, roughness: 0.2 });
+        var scr = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 0.52), scrMat);
+        scr.position.set(0, 1.35, 0.04); g.add(scr);
+        // Stand neck
+        var neck = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.32, 8), dm);
+        neck.position.y = 0.88; g.add(neck);
+        // Base
+        var base = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.28), dm);
+        base.position.y = 0.70; g.add(base);
+        var pick = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.00, 0.30), new THREE.MeshBasicMaterial({ visible: false }));
+        pick.position.y = 0.95; g.add(pick);
+        return { group: g, pickMesh: pick };
+    }
+
+    function _makeJukeboxFurniture() {
+        // A standalone jukebox cabinet (different from the interactive prop — just decor furniture).
+        var g = new THREE.Group();
+        var bm = new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.5, metalness: 0.2 });
+        // Cabinet body
+        var cab = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.20, 0.38), bm);
+        cab.position.y = 0.60; g.add(cab);
+        // Dome top
+        var dome = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.275, 0.24, 14),
+            new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0xffc800, emissiveIntensity: 0.35, roughness: 0.3, metalness: 0.4 }));
+        dome.position.y = 1.32; g.add(dome);
+        // Chrome strips
+        var cm = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.15, metalness: 0.9 });
+        [0.22, -0.22].forEach(function(ox){
+            var s = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.0, 0.02), cm);
+            s.position.set(ox, 0.70, 0.20); g.add(s);
+        });
+        // Glow face
+        var face = new THREE.Mesh(new THREE.PlaneGeometry(0.40, 0.55),
+            new THREE.MeshStandardMaterial({ color: 0xff6040, emissive: 0xff3010, emissiveIntensity: 0.4, roughness: 0.4 }));
+        face.position.set(0, 0.70, 0.20); g.add(face);
+        var pick = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.30, 0.42), new THREE.MeshBasicMaterial({ visible: false }));
+        pick.position.y = 0.65; g.add(pick);
+        return { group: g, pickMesh: pick };
+    }
+
+    function _makeWasteBin() {
+        var g = new THREE.Group();
+        var bm = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.55, metalness: 0.4 });
+        var body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.42, 10), bm);
+        body.position.y = 0.21; g.add(body);
+        var rim = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.015, 6, 18), bm);
+        rim.position.y = 0.42; g.add(rim);
+        var pick = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.44, 8), new THREE.MeshBasicMaterial({ visible: false }));
+        pick.position.y = 0.22; g.add(pick);
         return { group: g, pickMesh: pick };
     }
 
@@ -1228,16 +1359,18 @@
             'background:rgba(20,24,40,0.94);color:#e8eaf6;border:1px solid rgba(120,140,210,0.4);' +
             'border-radius:8px;padding:6px 8px;backdrop-filter:blur(6px);';
         var FURN_ITEMS = [
-            ['📋','whiteboard'],['🪴','plant'],['🎵','jukebox'],['💡','lamp'],
-            ['🛋️','sofa'],['📚','bookshelf'],['🖥️','monitor'],['🗑️','bin']
+            ['📋','whiteboard','Whiteboard'],['🪴','plant','Plant'],['🎵','jukebox','Jukebox'],
+            ['💡','lamp','Floor lamp'],['🛋️','sofa','Sofa'],['📚','bookshelf','Bookshelf'],
+            ['🖥️','monitor','Monitor'],['🗑️','bin','Bin'],
+            ['☕','coffee_table','Coffee table'],['📽️','projector','Projector']
         ];
         fhud.innerHTML = '<div style="font-size:0.62rem;opacity:0.6;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Add to room</div>' +
             '<div style="display:flex;flex-wrap:wrap;gap:4px;max-width:180px;">' +
             FURN_ITEMS.map(function(f){
                 return '<button type="button" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);' +
                     'border-radius:5px;color:#e8eaf6;padding:4px 8px;cursor:pointer;font-size:0.75rem;" ' +
-                    'title="Add ' + f[1] + '" onclick="window.RS3D && RS3D.addFurniture(\'' + f[1] + '\')">' +
-                    f[0] + ' ' + f[1].charAt(0).toUpperCase() + f[1].slice(1) + '</button>';
+                    'title="Add ' + (f[2]||f[1]) + '" onclick="window.RS3D && RS3D.addFurniture(\'' + f[1] + '\')">' +
+                    f[0] + ' ' + (f[2]||f[1]) + '</button>';
             }).join('') + '</div>' +
             '<div style="display:flex;gap:4px;margin-top:5px;">' +
             '<button type="button" style="background:transparent;border:1px solid rgba(200,100,100,0.5);color:#f88;' +
@@ -1450,6 +1583,7 @@
     }
 
     // E key: drop a carried item, or sit/stand at the chair ahead, or pick up furniture.
+    // Each interaction type uses its own proximity-limited ray to avoid cross-room false triggers.
     function _walkInteract() {
         if (_walk.held != null) { _saveFurniture(); _walk.held = null; return; }
         if (!_raycaster || !_camera) return;
@@ -1464,26 +1598,37 @@
             dir = new THREE.Vector3(); _camera.getWorldDirection(dir);
         }
         _raycaster.set(rayOrigin, dir);
-        _raycaster.far = 5.5;   // generous range — props are in far corners
 
-        // Whiteboard ahead → open it.
-        if (_wbBoard && _raycaster.intersectObject(_wbBoard, true).length) {
-            _raycaster.far = Infinity;
-            if (window.Whiteboard) Whiteboard.open();
-            return;
+        // ── Whiteboard (left wall) — only interact when within 2 m of the board ──
+        if (_wbBoard) {
+            var wbPos = new THREE.Vector3();
+            _wbBoard.getWorldPosition(wbPos);
+            var wbDist = Math.hypot(_walk.wx - wbPos.x, _walk.wz - wbPos.z);
+            if (wbDist < 2.2) {
+                _raycaster.far = 2.2;
+                if (_raycaster.intersectObject(_wbBoard, true).length) {
+                    _raycaster.far = Infinity;
+                    if (window.Whiteboard) Whiteboard.open();
+                    return;
+                }
+            }
         }
-        // Interactive prop ahead → trigger it (check children too for group-based props).
+
+        // ── Props (confetti / jukebox) — short range ──
         var pms = _propMeshes();
         if (pms.length) {
+            _raycaster.far = 2.5;
             var phit = _raycaster.intersectObjects(pms, true);
             if (phit.length) {
-                // Walk up the hit hierarchy to find the registered pick mesh.
                 var hit = phit[0].object, prp = null;
                 while (hit && !prp) { prp = _propForMesh(hit); hit = hit.parent; }
                 if (prp) { _runProp(prp.action); _raycaster.far = Infinity; return; }
             }
         }
+
+        // ── Chairs — must be adjacent ──
         var chairMeshes = _chairObjects.map(function (c) { return c.seatMesh; });
+        _raycaster.far = 1.9;
         var ch = chairMeshes.length ? _raycaster.intersectObjects(chairMeshes, true) : [];
         if (ch.length) {
             var hitMesh = ch[0].object, chairObj = null;
@@ -1822,15 +1967,20 @@
     }
 
     // Walk cycle: swing legs and opposite arms based on a phase angle.
+    // Also resets any Z-axis spread set by the jump pose so it doesn't linger.
     function _poseRobotWalk(root, phase, isWalking) {
         var j = root.userData.joints; if (!j) return;
         var s = isWalking ? Math.sin(phase) : 0;
         j.lHip.rotation.x   =  s * 0.42;
         j.rHip.rotation.x   = -s * 0.42;
+        j.lHip.rotation.z   =  0;   // clear jump spread
+        j.rHip.rotation.z   =  0;
         j.lKnee.rotation.x  = Math.max(0,  s) * 0.45;
         j.rKnee.rotation.x  = Math.max(0, -s) * 0.45;
         j.lShoulder.rotation.x = -s * 0.28;
         j.rShoulder.rotation.x =  s * 0.28;
+        j.lShoulder.rotation.z =  0;   // clear jump spread
+        j.rShoulder.rotation.z =  0;
         j.lElbow.rotation.x = Math.abs(s) * 0.15;
         j.rElbow.rotation.x = Math.abs(s) * 0.15;
         // Hip height: standing
@@ -1852,17 +2002,26 @@
         j.rElbow.rotation.x    =  0.20;
     }
 
-    // Jump pose: legs extended/spread, arms out.
+    // Jump pose: dramatic air pose — hips raised, legs kick back hard, arms fly up+out.
     function _poseRobotJump(root) {
         var j = root.userData.joints; if (!j) return;
-        j.lHip.rotation.x   = -0.25;
-        j.rHip.rotation.x   = -0.25;
-        j.lKnee.rotation.x  =  0.10;
-        j.rKnee.rotation.x  =  0.10;
-        j.lShoulder.rotation.x = -0.55;
-        j.rShoulder.rotation.x = -0.55;
-        j.lElbow.rotation.x    =  0.30;
-        j.rElbow.rotation.x    =  0.30;
+        var hy = j.hipY !== undefined ? j.hipY : ROBOT_HIP_Y;
+        // Whole body lifts up
+        j.hips.position.y = hy + 0.35;
+        // Legs kick backward and spread (tuck under)
+        j.lHip.rotation.x  = -0.72;
+        j.rHip.rotation.x  = -0.72;
+        j.lHip.rotation.z  =  0.18;  // legs spread outward
+        j.rHip.rotation.z  = -0.18;
+        j.lKnee.rotation.x =  0.90;  // knees bend sharply (tuck)
+        j.rKnee.rotation.x =  0.90;
+        // Arms fly upward and outward — triumphant leap
+        j.lShoulder.rotation.x = -1.10;
+        j.rShoulder.rotation.x = -1.10;
+        j.lShoulder.rotation.z =  0.55;   // out to sides
+        j.rShoulder.rotation.z = -0.55;
+        j.lElbow.rotation.x    = -0.35;
+        j.rElbow.rotation.x    = -0.35;
     }
 
     // Idle: gentle sway animation; call each tick with the global clock.
@@ -2304,7 +2463,11 @@
 
             // Seated robot for claimed chair
             var p = _claimOccupant(claim);
-            if (p && _roamers[p.connectionId]) continue;   // they're up and roaming → seat stays empty
+            // Skip drawing seated robot if this participant is currently roaming.
+            // Also covers the case where CID was null at enterWalk time (no roamer key, but _iAmRoaming=true).
+            var pRoaming = p && (_roamers[p.connectionId] ||
+                (_iAmRoaming && i === _myChairIdx));
+            if (pRoaming) continue;
             if (!p) {
                 var ghost = _makeRobot(claim.color || 0x444444, 'none', true);
                 ghost.position.set(pos.x, 0, pos.z);
