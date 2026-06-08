@@ -395,9 +395,24 @@
         _applyMode();
     }
 
-    function updateConfig(patch) {
+    // Shared (room-level) config fields broadcast to all participants.
+    // Personal fields (keyBindings, walkCameraMode, dragMode, twoDStyle, windowImage) are excluded.
+    var _SHARED_FIELDS = ['preset','tableShape','tableSize','chairType','chairCount',
+        'floorMaterial','wallColor','tableMaterial','lighting',
+        'windowView','windowAnimated','windowTimeOfDay','whiteboard','plants'];
+
+    // silent=true: received from another participant — apply locally but don't echo back.
+    function updateConfig(patch, silent) {
         state.config = Object.assign({}, state.config, patch || {});
         saveConfig();
+        // Broadcast shared fields to other participants unless this is an incoming update.
+        if (!silent && window.RoomSceneNet && RoomSceneNet.broadcastSceneConfig) {
+            var toShare = {};
+            _SHARED_FIELDS.forEach(function(k){ if (patch && patch.hasOwnProperty(k)) toShare[k] = patch[k]; });
+            if (Object.keys(toShare).length > 0) {
+                try { RoomSceneNet.broadcastSceneConfig(JSON.stringify(toShare)); } catch(e) {}
+            }
+        }
         var wantGl = _wantGl();
         if (wantGl === _glActive) {
             // Renderer unchanged — just apply the new config to whatever is showing.

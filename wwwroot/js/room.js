@@ -72,6 +72,9 @@ window.RoomSceneNet = {
     },
     hostFreeChair: function (idx) {
         if (connection) connection.invoke('HostFreeChair', idx).catch(function(e){ console.error('HostFreeChair failed', e); });
+    },
+    broadcastSceneConfig: function (configJson) {
+        if (connection) connection.invoke('BroadcastSceneConfig', configJson).catch(function(e){ console.error('BroadcastSceneConfig failed', e); });
     }
 };
 
@@ -127,6 +130,17 @@ function _syncRoomScene() {
     if (window.RoomScene && typeof window.RoomScene.syncRoom === 'function') {
         window.RoomScene.syncRoom(roomState);
     }
+}
+
+// Fields that are room-level (shared between all participants).
+// Personal prefs (keyBindings, walkCameraMode, dragMode, twoDStyle, windowImage) are intentionally excluded.
+var _SCENE_SHARED_FIELDS = ['preset','tableShape','tableSize','chairType','chairCount',
+    'floorMaterial','wallColor','tableMaterial','lighting',
+    'windowView','windowAnimated','windowTimeOfDay','whiteboard','plants'];
+function _sharedSceneConfig(cfg) {
+    var out = {};
+    _SCENE_SHARED_FIELDS.forEach(function(k){ if (cfg && cfg[k] !== undefined) out[k] = cfg[k]; });
+    return out;
 }
 
 // ============================================================
@@ -226,6 +240,16 @@ function registerHandlers() {
         roomState.participants.push(p);
         renderParticipants();
         appendChat('System', `${p.name} joined the room`, null);
+        // When the host sees a new participant join, push the current room scene config so
+        // everyone renders the same room (chair count, window view, chair type, etc.).
+        if (roomState.isHost && window.RoomScene && window.RoomSceneNet) {
+            try {
+                var _cfg = RoomScene.getConfig();
+                var _shared = _sharedSceneConfig(_cfg);
+                RoomSceneNet.broadcastSceneConfig(JSON.stringify(_shared));
+            } catch(e) {}
+        }
+        _syncRoomScene();
     });
 
     connection.on('ParticipantLeft', (connectionId, name) => {
@@ -510,7 +534,16 @@ function registerHandlers() {
 
     connection.on('AvatarUpdated', (connectionId, avatarData) => {
         const p = roomState.participants.find(p => p.connectionId === connectionId);
-        if (p) { p.avatarData = avatarData; renderParticipants(); }
+        if (p) { p.avatarData = avatarData; renderParticipants(); _syncRoomScene(); }
+    });
+
+    // Room scene visual config broadcast: host pushes on join + on any config change.
+    // Non-hosts apply silently so everyone's room looks identical.
+    connection.on('SceneConfigUpdated', (configJson) => {
+        try {
+            var patch = JSON.parse(configJson);
+            if (window.RoomScene && RoomScene.updateConfig) RoomScene.updateConfig(patch, /*silent=*/true);
+        } catch(e) { console.error('SceneConfigUpdated parse error', e); }
     });
 
     connection.on('VibeUpdated', (counts) => { renderVibeDisplay(counts); });

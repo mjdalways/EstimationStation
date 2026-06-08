@@ -2885,7 +2885,11 @@
     function _colorHex(v){if(typeof v==='number')return v;var n=parseInt(String(v).replace('#',''),16);return isNaN(n)?0x4488cc:n;}
     function _darken(h,f){return(Math.round(((h>>16)&0xff)*f)<<16)|(Math.round(((h>>8)&0xff)*f)<<8)|Math.round((h&0xff)*f);}
     function _parseColor(p){
+        // Legacy field (never set by server — kept for safety).
         if(p.avatarColor){var n=parseInt(String(p.avatarColor).replace('#',''),16);if(!isNaN(n))return n;}
+        // avatarData format: "initials|#rrggbb"  or  "dicebear:bottts:seed|#rrggbb"
+        if(p.avatarData){var m=String(p.avatarData).match(/\|#?([0-9a-fA-F]{6})(?:\b|$)/);if(m){var cn=parseInt(m[1],16);if(!isNaN(cn))return cn;}}
+        // Fallback: deterministic colour from name hash.
         var hash=0,s=String(p.name||'?');
         for(var i=0;i<s.length;i++)hash=s.charCodeAt(i)+((hash<<5)-hash);
         return _hslToHex(Math.abs(hash%360)/360,0.55,0.48);

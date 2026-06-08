@@ -1653,6 +1653,13 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/7/2026 (152)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎨 <strong>Avatar colours now correct in 3D</strong>: robot body colours finally reflect each participant's chosen profile colour — previously every robot used a name-hash fallback colour because <code>avatarData</code> was never being parsed for the hex suffix.</li>
+                            <li>🔄 <strong>Avatar colour updates live</strong>: changing your profile avatar colour now immediately updates your robot in all other participants' 3D rooms (was silently ignored before).</li>
+                            <li>🏠 <strong>Room scene config syncs between participants</strong>: chair count, window view, table shape, chair type, floor/wall material, and lighting are now broadcast in real-time so everyone in the room sees the same room layout. Previously each client had its own independent local settings, causing mismatched chair counts and wrong skylines.</li>
+                            <li>👋 <strong>Late-joiner room sync</strong>: when a new participant joins, the host automatically pushes their current room config so the joiner renders the correct room immediately.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/7/2026 (151)</strong></p>
                         <ul class="mb-2">
                             <li>🎯 <strong>Interact range fixed</strong>: pressing <kbd>E</kbd> now uses per-target proximity — whiteboard only triggers within 2.2 m of the left wall, props within 2.5 m, chairs within 1.9 m. No more accidentally opening the whiteboard from across the room.</li>

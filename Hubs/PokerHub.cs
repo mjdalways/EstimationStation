@@ -369,6 +369,17 @@ public class PokerHub : Hub
         await Clients.OthersInGroup(roomName).SendAsync("ChairPositionsChanged", json);
     }
 
+    /// <summary>Broadcasts room-scene visual config (chair count, table shape, window view, etc.)
+    /// so all participants render the same room. Each client stores its own local copy.</summary>
+    public async Task BroadcastSceneConfig(string configJson)
+    {
+        if (string.IsNullOrEmpty(configJson) || configJson.Length > 4000) return;
+        if (RateLimited("sceneConfig", TimeSpan.FromMilliseconds(500))) return;
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        await Clients.OthersInGroup(roomName).SendAsync("SceneConfigUpdated", configJson);
+    }
+
     public async Task ReleaseChair()
     {
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
