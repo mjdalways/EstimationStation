@@ -54,7 +54,11 @@
     }
 
     function saveConfig() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.config));
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.config));
+        } catch (e) {
+            console.warn('[RoomScene] config not persisted (quota?)', e);
+        }
     }
 
     function esc(value) {

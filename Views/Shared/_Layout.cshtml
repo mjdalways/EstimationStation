@@ -1653,6 +1653,10 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/9/2026 (154)</strong></p>
+                        <ul class="mb-2">
+                            <li>🐛 <strong>Room scene bug fixes (P0)</strong>: large window-media uploads no longer crash silently when the local storage quota is exceeded; rebuilding the room while a custom video plays no longer leaves orphaned hidden <code>&lt;video&gt;</code> elements; the custom video window now fills the opening at the correct position (matching static images); upload help text now correctly reads "Images up to 600 KB, MP4 video up to 10 MB"; clicking your own chair to stand up is now a single code path; pressing <kbd>Esc</kbd> while capturing a key binding now cancels instead of binding Escape, and clicking away or re-clicking the button also cancels.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/7/2026 (153)</strong></p>
                         <ul class="mb-2">
                             <li>🎞️ <strong>Animated GIF window views</strong>: upload any animated GIF (up to 4 MB) as the room's window view. The browser animates the GIF natively and each frame is captured to a canvas texture every tick — space, storm, lava, fire, anything plays live behind the window glass. Static images still work as before; GIFs are detected automatically.</li>
@@ -2719,8 +2723,8 @@
                                         </select>
                                     </div>
                                     <div class="mt-1">
-                                        <input type="file" id="rs-window-image" accept="image/*,.mp4" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Upload a custom window image or animated MP4 (max 4 MB)" />
-                                        <div class="form-text small mt-1">Supports still images &amp; 🎞️ animated MP4s (max 4 MB)</div>
+                                        <input type="file" id="rs-window-image" accept="image/*,.mp4" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Images up to 600 KB, MP4 video up to 10 MB" />
+                                        <div class="form-text small mt-1">Images up to 600 KB, MP4 video up to 10 MB</div>
                                     </div>
                                 </div>
                                 <script>
@@ -2905,11 +2909,31 @@
                                         +'<span style="opacity:.7;font-size:.64rem;display:block;">'+a[1]+'</span><strong>'+window._rsKeyLabel(kb[a[0]])+'</strong></button>';
                                 }).join('');
                             };
+                            // Tracks an in-progress key capture so Escape, blur, or a second
+                            // click of the same button can cancel it cleanly.
+                            var _rsCapturing = null; // { btn, onKey, onBlur, prevLabel }
+                            function _rsCancelCapture(){
+                                if(!_rsCapturing) return;
+                                var s=_rsCapturing.btn.querySelector('strong');
+                                if(s) s.textContent=_rsCapturing.prevLabel;
+                                document.removeEventListener('keydown', _rsCapturing.onKey, true);
+                                _rsCapturing.btn.removeEventListener('blur', _rsCapturing.onBlur);
+                                _rsCapturing = null;
+                            }
                             window._rsCaptureKey = function(action, btn){
-                                var s=btn.querySelector('strong'); if(s) s.textContent='press…';
+                                // Clicking the button that's already capturing cancels it.
+                                if(_rsCapturing && _rsCapturing.btn === btn) { _rsCancelCapture(); return; }
+                                _rsCancelCapture();
+                                var s=btn.querySelector('strong');
+                                var prevLabel = s ? s.textContent : '';
+                                if(s) s.textContent='press a key (Esc cancels)';
                                 function onKey(e){
+                                    if(e.code === 'Escape') {
+                                        e.preventDefault(); e.stopPropagation();
+                                        _rsCancelCapture();
+                                        return;
+                                    }
                                     e.preventDefault(); e.stopPropagation();
-                                    document.removeEventListener('keydown', onKey, true);
                                     var code = e.code;
                                     var kb=Object.assign({}, (RoomScene.getConfig().keyBindings)||{});
                                     // Warn if the key is already assigned to a different action.
@@ -2919,7 +2943,7 @@
                                     });
                                     if(conflict) {
                                         if(!confirm('"'+window._rsKeyLabel(code)+'" is already used for "'+conflict+'". Reassign it here anyway?')) {
-                                            if(s) s.textContent = window._rsKeyLabel(kb[action])||'—';
+                                            _rsCancelCapture();
                                             return;
                                         }
                                         // Clear the old binding that used this key.
@@ -2929,15 +2953,19 @@
                                     var pageConflict = _RS_PAGE_KEYS[code];
                                     if(pageConflict) {
                                         if(!confirm('"'+window._rsKeyLabel(code)+'" is a page shortcut: '+pageConflict+'. It will still fire while in walk mode — consider a different key.')) {
-                                            if(s) s.textContent = window._rsKeyLabel(kb[action])||'—';
+                                            _rsCancelCapture();
                                             return;
                                         }
                                     }
                                     kb[action]=code;
+                                    _rsCapturing = null;
                                     RoomScene.updateConfig({ keyBindings: kb });
                                     window._rsRenderKeyBinds();
                                 }
+                                function onBlur(){ _rsCancelCapture(); }
                                 document.addEventListener('keydown', onKey, true);
+                                btn.addEventListener('blur', onBlur);
+                                _rsCapturing = { btn: btn, onKey: onKey, onBlur: onBlur, prevLabel: prevLabel };
                             };
                             window._rsResetKeyBinds = function(){
                                 RoomScene.updateConfig({ keyBindings:{ forward:'ArrowUp',back:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',jump:'AltLeft',crouch:'ControlLeft',interact:'KeyE',walk:'KeyT' } });

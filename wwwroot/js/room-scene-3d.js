@@ -39,6 +39,7 @@
     var _winGroup = null;   // active parent for window-scene primitives (group-local coords)
     var _winAnims = [];     // animated window elements (clouds, stars, sea…) updated in _tick
     var _gifTextures = [];  // animated GIF window textures: { img, canvas, ctx, tex } — updated every tick
+    var _videoTextures = []; // active <video> window textures: { video, tex } — disposed on rebuild
     var _wbBoard = null, _wbTex = null, _wbVer = -1;   // in-room whiteboard board mesh + live texture
     var _props = [];                 // interactive props: { mesh, action }
     var _storyScreenLabel = null;    // CSS2D label on the in-room story screen
@@ -291,6 +292,16 @@
             if (g.img && g.img.parentNode) g.img.parentNode.removeChild(g.img);
         });
         _gifTextures = [];
+        // Dispose any live <video> window textures from the previous build — otherwise
+        // each rebuild leaks a hidden playing <video> element + VideoTexture.
+        _videoTextures.forEach(function(v){
+            v.video.pause();
+            v.video.removeAttribute('src');
+            v.video.load();
+            if (v.video.parentNode) v.video.parentNode.removeChild(v.video);
+            v.tex.dispose();
+        });
+        _videoTextures = [];
 
         var wallCol = _wallColor(pal);
 
@@ -386,15 +397,16 @@
                 // 2. Combine the Geometry and the Material into a visible Mesh
                 const skylineMesh = new THREE.Mesh(skylineGeometry, skylineMaterial);
 
-                // 3. Position the Mesh behind the window
-                // You will need to tweak these XYZ coordinates to match your room's layout
-                skylineMesh.position.set(0, ROOM_H / 2, -4); // Example: Centered, halfway up, pushed back 5 units
+                // 3. Position the Mesh behind the window — same spot the static-image
+                // branch uses, so video and image fill the opening identically.
+                skylineMesh.position.set(0, cy, zb);
 
                 // Optional: If the video looks backwards, you can flip the plane around
                 // skylineMesh.rotation.y = Math.PI;
 
                 // 4. Add the Mesh to your scene (CRITICAL)
                 _scene.add(skylineMesh);
+                _videoTextures.push({ video: video, tex: skylineTexture });
 
                 // 4. Wait for data BEFORE playing
                 video.addEventListener('loadeddata', function () {
@@ -2802,13 +2814,7 @@
             if (myMesh) {
                 var myHit = _raycaster.intersectObject(myMesh, false);
                 if (myHit.length) {
-                    // Confirm stand-up only when seated (not already roaming).
-                    if (!_iAmRoaming) {
-                        releaseMySeat();
-                    } else {
-                        // Already roaming — just release the seat claim so they can pick another.
-                        releaseMySeat();
-                    }
+                    releaseMySeat();
                     return;
                 }
             }
@@ -3208,6 +3214,14 @@
             if (g.img && g.img.parentNode) g.img.parentNode.removeChild(g.img);
         });
         _gifTextures = [];
+        _videoTextures.forEach(function(v){
+            v.video.pause();
+            v.video.removeAttribute('src');
+            v.video.load();
+            if (v.video.parentNode) v.video.parentNode.removeChild(v.video);
+            v.tex.dispose();
+        });
+        _videoTextures = [];
         _walk = null; _keys = {}; _look = null;
         if (_renderer) {
             var el = _renderer.domElement;
