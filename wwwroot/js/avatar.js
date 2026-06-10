@@ -1,7 +1,40 @@
+// ── 3D avatar customization (P13) ────────────────────────────
+// Stored as a "||s3d:hat=...,eyes=...,tint=..." suffix appended to avatarData.
+// All 2D parsing below strips this suffix first, so existing avatar rendering
+// (initials/dicebear/robohash/unavatar/upload) is completely unaffected by it.
+var SCENE3D_MARKER = '||s3d:';
+var AVATAR3D_SETTINGS_KEY = 'es_avatar3dSettings';
+var DEFAULT_AVATAR3D_SETTINGS = { hat: 'none', eyes: 'round', useTeamColor: true, tint: '#5b8dee' };
+
+function getAvatar3dSettings() {
+    try {
+        var raw = localStorage.getItem(AVATAR3D_SETTINGS_KEY);
+        return Object.assign({}, DEFAULT_AVATAR3D_SETTINGS, raw ? JSON.parse(raw) : {});
+    } catch (e) { return Object.assign({}, DEFAULT_AVATAR3D_SETTINGS); }
+}
+
+function saveAvatar3dSettings(s) { localStorage.setItem(AVATAR3D_SETTINGS_KEY, JSON.stringify(s)); }
+
+function _stripScene3dSuffix(avatarData) {
+    if (!avatarData) return avatarData;
+    var idx = avatarData.indexOf(SCENE3D_MARKER);
+    return idx >= 0 ? avatarData.substring(0, idx) : avatarData;
+}
+
+function buildScene3dSuffix(s) {
+    if (!s) return '';
+    var parts = [];
+    if (s.hat && s.hat !== 'none') parts.push('hat=' + s.hat);
+    if (s.eyes && s.eyes !== 'round') parts.push('eyes=' + s.eyes);
+    if (!s.useTeamColor && s.tint) parts.push('tint=' + s.tint.replace('#', ''));
+    return parts.length ? (SCENE3D_MARKER + parts.join(',')) : '';
+}
+
 // ── URL generation ───────────────────────────────────────────
 
 function avatarDataToUrl(avatarData, size) {
     size = size || 64;
+    avatarData = _stripScene3dSuffix(avatarData);
     if (!avatarData) return null;
     var parts = avatarData.split(':');
     var provider = parts[0];
@@ -36,6 +69,7 @@ function avatarDataToUrl(avatarData, size) {
 
 function renderAvatar(avatarData, name, size) {
     size = size || 48;
+    avatarData = _stripScene3dSuffix(avatarData);
     var wrapper = document.createElement('div');
     wrapper.className = 'avatar-wrapper';
     wrapper.style.setProperty('--av-size', size + 'px');
@@ -360,11 +394,44 @@ function saveAvatarFromForm() {
     }
 
     saveAvatarSettings(s);
-    var avatarData = buildAvatarData(s);
+    var avatarData = (buildAvatarData(s) || '') + buildScene3dSuffix(getAvatar3dSettings());
     if (typeof connection !== 'undefined' && connection) {
-        connection.invoke('UpdateAvatar', avatarData).catch(function(e) { console.error(e); });
+        connection.invoke('UpdateAvatar', avatarData || null).catch(function(e) { console.error(e); });
     }
     updateAvatarPreview();
+}
+
+// ── 3D avatar customization (P13) — hat/eyes/tint for the room robot ──
+
+function populateAvatar3dForm() {
+    var s = getAvatar3dSettings();
+    var hatEl  = document.getElementById('rs-avatar-hat');
+    var eyesEl = document.getElementById('rs-avatar-eyes');
+    var tintEl = document.getElementById('rs-avatar-tint');
+    var teamEl = document.getElementById('rs-avatar-team-color');
+    if (hatEl)  hatEl.value  = s.hat;
+    if (eyesEl) eyesEl.value = s.eyes;
+    if (teamEl) teamEl.checked = !!s.useTeamColor;
+    if (tintEl) { tintEl.value = s.tint || '#5b8dee'; tintEl.disabled = !!s.useTeamColor; }
+}
+
+function saveAvatar3dFromForm() {
+    var hatEl  = document.getElementById('rs-avatar-hat');
+    var eyesEl = document.getElementById('rs-avatar-eyes');
+    var tintEl = document.getElementById('rs-avatar-tint');
+    var teamEl = document.getElementById('rs-avatar-team-color');
+    var s3d = {
+        hat: hatEl ? hatEl.value : 'none',
+        eyes: eyesEl ? eyesEl.value : 'round',
+        useTeamColor: teamEl ? teamEl.checked : true,
+        tint: tintEl ? tintEl.value : '#5b8dee'
+    };
+    saveAvatar3dSettings(s3d);
+    if (tintEl) tintEl.disabled = s3d.useTeamColor;
+    var avatarData = (buildAvatarData(getAvatarSettings()) || '') + buildScene3dSuffix(s3d);
+    if (typeof connection !== 'undefined' && connection) {
+        connection.invoke('UpdateAvatar', avatarData || null).catch(function(e) { console.error(e); });
+    }
 }
 
 function onAvatarFileChange(input) {

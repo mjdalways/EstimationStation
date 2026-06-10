@@ -132,18 +132,6 @@ function _syncRoomScene() {
     }
 }
 
-// Fields that are room-level (shared between all participants).
-// Personal prefs (keyBindings, walkCameraMode, dragMode, twoDStyle, windowImage) are intentionally excluded.
-var _SCENE_SHARED_FIELDS = ['preset','tableShape','tableSize','chairType','chairCount',
-    'floorMaterial','wallColor','tableMaterial','lighting',
-    'windowView','windowAnimated','windowTimeOfDay','whiteboard','plants',
-    'windowMediaId','windowMediaMime'];
-function _sharedSceneConfig(cfg) {
-    var out = {};
-    _SCENE_SHARED_FIELDS.forEach(function(k){ if (cfg && cfg[k] !== undefined) out[k] = cfg[k]; });
-    return out;
-}
-
 // ============================================================
 // SignalR Connection
 // ============================================================

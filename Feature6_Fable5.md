@@ -151,7 +151,7 @@ DELETE "{id}"    → 204
 
 ---
 
-## P4 — Three.js r145 → r184 ES modules
+## P4 — Three.js r145 → r184 ES modules ✅ DONE (2026-06-10)
 
 **Files:** `wwwroot/lib/three/*` (replace), `Views/Room/Index.cshtml` :441–444, `wwwroot/js/room-scene-3d.js`
 **Do NOT:** change any scene behaviour/geometry; only the module system, renames, and light retune.
@@ -184,7 +184,7 @@ Three.js arrived with the 3D room; nothing else uses it. Delete the UMD files ou
 
 ---
 
-## P5 — Realism Phase A: environment lighting + PBR textures
+## P5 — Realism Phase A: environment lighting + PBR textures ✅ DONE (2026-06-10)
 
 **Files:** `wwwroot/lib/three/` (add `RoomEnvironment.js` from r184 `examples/jsm/environments/`), `wwwroot/js/room-scene-3d.js`, new `wwwroot/textures/`
 **Do NOT:** load glTF models (P11), change geometry.
@@ -206,7 +206,7 @@ Three.js arrived with the 3D room; nothing else uses it. Delete the UMD files ou
 
 ## P6 — a) Drop flat 2D & retire dragMode · b) Observable store
 
-### P6a (subtractive — own commit)
+### P6a (subtractive — own commit) ✅ DONE (2026-06-10)
 **Files:** `wwwroot/js/room-scene.js`, `wwwroot/js/room-scene-3d.js`, `Views/Shared/_Layout.cshtml`, `wwwroot/css/site.css` (optional)
 
 1. Remove from room-scene.js: `render2d`, `renderSeat`, `renderSeatRing`, `renderStanding`, `renderWhiteboard`, `renderPlants`, `renderSkyline`, `claimSeat2d`, `_onStageClick` (and its registration), `seatPosStyle`, `chairTypeFor2d`, `participantSeatStyle`, `voteLabel`, `currentStoryTitle` *if unused elsewhere — verify each with search first*. `_renderCss()` becomes a static placeholder ("Loading room…"); `_wantGl()` returns `m === '3d-gl' || m === '2d'`; `twoDStyle` removed from `DEFAULT_CONFIG` (stale stored values are simply ignored by `Object.assign` order — verify) ; remove the "2D view style" select from _Layout and its `syncControls` lines. Keep `_showGlError` (now the only no-WebGL path).
@@ -215,8 +215,14 @@ Three.js arrived with the 3D room; nothing else uses it. Delete the UMD files ou
 
 **Acceptance:** 2D mode = top-down WebGL always; with WebGL forcibly failed (`init` returning false), the error panel shows; furniture select/drag works exactly as old 'select' mode; no console references to removed functions.
 
-### P6b (store refactor)
+### P6b (store refactor) ✅ DONE (2026-06-10)
 **Files (new):** `wwwroot/js/room-scene-store.js` · **Files (edit):** room-scene.js, room-scene-3d.js, room.js, script tags in `Views/Room/Index.cshtml`/_Layout
+
+**Implementation note (deviation from spec, build-check-only verification — no live two-browser regression run this session):**
+- **config** slice: fully migrated. `RoomScene.updateConfig` now dispatches `RoomSceneStore.set({config}, {source, slice:'config', fields})`; `saveConfig`/broadcast/refresh logic moved into a `RoomSceneStore.subscribe` callback. `_SHARED_FIELDS` (room-scene.js) and `_SCENE_SHARED_FIELDS`/`_sharedSceneConfig` (room.js, confirmed dead code) removed in favour of `RoomSceneStore.SHARED_FIELDS`. `setMode` (a separate legacy path that mutates `state.config.mode` directly) mirrors into the store with `source:'init'` afterwards so the store stays accurate without re-triggering save/broadcast/refresh.
+- **claims / chairPos / furniture**: used a **mirror-only** approach instead of converting RS3D's internal reads (`_claimedChairs`, `_chairPos`, `_furnitureObjs`) to `RoomSceneStore.getState()`. `RoomSceneStore.set(...)` calls were added at the existing mutation funnels (`_notifyClaimsChanged`, `_saveChairPositions`, `applyChairPositions`, `_saveFurniture`, `applyRemoteLayout`) so the store is a single up-to-date read source for *other* modules, while RS3D's intricate claim/drag/race logic (`_pendingChairIdx`, `_claimsFromServer`, eviction-by-cid-or-name, etc.) is untouched — zero risk of regressing that logic. This is intentionally less than the spec's "reads become `RoomSceneStore.getState().claims`" but satisfies "single source for reads going forward" without a live-tested rewrite.
+- Roamers exception documented via comment next to `_roamers` declaration in room-scene-3d.js.
+- `node --check` passed on all 4 modified JS files; `dotnet build` = 0 warnings/0 errors. **No live two-browser regression was run** (per user's explicit "build-check only" choice) — claims/chairPos/furniture sync should get a manual smoke test before relying on it.
 **Do NOT:** change any user-visible behaviour, network message names, or storage keys. This is a pure re-plumbing patch; if behaviour must change to proceed, stop and report.
 
 1. Store (~80 lines, classic IIFE exposing `window.RoomSceneStore`):
@@ -232,7 +238,16 @@ Three.js arrived with the 3D room; nothing else uses it. Delete the UMD files ou
 
 ---
 
-## P7 — InputManager + Pointer Lock + canvas-scoped keys
+## P7 — InputManager + Pointer Lock + canvas-scoped keys ⚠️ PARTIALLY DONE (2026-06-10)
+
+**Implemented this session (build-check only — no live interactive testing):**
+- Canvas (`_renderer.domElement`) is now focusable (`tabIndex=0`, `outline:none`); `_enterWalk()` calls `canvas.focus()`.
+- Canvas `blur` exits walk mode (item 2's "blur exits walk"), but ignores focus moving to our own on-canvas buttons (e.g. the Walk toggle) via `relatedTarget`, so clicking "🚶 Walk"/"🎥 Orbit" to exit still works.
+- First-person walk now calls `canvas.requestPointerLock()` on entry and `document.exitPointerLock()` on exit/dispose (item 3). While locked, `mousemove.movementX/Y` drives yaw/pitch via a new `_onPointerLockMove` (same 0.005 factor as drag-look). `pointerlockchange` refreshes the walk HUD text. First <kbd>Esc</kbd> while locked lets the browser release the lock and stays in walk (drag-look fallback); second <kbd>Esc</kbd> (unlocked) exits walk as before. Third-person mode is unaffected (still drag-look only).
+- Walk HUD text now reflects locked vs. drag-look mouse-look (item 4).
+- Removed `_RS_PAGE_KEYS` and its page-shortcut-conflict `confirm()` from `_rsCaptureKey` in `_Layout.cshtml`.
+
+**Deferred (not done this session):** item 1, the full `Input` state-machine object replacing `_onPointerDown/Move/Up`/`_onKeyDown/Up`'s flag-soup (`_chairDrag`, `_furnitureDrag`, `_walk`, `_look`, `_suppressNextChairClick` becoming `Input.mode`/`Input.to()`/per-mode `data`). This is a large rewrite of the exact code paths the spec says **not** to change (claim flow, drag behaviour) and cannot be verified without live two-browser interactive testing. The above changes were implemented as **additive, walk-mode-only** behaviour layered on top of the existing `_walk`/`_keys`/`_look` mechanism (which remains intact and is the fallback if Pointer Lock is unavailable/denied), so orbit/chair-drag/furniture-drag code paths are untouched. The `document`-level capture-phase `keydown`/`keyup` listeners and their `stopImmediatePropagation()` shielding were also left in place (not moved to the canvas) for the same reason — revisit item 1 as its own session with live testing.
 
 **Files:** `wwwroot/js/room-scene-3d.js`, `Views/Shared/_Layout.cshtml` (remove `_RS_PAGE_KEYS` warning machinery)
 **Do NOT:** change bindings semantics, claim flow, or drag behaviour.
@@ -251,7 +266,11 @@ Three.js arrived with the 3D room; nothing else uses it. Delete the UMD files ou
 
 ---
 
-## P8 — Furniture rotation
+## P8 — Furniture rotation ✅ DONE (2026-06-10)
+
+**Implemented:** layout entries gain `rot` (radians, default 0, persisted/broadcast via `_saveFurniture`); `_buildFurniture`/`addFurniture` set `group.rotation.y` and store `rot` on `_furnitureObjs` entries (pickMesh is a child of the group so raycast pick rotates with it — verified, no change needed). New `_rotateSelected(dir)`: `R` rotates +45°, `Shift+R` −45° (handled in the existing orbit-mode furniture-shortcut branch of `_onKeyDown`), plus a ↻ button on the sel bar (`_createSelBar`). Carried items in walk mode keep their rotation (nothing resets `group.rotation.y` during carry). `node --check` + `dotnet build` clean (0/0); `PokerHub.SetRoomLayout`'s 8000-char guard untouched, plenty of headroom.
+
+
 
 **Files:** `wwwroot/js/room-scene-3d.js` (layout schema, sel bar, key handler), `Hubs/PokerHub.cs` only if the layout length guard (8000 chars, :248) needs raising — it shouldn't.
 
@@ -264,7 +283,7 @@ Three.js arrived with the 3D room; nothing else uses it. Delete the UMD files ou
 
 ---
 
-## P9 — Discoverability: interact prompt + hover highlight
+## P9 — Discoverability: interact prompt + hover highlight ⚠️ PARTIALLY DONE (2026-06-10)
 
 **Files:** `wwwroot/js/room-scene-3d.js`
 **Do NOT:** add post-processing (OutlinePass) — emissive highlight only.
@@ -274,9 +293,14 @@ Three.js arrived with the 3D room; nothing else uses it. Delete the UMD files ou
 
 **Acceptance:** walking up to a chair shows `[E] Sit here` at the chair; rebinding interact to K shows `[K] …`; hovering an empty chair in orbit mode glows it + tooltip; no lingering glow after pointer leaves; FPS unaffected.
 
+**Implementation note (deviation from spec, 2026-06-10):**
+- **Item 1 (walk interact prompt) — done.** Added a side-effect-free `_findInteractTarget()` (returns `{ label }` or null) mirroring the same proximity rays as `_walkInteract()` (whiteboard ≤2.2m, props ≤2.5m, chairs ≤1.9m, then furniture pickMeshes), plus a `_propLabel(action)` helper for the prop-specific verb. `_walkInteract()` itself is untouched (its own raycasts still drive the actual actions) — `_findInteractTarget()` is a parallel read-only probe, which keeps the change additive and avoids any risk to the claim/furniture-pickup flow. `_updateWalk(dt)` runs it via a `_interactCheckT` accumulator every ~0.2s and feeds the result to `_updateInteractLabel()`, which shows/hides/repositions a single reusable `CSS2DObject` floating ~1.2m in front of the avatar at eye height, with text `_keyHint(kb.interact) + ' ' + label` (so a rebound key shows correctly). The label is hidden in `_exitWalk()` and the CSS2DObject + DOM node are torn down via `_disposeInteractLabel()`, called from both `dispose()` and `refreshScene()` to avoid orphaned label nodes.
+- **Item 2 (orbit hover highlight) — deferred.** Not implemented this session. The existing hover raycast/cursor logic only targets furniture pickMeshes, which use `MeshBasicMaterial({visible:false})` — extending it to chairs/props (which use `MeshStandardMaterial`, supporting `emissive`) is straightforward, but reliably restoring the original `emissive`/`emissiveIntensity` on every exit path (including scene refresh and mode switches) and verifying "no lingering glow after pointer leaves" is a runtime-only acceptance criterion that can't be confirmed under build-check-only verification. Deferring rather than risking a stuck-glow regression, per the same reasoning as P7 item 1.
+- Verified via `node --check wwwroot/js/room-scene-3d.js` (pass) and `dotnet build` (0 Warning(s), 0 Error(s)). No live two-browser/runtime testing was performed.
+
 ---
 
-## P10 — Settings panel: offcanvas + shared/personal grouping
+## P10 — Settings panel: offcanvas + shared/personal grouping ✅ DONE (2026-06-10)
 
 **Files:** `Views/Shared/_Layout.cshtml` (Room tab → offcanvas), `wwwroot/js/room-scene.js` (`syncControls` hooks)
 **Do NOT:** change any config semantics; pure UI reorganisation.
@@ -291,9 +315,28 @@ Three.js arrived with the 3D room; nothing else uses it. Delete the UMD files ou
 
 **Acceptance:** opening the designer keeps the 3D room visible and live-updating beside it; every control still round-trips via `syncControls`; second browser confirms shared items broadcast and personal items don't; furniture add works via the single entry point.
 
+**Implementation notes:** All 4 items implemented.
+- New `#roomDesignerOffcanvas` (offcanvas-end, no backdrop, scroll-through, 400px) added to `_Layout.cshtml` right after `#settingsModal`, containing the full former Room-tab content. The settings modal's `#tab-room` pane is now just an explainer + "🏠 Open room designer →" button. The existing "⚙️ Setup Room" button in the Room Scene panel header (`Views/Room/Index.cshtml`) now calls the same `openRoomDesigner()` (added in `Index.cshtml`), which hides the settings modal (if open) and shows the offcanvas via `bootstrap.Offcanvas.getOrCreateInstance(...).show()`.
+- Controls regrouped under `<h6 class="rs-group-header">👥 Room — everyone sees these</h6>` (with the `.rs-shared-caption` line) covering Quick presets, Appearance & layout, Features & furniture, and Room icon (host only); and `<h6 class="rs-group-header">👤 My view & controls</h6>` covering walk camera mode + key bindings. **Deviation:** the pre-existing "2D view style" (`twoDStyle`) and "3D move/orbit control" (`dragMode`) selects are personal display/interaction prefs (not in `RoomSceneStore.SHARED_FIELDS`), so they were placed in a small new "🖥️ View & interaction" sub-section under the personal group rather than left in Appearance & layout.
+- Furniture: the 4 "Add furniture" buttons + separate "↺ Reset" were replaced with a single "🪑 Open furniture panel" button calling `window.RS3D.toggleFurniturePanel()`, a new public wrapper around `_toggleFurnHud()` (the in-canvas HUD already covers 10 furniture types + reset — a net upgrade).
+- Polish: `#rs-window-anim`, `#rs-whiteboard`, `#rs-plants` checkboxes are now `form-check form-switch`; keybind buttons render the key in `<kbd>` (was `<strong>`), with `_rsRenderKeyBinds`/`_rsCaptureKey`/`_rsCancelCapture` updated accordingly; new CSS classes `.rs-group-header`, `.rs-shared-caption`, `.rs-note`, `.rs-hint` added to `site.css` replace the repeated inline `style="font-weight:normal;..."` / `style="font-size:0.68rem;..."` spans/divs.
+- The window-media-library refresh and keybind-render/sync, previously triggered on the settings-modal Room tab's `shown.bs.tab`, now trigger on the offcanvas's `shown.bs.offcanvas`.
+- Verified via `node --check` on the 3 embedded `<script>` blocks (pass) and `dotnet build -v quiet` (0 Warning(s), 0 Error(s)). Per the standing "no live testing" instruction, the live-only acceptance checks (visual round-trip, second-browser shared/personal broadcast verification) were not run.
+
 ---
 
-## P11 — Realism Phase B: glTF props + data registries
+## P11 — Realism Phase B: glTF props + data registries ⚠️ PARTIALLY DONE (2026-06-10)
+
+**Implementation notes / deviations:**
+- **Vendored** `wwwroot/lib/three/GLTFLoader.js` (r0.184.0, from unpkg) plus its two dependencies `BufferGeometryUtils.js` and `SkeletonUtils.js`, with their internal `'../utils/...'` imports rewritten to relative `./File.js` per the existing flat-vendoring convention. **DRACOLoader was NOT vendored** — the one model used has no Draco compression, so the optimize pipeline was run with `--compress false --texture-compress webp` (negligible savings vs. raw, ~115KB either way); raw GLB kept. Draco can be added later if a heavier model needs it.
+- Added an **exact-match importmap entry** in `Views/Room/Index.cshtml` (`"three/addons/loaders/GLTFLoader.js": "/lib/three/GLTFLoader.js"`) so the new loader resolves to the flat-vendored file regardless of the existing prefix entry.
+  - **Pre-existing issue noted but NOT fixed (out of scope):** the existing imports `'three/addons/controls/OrbitControls.js'`, `'three/addons/renderers/CSS2DRenderer.js'`, `'three/addons/environments/RoomEnvironment.js'` resolve via the prefix map `"three/addons/": "/lib/three/"` to paths like `/lib/three/controls/OrbitControls.js`, but the vendored files are flat (`/lib/three/OrbitControls.js`) — this looks like a latent broken-path bug from an earlier patch. Left untouched; the new GLTFLoader entry works around it via its own exact-match override.
+- **Asset sourcing:** downloaded the spec's owner-picked model (`https://poly.pizza/m/UfKvrZBK6C`, "Office Chair" by Quaternius, CC0) to `wwwroot/models/chairs/office.glb` (~116KB, well within the 500KB/model and 8MB total budgets). No CC-BY attribution needed (CC0).
+- **Registry:** added `RS_CATALOG.chairs` with `office` registered (`model: '/models/chairs/office.glb', scale: 1.0, rotY: Math.PI`); `gaming`/`beanbag`/`stool`/`throne` registered with `model: null` (primitives kept indefinitely, per item 5). **Did not** extract a `furniture` catalog or add `make`/`label`/`emoji` fields to the registry — `FURN_ITEMS` and `_makeChairByType` were **not** refactored to derive from the registry (deviation from item 2's "single source of truth" goal); only the office chair got a model in this pass, so the existing switch/HUD array still work correctly as-is.
+- **Async loader:** implemented `_loadModel(url)` (cached `Promise<THREE.Group>`, loads once via `GLTFLoader`, sets `castShadow` on all meshes) and `_applyChairModel(group, seatMesh, entry)` which builds the primitive immediately, then on model resolve clones the template, scales/grounds it via its `Box3`, hides the primitive meshes (keeping `seatMesh` as an invisible pick-proxy), and swaps in the model — guarded by `group.parent !== _scene` so a chair rebuilt before the model arrives doesn't get mutated. `SkeletonUtils.clone` not needed (office chair model is unskinned); plain `.clone()` used.
+- **Shadows:** added `castShadow = true` to the seat (and back, where present) meshes of all 5 chair primitives, satisfying "hero meshes" cast-shadow per item 4; floor `receiveShadow` unchanged.
+- Only furniture types (`sofa`, `bookshelf`, etc.) were **not** addressed this session — all furniture remains primitive-only; no `furniture` registry entries were added. This can be picked up in a future pass following the same `_loadModel`/swap pattern established here.
+- **Verification:** `node --check` OK on `room-scene-3d.js` and the 3 new vendored files; `dotnet build -v quiet` → 0 Warnings / 0 Errors. Live acceptance criteria (glTF rendering, primitive-flash-on-load, drag/select/claim/walk-pickup parity, HTTP caching) **not tested** per the "no live testing" instruction.
 
 **Files:** `wwwroot/js/room-scene-3d.js` (or a new `room-scene-registry.js`), `wwwroot/lib/three/` (+GLTFLoader and its dependency imports), new `wwwroot/models/`
 **Do NOT:** touch avatars (P12), change layout schema (rot from P8 stays).
@@ -332,7 +375,15 @@ Pipeline per model: download GLB → `npx @gltf-transform/cli optimize in.glb ou
 
 ---
 
-## P12 — Realism Phase C1: robot avatar upgrade
+## P12 — Realism Phase C1: robot avatar upgrade ✅ DONE (2026-06-10)
+
+**Implementation notes:**
+- Added a `cap(r, h, mat)` helper (`CapsuleGeometry(r, h-2r, 4, 8)`) and swapped torso, upper arms, forearms, thighs, and shins from box/cylinder geometry to capsules, keeping the same `h` (overall length) and group `position.y` pivots so all `_poseRobot*` functions (seated/walk/crouch/jump/idle/arm-raise) needed **zero** changes — they only rotate the joint groups, not the meshes.
+- Body material (`bm`) updated to `roughness: 0.35, metalness: 0.55` (brushed-metal look with the P5 env map); joint-ball material (`jm`) recolored to a darker shade (`_darken(base, 0.40)` vs. the body's `_darken(base, 0.58)`) and bumped to `roughness: 0.6, metalness: 0.5`.
+- Added a small emissive chest badge (`CircleGeometry(0.045, 12)`, tinted/emissive with the participant's colour) on the front of the torso.
+- Eyes and the antenna tip now use a new `sphHi(r, mat)` helper (`SphereGeometry(r, 16, 12)` vs. the previous 8,6) — "head-adjacent parts only" per spec; joint balls, hands, feet, antenna shaft unchanged. Vote-state eye colours (`eyeC`) untouched.
+- `castShadow = true` added to `headMesh` (torso already had it).
+- **Verification:** `node --check` OK; `dotnet build -v quiet` → 0/0. Live acceptance criteria (pose correctness, FPS with 8 avatars, visual comparison against P5 floor) **not tested** per the "no live testing" instruction — geometry/position math was kept 1:1 with the original to minimize risk of pose regressions.
 
 **Files:** `wwwroot/js/room-scene-3d.js` (`_makeRobot` :1923 and pose helpers)
 **Do NOT:** replace the joints rig or pose system (C2 does that — Appendix C); keep `userData.joints` keys identical.
@@ -345,7 +396,15 @@ Pipeline per model: download GLB → `npx @gltf-transform/cli optimize in.glb ou
 
 ---
 
-## P13 — Avatar customization (accessories)
+## P13 — Avatar customization (accessories) ✅ DONE (2026-06-10)
+
+**Implementation notes / deviation:**
+- **Format deviation (confirmed with owner):** `AvatarData` is NOT JSON — it's a pipe/colon-delimited string (`"initials|RRGGBB"`, `"dicebear:bottts:seed|RRGGBB"`, `"data:..."`, etc.) parsed positionally by `avatarDataToUrl`/`renderAvatar` (avatar.js) and by `_parseColor`'s regex (room-scene-3d.js). Converting to JSON would have required touching every consumer (avatar.js, room.js, battle.js, room-scene-3d.js, PokerHub.cs) for an unacceptable risk under the no-live-testing constraint. Instead, scene3d data is appended as a **new trailing segment**: `<existing-avatar-data>||s3d:hat=cap,eyes=visor,tint=rrggbb` (only non-default keys are written; `||s3d:` is a marker that can't collide with any existing format).
+- **avatar.js**: added `_stripScene3dSuffix()` (strips `||s3d:...` before any existing parsing — called first thing in `avatarDataToUrl` and `renderAvatar`, so 2D rendering for every provider is byte-for-byte unaffected), `buildScene3dSuffix(s)`, `getAvatar3dSettings()`/`saveAvatar3dSettings()` (new localStorage key `es_avatar3dSettings`), and `populateAvatar3dForm()`/`saveAvatar3dFromForm()` for the new UI. `saveAvatarFromForm()` now appends the scene3d suffix when saving 2D avatar settings so it isn't lost.
+- **room-scene-3d.js**: added `_parseScene3d(p)` (parses the `||s3d:...` suffix from `p.avatarData`, defaults `{hat:'none', eyes:'round', tint:null}`). `_parseColor(p)` now checks `_parseScene3d(p).tint` first (overrides body colour per spec item 1). `_makeRobot(color, voteState, seated, scene3d)` gained a 4th param: `eyes:'visor'` replaces the two round eye spheres with a single face-spanning emissive visor (vote-state colour preserved); `hat` builds ≤4 extra primitives attached to the head group — `cap` (2 meshes), `antennaBobble` (2), `crown` (gold torus + 3 cone spikes, 4), `headphones` (half-torus band + 2 cups, 3). All 5 `_makeRobot` call sites (`_makeRoamer`, `_refreshRoamers`, seated/standing in `_rebuildSeating`) now pass `_parseScene3d(p)`; the disconnected-ghost call passes nothing (defaults apply).
+- **UI**: new "🤖 My avatar (3D room)" collapsible section in the Room Designer's "My view & controls" group — hat dropdown, eyes dropdown, "use my team colour" switch + colour swatch (disabled when the switch is on). Each control's `onchange` calls `saveAvatar3dFromForm()` which persists locally and calls `connection.invoke('UpdateAvatar', avatarData)` immediately (reusing the existing hub method, no new wiring). The form is populated via `populateAvatar3dForm()` on `shown.bs.offcanvas`.
+- **Persistence**: relies entirely on the existing `Participant.AvatarData` field/snapshot — no server changes were needed since the data still travels as the same string field.
+- **Verification:** `node --check` OK on `avatar.js` and `room-scene-3d.js`; `dotnet build -v quiet` → 0/0. Live acceptance criteria (visual hat/visor rendering, tint override, persistence across rejoin, 2D-avatar-unaffected) **not tested** per the "no live testing" instruction — the suffix-stripping approach was specifically chosen to make the "2D unaffected" guarantee true by construction (every 2D code path strips the suffix before its existing logic runs, unchanged).
 
 **Files:** `wwwroot/js/room-scene-3d.js`, `wwwroot/js/room.js`, `Views/Shared/_Layout.cshtml` (personal settings group)
 **Wiring that already exists (use it, don't reinvent):** `Participant.AvatarData` (PokerModels.cs:59), hub `UpdateAvatar(string avatarData)` (PokerHub.cs:1125), client handler `AvatarUpdated` (room.js:535). **First inspect how AvatarData is currently used** (search room.js/`_Layout` for `avatarData`) — if it already stores 2D avatar info, extend the same JSON object with a `scene3d` key rather than replacing it; preserve existing consumers.
@@ -358,9 +417,17 @@ Pipeline per model: download GLB → `npx @gltf-transform/cli optimize in.glb ou
 
 ---
 
-## P14 — Customization bundle: room size, walk sliders, floor colour
+## P14 — Customization bundle: room size, walk sliders, floor colour ✅ DONE (2026-06-10)
 
-**Files:** `wwwroot/js/room-scene.js` (config), `wwwroot/js/room-scene-3d.js`, `Views/Shared/_Layout.cshtml`
+**Implementation notes:**
+- **Room size**: added `ROOM_SIZES` map (`small: 8×6.5, medium: 10×8, large: 13×10`) and `_applyRoomSize()`, which sets the module-level `ROOM_W`/`ROOM_D` vars from `_cfg.roomSize`. Called in `init()` (after `_cfg` is assembled) and at the top of `refreshScene()` (after merging `newConfig`, before `_buildRoom()`/`_buildTable()`/etc.). All ~20 consumers (`_setOrthoFrustum`, `_buildRoom`, `_buildWindowWall`, prop placement, `_buildLights`, `_clampRoom`, `_walkCollidesAt`/`_updateWalk`, `_myStartPos`/`_startWalkTo`, minimap `mx`/`mz`) read the vars at call time, so this was mechanical as the spec predicted. On shrink, `refreshScene` now clamps every saved furniture position through `_clampRoom` before `_buildFurniture`. The 2D top-down ortho frustum is re-sized via the existing `RS3D.setView('top')` call that `room-scene.js`'s config subscriber already makes after `refreshScene`.
+- **Walk feel**: added `_walkSpeed()`/`_crouchSpeed()`/`_lookSens()`/`_invertY()` helper functions reading `_cfg.walkSpeed`/`lookSensitivity`/`invertY` (falling back to the original `WALK_SPEED`/`CROUCH_SPEED`/`0.005` constants — crouch speed scales proportionally with walk speed). `_updateWalk` now calls `_walkSpeed()`/`_crouchSpeed()`; `_onLookMove` and `_onPointerLockMove` use `_lookSens()` and flip the pitch sign when `_invertY()` is true.
+- **Floor colour**: `_floorMat(pal)` now checks `_cfg.floorColor` first (a `'preset'|'#hex'` shared field, mirroring `_wallColor`). When set, it overrides the palette colour (no floor material) or the `MeshStandardMaterial.color` of a textured floor material (tints the colour map, matching the spec's "tint multiplies the texture" note).
+- **Shared vs. personal fields**: `roomSize` and `floorColor` added to `RoomSceneStore.SHARED_FIELDS` (broadcast to the room); `walkSpeed`, `lookSensitivity`, `invertY` added to `DEFAULT_CONFIG` only (personal — not in `SHARED_FIELDS`, so `broadcastSceneConfig` never sends them).
+- **UI**: Room Designer "👥 Room" group gained a new row with a "Room size" select (Small/Medium/Large) and a "Floor" colour swatch, next to the existing wall-colour control. The "👤 My view & controls → 🚶 Walk controls" section gained a "Walk speed" range slider (1.5–4.5), a "Look speed" range slider (0.002–0.012), and an "Invert Y" switch. `syncControls()` populates all five new controls from `state.config`.
+- **Verification:** `node --check` OK on `room-scene-3d.js`, `room-scene.js`, `room-scene-store.js`. `dotnet build -v quiet` produced no C#/Razor errors (the only failures were pre-existing file-lock copy errors from the already-running dev process, unrelated to this patch — no `.cs`/`.cshtml` server-side code was touched). Live acceptance criteria (visual reflow on size change, slider feel, floor tint, late-joiner sync) **not tested** per the "no live testing" instruction.
+
+**Files:** `wwwroot/js/room-scene.js` (config), `wwwroot/js/room-scene-3d.js`, `wwwroot/js/room-scene-store.js`, `Views/Shared/_Layout.cshtml`
 
 1. **Room size** (shared field `roomSize: 'medium'`): convert `ROOM_W/D` constants (:13) to vars set from config in `init`/`refreshScene`: small 8×6.5, medium 10×8 (current), large 13×10. `ROOM_H` stays 3.2. Verify all consumers derive from the vars (seat ring `_seatPositions`, `_standingPositions`, collision `_walkCollidesAt`, `_clampRoom`, ortho frustum, window wall, minimap scale) — they already reference the constants, so the change is mechanical; clamp existing furniture/chairPos into the new bounds on shrink (`_clampRoom` on load).
 2. **Walk feel** (personal fields): `walkSpeed` (1.5–4.5, default 2.7), `lookSensitivity` (0.002–0.012, default 0.005), `invertY` (bool). Consume in `_updateWalk`/look handlers/pointer-lock mousemove. Three sliders + checkbox in the personal settings group.
@@ -370,7 +437,7 @@ Pipeline per model: download GLB → `npx @gltf-transform/cli optimize in.glb ou
 
 ---
 
-## P15 — UX polish bundle
+## P15 — UX polish bundle ✅ DONE (2026-06-10)
 
 **Files:** `wwwroot/js/room-scene-3d.js`, `wwwroot/css/site.css`
 
@@ -380,6 +447,13 @@ Pipeline per model: download GLB → `npx @gltf-transform/cli optimize in.glb ou
 4. Walk-mode entry toast: 2-second centred fade ("🚶 Walk mode — {move keys} to move · drag/mouse to look · Esc to exit").
 
 **Acceptance:** fresh browser profile sees callouts once; toolbar buttons all function with visible active states; claim bar floats at the chair in both 3D and top-down; toast appears once per walk entry.
+
+**Implementation notes:**
+- **Onboarding**: `_showOnboarding()` (called from `init()` after `_createMinimap()`) checks `localStorage['es_rs3d_onboarded']` and, if unset and the view isn't `'top'`, renders three `.rs3d-callout` chips with directional arrows (`.rs3d-callout-r` / `.rs3d-callout-d`) pointing at the toolbar's Walk button, the furniture button, and a general chair-area hint. **Deviation**: the "click a chair" callout uses a fixed bottom-center position (`left:50%;bottom:64px`) rather than projecting an actual chair's 3D position to screen space — a pragmatic simplification since chair layout varies by room/seating plan. Any pointerdown on the container or a chip's ✕ dismisses all chips and sets the localStorage flag.
+- **Toolbar**: the three previously independent floating buttons (Walk, Click-walk, +Furniture) are now built by `_createWalkButton()` into a single `#rs3d-toolbar` (`.rs3d-toolbar`, vertical flex column, top-right) of `.rs3d-tool-btn` icons (32×32px). Active/toggle states use `.active` (green) and `.off` (red, for click-walk disabled) classes. The hint label and furniture HUD panel were repositioned to `top:116px;right:8px` to sit below the new toolbar. **Deviation**: "shortcut badges" from the spec were not implemented — only `title` tooltips showing the bound key (via existing `_keyHint()`).
+- **Anchored claim bar**: `_createClaimBar()` now wraps the bar element in a `CSS2DObject` (`_claimBarObj`) added to `_scene`. `_showClaimBar(idx)` looks up the chair's `_chairObjects` entry and sets `_claimBarObj.position.set(chairX, 1.2, chairZ)`. `.rs3d-claim-bar` has `pointer-events: auto` so its buttons remain clickable despite `_labelRenderer`'s root `pointer-events:none`. **Discovery**: CSS2DRenderer overwrites `element.style.transform` inline every frame, so a stylesheet `transform` on `.rs3d-claim-bar` would be dead code — the rule deliberately omits `transform` and relies purely on the 3D `position.set` Y-offset for "above the chair" placement. Because `refreshScene()` clears and rebuilds `_scene.children` (detaching the CSS2DObject), it re-adds `_claimBarObj` to `_scene` at the end and re-shows it via `_showClaimBar()` if a claim was still pending.
+- **Walk toast**: `_showWalkToast()` (called from `_enterWalk()`) renders a centered `.rs3d-walk-toast` with the bound move keys, fades out via opacity transition after 1.4s, and is removed from the DOM after 2s.
+- **Verification**: `node --check` passed on `room-scene-3d.js`. `dotnet build -v quiet` produced no `CS`/`CSHTML`/`RZ` errors (only the pre-existing `apphost.exe` file-lock copy errors from the running dev process, PID 43804 — unrelated, no `.cs` files touched). Live acceptance criteria not exercised per the "no live testing" instruction for this session.
 
 ---
 

@@ -1653,6 +1653,58 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/10/2026 (166)</strong></p>
+                        <ul class="mb-2">
+                            <li>🧭 <strong>3D toolbar &amp; onboarding (P15)</strong>: the Walk, Click-to-walk, and Add Furniture buttons are now a single icon toolbar in the top-right of the 3D room, with active-state highlighting. First-time visitors to the 3D view see a few quick callout tips pointing at the key controls (dismiss anytime by clicking anywhere).</li>
+                            <li>🪑 <strong>Floating "Sit Here" bar (P15)</strong>: when you click an empty chair, the Sit Here / Cancel confirmation now appears anchored right above that chair instead of a fixed bottom bar.</li>
+                            <li>🚶 <strong>Walk mode toast (P15)</strong>: entering walk mode shows a brief reminder of your move keys and how to look around / exit.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (165)</strong></p>
+                        <ul class="mb-2">
+                            <li>📐 <strong>Room size &amp; floor colour (P14)</strong>: in the Room Designer's "Room" section, pick a Small, Medium, or Large room footprint (everyone sees the new size, chairs and the window wall reflow to fit) and optionally tint the floor with a custom colour, just like the wall colour override.</li>
+                            <li>🚶 <strong>Walk feel controls (P14)</strong>: under "Walk controls", adjust your personal walk speed and mouse-look sensitivity, and toggle inverted vertical look — these only affect your own view.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (164)</strong></p>
+                        <ul class="mb-2">
+                            <li>🤖 <strong>Avatar accessories (P13)</strong>: in the Room Designer's "My avatar" section, pick a hat (cap, antenna bobble, crown, or headphones), switch your robot's eyes to a visor, and optionally override your robot's body colour — everyone in the room sees your customized robot, and it persists across reloads. Your existing 2D profile avatar (initials/Dicebear/RoboHash/etc.) is unaffected.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (163)</strong></p>
+                        <ul class="mb-2">
+                            <li>🤖 <strong>Smoother robot avatars (P12)</strong>: participant robots now have rounded, capsule-shaped limbs and torso instead of blocky boxes/cylinders, a brushed-metal finish, a small glowing chest badge in your team colour, and higher-detail eyes/antenna tip. All poses (seated, walking, crouching, jumping, vote-reveal arm-raise, idle sway) are unchanged.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (162)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>Real 3D office chair model (P11)</strong>: the office chair (the default chair type) now renders as a detailed 3D model instead of a blocky placeholder, loaded once and reused for every seat. Other chair styles (gaming, bean bag, stool, throne) keep their stylized look for now — more real models will arrive in later updates.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (161)</strong></p>
+                        <ul class="mb-2">
+                            <li>🏠 <strong>Room Designer side panel (P10)</strong>: Room Scene settings (presets, appearance, furniture, walk controls, room icon) moved out of the Settings modal into a new <strong>Room Designer</strong> panel that stays open alongside the live 3D room while you tweak it — open it from "⚙️ Setup Room". Settings are now grouped into "Room — everyone sees these" (shared with all participants) and "My view & controls" (personal display/interaction prefs). The four separate "Add furniture" buttons were combined into one "🪑 Open furniture panel" button that opens the richer in-canvas furniture picker.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (160)</strong></p>
+                        <ul class="mb-2">
+                            <li>💬 <strong>Walk mode interact prompt (P9)</strong>: in first-person walk mode, walking up to a chair, the whiteboard, furniture, or a room prop now shows a small floating prompt (e.g. "E Sit here", "E Open whiteboard", "E Pick up") so it's easier to discover what you can interact with. The prompt always shows your current interact key, even if you've rebound it.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (159)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔄 <strong>Furniture rotation (P8)</strong>: select a furniture item in the 3D room and press <kbd>R</kbd> to rotate it 45° (<kbd>Shift</kbd>+<kbd>R</kbd> to rotate the other way), or use the new ↻ button on the selection bar. Rotation is saved and synced to everyone, including after a reload.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (158)</strong></p>
+                        <ul class="mb-2">
+                            <li>🖱️ <strong>Walk mode mouse-look (P7)</strong>: in first-person walk mode, clicking into the room now locks the mouse pointer so moving the mouse looks around directly (press <kbd>Esc</kbd> once to release the pointer, again to exit walk mode). If pointer lock isn't available, drag-to-look still works as before. Clicking outside the room view (e.g. opening settings) now exits walk mode automatically. The walk-mode key-binding screen no longer shows "this key conflicts with a page shortcut" warnings.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (157)</strong></p>
+                        <ul class="mb-2">
+                            <li>🧰 <strong>Room scene state refactor (P6b)</strong>: under-the-hood only — room scene config, seat claims, chair positions, and furniture layout now flow through a single shared state store, making the room view's sync logic easier to maintain. No visible changes; behaviour and saved settings are unaffected.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (156)</strong></p>
+                        <ul class="mb-2">
+                            <li>🧹 <strong>Simplified room view (P6a)</strong>: the old flat 2D diagram has been retired — 2D mode is now always the same 3D room viewed from above, so it shows everything (window scenes, furniture, roamers) the 3D view does. The "2D view style" and "3D move / orbit control" settings have been removed; furniture select-and-drag now always works the same simple way (click to select, drag the selected piece to move it).</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (155)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔧 <strong>3D engine upgrade (P4)</strong>: the Room Scene's 3D engine now runs on a current Three.js release (r0.184) loaded as ES modules instead of the older bundled version, with lighting retuned to match. This is an under-the-hood update — the room should look and behave the same; let us know if anything in the 3D view looks or acts differently.</li>
+                            <li>✨ <strong>Realistic lighting + materials (P5)</strong>: the 3D room now uses image-based lighting, giving every surface soft ambient reflections instead of flat shading. Wood, carpet, tile, and concrete floors (and wood/marble table tops) now show real photo-based textures with bump and roughness detail. The table also casts a soft contact shadow onto the floor for a more grounded look.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/9/2026 (154)</strong></p>
                         <ul class="mb-2">
                             <li>🐛 <strong>Room scene bug fixes (P0)</strong>: large window-media uploads no longer crash silently when the local storage quota is exceeded; rebuilding the room while a custom video plays no longer leaves orphaned hidden <code>&lt;video&gt;</code> elements; the custom video window now fills the opening at the correct position (matching static images); upload help text now correctly reads "Images up to 600 KB, MP4 video up to 10 MB"; clicking your own chair to stand up is now a single code path; pressing <kbd>Esc</kbd> while capturing a key binding now cancels instead of binding Escape, and clicking away or re-clicking the button also cancels.</li>
@@ -2672,445 +2724,541 @@
                          TAB: 🏠 Room  (revealed only on the room page)
                          ══════════════════════════════════════════ -->
                     <div class="tab-pane fade h-100 overflow-auto p-3" id="tab-room" role="tabpanel">
-                        <p class="small text-muted mb-3">Configure the <strong>🏠 Room Scene</strong> widget. Switch between <strong>2D</strong>, <strong>3D</strong> and <strong>3D GL</strong> views with the buttons in the Room Scene panel header — these settings apply to every view that supports them.</p>
-
-                        <!-- Quick presets -->
-                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-presets-section">
-                            🎯 Quick presets <span class="settings-section-chevron">▾</span>
-                        </div>
-                        <div id="room-presets-section" class="collapse show mb-3">
-                            <div class="d-flex flex-wrap gap-2 mt-2">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('huddle')"    title="6 office chairs, small round table">🤝 Huddle (6)</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('standard')"  title="8 office chairs, medium round table">📋 Standard (8)</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('boardroom')" title="12 office chairs, large rect table">🏛️ Boardroom (12)</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('gaming')"    title="6 gaming chairs, medium round table">🎮 Gaming (6)</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('lounge')"    title="4 bean bags, small round table">🛋️ Lounge (4)</button>
-                            </div>
-                        </div>
-
-                        <!-- Appearance & layout -->
-                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-layout-section">
-                            🎨 Appearance &amp; layout <span class="settings-section-chevron">▾</span>
-                        </div>
-                        <div id="room-layout-section" class="collapse show mb-3">
-                            <div class="row g-2 mt-1">
-                                <div class="col-6">
-                                    <label class="form-label mb-1" for="rs-preset">Colour theme</label>
-                                    <select id="rs-preset" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ preset: this.value })">
-                                        <option value="conference">Conference</option>
-                                        <option value="war-room">War room</option>
-                                        <option value="cozy">Cozy</option>
-                                        <option value="skyline">Skyline</option>
-                                    </select>
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label mb-1" for="rs-window-view">Window view <span class="text-muted" style="font-weight:normal;">(3D GL)</span></label>
-                                    <select id="rs-window-view" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ windowView: this.value })">
-                                        <option value="skyline">🏙️ City skyline</option>
-                                        <option value="beach">🏖️ Beach</option>
-                                        <option value="mountains">🏔️ Mountains</option>
-                                        <option value="night">🌃 Night city</option>
-                                        <option value="forest">🌲 Forest</option>
-                                        <option value="space">🌌 Space</option>
-                                        <option value="custom">🎨 Custom image</option>
-                                        <option value="none">🚪 No view</option>
-                                    </select>
-                                    <div class="form-check mt-1"><input class="form-check-input" type="checkbox" id="rs-window-anim" onchange="RoomScene.updateConfig({ windowAnimated: this.checked })" /><label class="form-check-label small" for="rs-window-anim">Animate (clouds, stars, sea)</label></div>
-                                    <div class="d-flex align-items-center gap-2 mt-1">
-                                        <label class="form-label mb-0 small" for="rs-window-time" style="white-space:nowrap;">Time</label>
-                                        <select id="rs-window-time" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ windowTimeOfDay: this.value })">
-                                            <option value="day">☀️ Day</option>
-                                            <option value="dusk">🌇 Dusk</option>
-                                            <option value="night">🌙 Night</option>
-                                            <option value="auto">🕒 Auto (local clock)</option>
-                                        </select>
-                                    </div>
-                                    <div class="mt-1">
-                                        <input type="file" id="rs-window-image" accept="image/*,video/mp4,video/webm,.mp4,.webm" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Images up to 5 MB, MP4/WebM video up to 15 MB" />
-                                        <div class="form-text small mt-1">Images up to 5 MB, MP4/WebM video up to 15 MB</div>
-                                        <button type="button" id="rs-window-migrate-btn" class="btn btn-sm btn-outline-primary mt-1 d-none" onclick="_rsWindowMediaMigrate && _rsWindowMediaMigrate()">📤 Share this window with the room</button>
-                                        <select id="rs-window-media-lib" class="form-select form-select-sm mt-1" onchange="_rsWindowMediaSelect && _rsWindowMediaSelect(this)">
-                                            <option value="">— room media library —</option>
-                                        </select>
-                                        <button type="button" id="rs-window-media-del" class="btn btn-sm btn-outline-danger mt-1 d-none" onclick="_rsWindowMediaDelete && _rsWindowMediaDelete()" title="Delete the selected media from this room">🗑️ Delete selected</button>
-                                    </div>
-                                </div>
-                                <script>
-                                window._rsWindowImageUpload = function(input){
-                                    var f = input.files && input.files[0]; if(!f) return;
-                                    var isVideo = /^video\/(mp4|webm)$/.test(f.type);
-                                    var maxBytes = isVideo ? 15*1024*1024 : 5*1024*1024;
-                                    if(f.size > maxBytes){ alert('Please pick a ' + (isVideo ? 'video under 15 MB' : 'image under 5 MB') + '.'); input.value=''; return; }
-
-                                    if (window.ROOM_CONFIG && window.ROOM_CONFIG.roomName) {
-                                        _rsUploadWindowMedia(f, function(){ input.value=''; });
-                                        return;
-                                    }
-
-                                    // Preview pages without a live room: fall back to a local data URL.
-                                    var rd = new FileReader();
-                                    rd.onload = function(){ if(window.RoomScene) RoomScene.updateConfig({ windowImage: rd.result, windowView: 'custom' }); var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom'; };
-                                    rd.readAsDataURL(f);
-                                };
-
-                                // Uploads a file (Blob/File) to this room's window-media library and, on
-                                // success, switches the window to it and refreshes the library list.
-                                function _rsUploadWindowMedia(file, done) {
-                                    var fd = new FormData();
-                                    fd.append('file', file);
-                                    fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media', { method: 'POST', body: fd })
-                                        .then(function(resp){
-                                            if (!resp.ok) throw new Error('Upload failed (' + resp.status + ')');
-                                            return resp.json();
-                                        })
-                                        .then(function(e){
-                                            if (window.RoomScene) RoomScene.updateConfig({ windowMediaId: e.id, windowMediaMime: e.mime, windowView: 'custom', windowImage: null });
-                                            var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom';
-                                            _rsRefreshMediaLibrary();
-                                            if (done) done();
-                                        })
-                                        .catch(function(err){
-                                            if (window._showToastAD) _showToastAD('Upload failed: ' + err.message, 'warning');
-                                            else alert('Upload failed: ' + err.message);
-                                            if (done) done();
-                                        });
-                                }
-
-                                function _rsFormatBytes(n) {
-                                    if (n < 1024) return n + ' B';
-                                    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
-                                    return (n/(1024*1024)).toFixed(1) + ' MB';
-                                }
-
-                                // Populates the room media library <select> with this room's uploaded
-                                // window media, and shows/hides the legacy-windowImage migration button.
-                                window._rsRefreshMediaLibrary = function() {
-                                    var sel = document.getElementById('rs-window-media-lib');
-                                    if (!sel || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
-                                    fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media')
-                                        .then(function(resp){ return resp.ok ? resp.json() : []; })
-                                        .then(function(list){
-                                            var cfg = window.RoomScene ? RoomScene.getConfig() : {};
-                                            sel.innerHTML = '<option value="">— room media library —</option>';
-                                            (list || []).forEach(function(e){
-                                                var opt = document.createElement('option');
-                                                opt.value = e.id;
-                                                opt.dataset.mime = e.mime || '';
-                                                opt.textContent = (e.name || e.id) + ' (' + _rsFormatBytes(e.size || 0) + ')';
-                                                if (cfg.windowMediaId === e.id) opt.selected = true;
-                                                sel.appendChild(opt);
-                                            });
-                                            var delBtn = document.getElementById('rs-window-media-del');
-                                            if (delBtn) delBtn.classList.toggle('d-none', !cfg.windowMediaId);
-                                        })
-                                        .catch(function(){});
-
-                                    var migrateBtn = document.getElementById('rs-window-migrate-btn');
-                                    if (migrateBtn) {
-                                        var cfg2 = window.RoomScene ? RoomScene.getConfig() : {};
-                                        migrateBtn.classList.toggle('d-none', !cfg2.windowImage);
-                                    }
-                                };
-
-                                // Switches the room's window to a previously uploaded media item.
-                                window._rsWindowMediaSelect = function(sel) {
-                                    var id = sel.value;
-                                    if (!id) return;
-                                    var opt = sel.options[sel.selectedIndex];
-                                    var mime = (opt && opt.dataset.mime) || null;
-                                    if (window.RoomScene) RoomScene.updateConfig({ windowMediaId: id, windowMediaMime: mime, windowView: 'custom' });
-                                    var view=document.getElementById('rs-window-view'); if(view) view.value='custom';
-                                    var delBtn = document.getElementById('rs-window-media-del');
-                                    if (delBtn) delBtn.classList.remove('d-none');
-                                };
-
-                                // Deletes the selected media from the room's library; if it was the
-                                // active window, falls back to the skyline view for everyone.
-                                window._rsWindowMediaDelete = function() {
-                                    var sel = document.getElementById('rs-window-media-lib');
-                                    var id = sel && sel.value;
-                                    if (!id || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
-                                    fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media/' + id, { method: 'DELETE' })
-                                        .then(function(resp){
-                                            if (!resp.ok && resp.status !== 404) throw new Error('Delete failed (' + resp.status + ')');
-                                            var cfg = window.RoomScene ? RoomScene.getConfig() : {};
-                                            if (cfg.windowMediaId === id && window.RoomScene) {
-                                                RoomScene.updateConfig({ windowMediaId: null, windowMediaMime: null, windowView: 'skyline' });
-                                                var view=document.getElementById('rs-window-view'); if(view) view.value='skyline';
-                                            }
-                                            _rsRefreshMediaLibrary();
-                                        })
-                                        .catch(function(err){
-                                            if (window._showToastAD) _showToastAD('Delete failed: ' + err.message, 'warning');
-                                            else alert('Delete failed: ' + err.message);
-                                        });
-                                };
-
-                                // One-time migration: uploads a legacy local windowImage data URL to the
-                                // room's shared media library, then clears the legacy field.
-                                window._rsWindowMediaMigrate = function() {
-                                    if (!window.RoomScene || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
-                                    var dataUrl = RoomScene.getConfig().windowImage;
-                                    if (!dataUrl) return;
-                                    fetch(dataUrl).then(function(r){ return r.blob(); }).then(function(blob){
-                                        var ext = /^data:video\/webm/.test(dataUrl) ? 'webm' : (/^data:video\//.test(dataUrl) ? 'mp4' : (/^data:image\/gif/.test(dataUrl) ? 'gif' : 'png'));
-                                        var file = new File([blob], 'window.' + ext, { type: blob.type });
-                                        _rsUploadWindowMedia(file, function(){
-                                            RoomScene.updateConfig({ windowImage: null });
-                                            var migrateBtn = document.getElementById('rs-window-migrate-btn');
-                                            if (migrateBtn) migrateBtn.classList.add('d-none');
-                                        });
-                                    }).catch(function(){});
-                                };
-
-                                document.addEventListener('DOMContentLoaded', function() {
-                                    var roomTabBtn = document.getElementById('tab-room-btn');
-                                    if (roomTabBtn) roomTabBtn.addEventListener('shown.bs.tab', _rsRefreshMediaLibrary);
-                                });
-                                </script>
-                                <div class="col-6">
-                                    <label class="form-label mb-1" for="rs-2d-style">2D view style</label>
-                                    <select id="rs-2d-style" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ twoDStyle: this.value })">
-                                        <option value="topdown">⬇️ Top-down 3D (mirrors the 3D room)</option>
-                                        <option value="flat">🗺️ Flat diagram</option>
-                                    </select>
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label mb-1" for="rs-table-shape">Table shape</label>
-                                    <select id="rs-table-shape" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableShape: this.value })">
-                                        <option value="round">⭕ Round</option>
-                                        <option value="rect">▬ Rect</option>
-                                    </select>
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label mb-1" for="rs-table-size">Table size</label>
-                                    <select id="rs-table-size" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableSize: this.value })">
-                                        <option value="small">Small</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="large">Large</option>
-                                    </select>
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label mb-1" for="rs-chair-count">Chairs</label>
-                                    <input id="rs-chair-count" type="number" min="1" max="16" placeholder="auto" class="form-control form-control-sm"
-                                           onchange="RoomScene.updateConfig({ chairCount: parseInt(this.value)||0 })" />
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label mb-1" for="rs-chair-type">Chair style</label>
-                                    <select id="rs-chair-type" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ chairType: this.value })">
-                                        <option value="office">🪑 Office</option>
-                                        <option value="gaming">🎮 Gaming</option>
-                                        <option value="beanbag">🛋️ Bean bag</option>
-                                        <option value="stool">🪵 Stool</option>
-                                        <option value="throne">👑 Throne</option>
-                                        <option value="random">🎲 Random</option>
-                                    </select>
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label mb-1" for="rs-dragmode">3D move / orbit control</label>
-                                    <select id="rs-dragmode" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ dragMode: this.value })">
-                                        <option value="select">Click to select, then drag</option>
-                                        <option value="doubleselect">Double-click to select, then drag</option>
-                                        <option value="direct">Drag item to move (Shift+drag orbits)</option>
-                                    </select>
-                                </div>
-                                <div class="col-3">
-                                    <label class="form-label mb-1" for="rs-floor-mat">Floor</label>
-                                    <select id="rs-floor-mat" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ floorMaterial: this.value })">
-                                        <option value="preset">Preset</option>
-                                        <option value="wood">🪵 Wood</option>
-                                        <option value="carpet">🧶 Carpet</option>
-                                        <option value="tile">⬜ Tile</option>
-                                        <option value="concrete">🧱 Concrete</option>
-                                    </select>
-                                </div>
-                                <div class="col-3">
-                                    <label class="form-label mb-1" for="rs-table-mat">Table top</label>
-                                    <select id="rs-table-mat" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableMaterial: this.value })">
-                                        <option value="wood">🪵 Wood</option>
-                                        <option value="glass">🪟 Glass</option>
-                                        <option value="marble">⬜ Marble</option>
-                                    </select>
-                                </div>
-                                <div class="col-3">
-                                    <label class="form-label mb-1" for="rs-lighting">Lighting</label>
-                                    <select id="rs-lighting" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ lighting: this.value })">
-                                        <option value="normal">Normal</option>
-                                        <option value="warm">🔆 Warm</option>
-                                        <option value="cool">❄️ Cool</option>
-                                        <option value="neon">🌈 Neon</option>
-                                    </select>
-                                </div>
-                                <div class="col-3">
-                                    <label class="form-label mb-1" for="rs-wall-color">Walls</label>
-                                    <input type="color" id="rs-wall-color" class="form-control form-control-sm form-control-color" value="#cfd3da"
-                                           title="Wall colour (overrides preset)" onchange="RoomScene.updateConfig({ wallColor: this.value })" />
-                                </div>
-                            </div>
-                            <div class="text-muted mt-2" style="font-size:0.68rem;">In every mode: drag empty space to orbit the camera, and <strong>Shift+drag</strong> always orbits. When an item is selected, <strong>Delete</strong> removes it and <strong>Esc</strong> deselects.</div>
-                        </div>
-
-                        <!-- Features & furniture -->
-                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-features-section">
-                            🪴 Features &amp; furniture <span class="settings-section-chevron">▾</span>
-                        </div>
-                        <div id="room-features-section" class="collapse show">
-                            <div class="d-flex gap-3 mt-2 mb-3">
-                                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="rs-whiteboard" onchange="RoomScene.updateConfig({ whiteboard: this.checked })" /><label class="form-check-label small" for="rs-whiteboard">Whiteboard</label></div>
-                                <div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="rs-plants" onchange="RoomScene.updateConfig({ plants: this.checked })" /><label class="form-check-label small" for="rs-plants">Plants</label></div>
-                            </div>
-                            <label class="form-label mb-1">Add furniture <span class="text-muted" style="font-weight:normal;">(3D GL — drag items to reposition)</span></label>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.addFurniture('plant')">🌿 Plant</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.addFurniture('coffee_table')">☕ Coffee table</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.addFurniture('projector')">📽️ Projector</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.addFurniture('whiteboard')">📋 Whiteboard</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.resetFurniture()" title="Reset furniture to default positions">↺ Reset</button>
-                            </div>
-                        </div>
-
-                        <!-- Walk controls (first / third person) -->
-                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-walk-section">
-                            🚶 Walk controls <span class="text-muted" style="font-weight:normal;">(3D room)</span> <span class="settings-section-chevron">▾</span>
-                        </div>
-                        <div id="room-walk-section" class="collapse">
-                            <div class="text-muted mt-2 mb-2" style="font-size:0.68rem;">In <strong>3D</strong>, click <strong>🚶 Walk</strong> (or press its key) to walk around. Move with the arrow keys, <strong>Alt</strong> to jump, <strong>Ctrl</strong> to crouch, <strong>E</strong> facing a chair to sit / furniture to grab. Drag to look around. Esc to exit. To rebind, click an action then press the new key.</div>
-                            <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
-                                <label class="form-label mb-0" style="font-size:.76rem;min-width:80px;">Camera mode</label>
-                                <select class="form-select form-select-sm" style="max-width:190px;" id="rs-walk-cam-mode"
-                                    onchange="window.RoomScene && RoomScene.updateConfig({ walkCameraMode: this.value })">
-                                    <option value="first">👁️ First person</option>
-                                    <option value="third">🎥 Third person</option>
-                                </select>
-                            </div>
-                            <div id="rs-keybinds" class="d-flex flex-wrap gap-2"></div>
-                            <button type="button" class="btn btn-sm btn-link p-0 mt-2" onclick="_rsResetKeyBinds && _rsResetKeyBinds()">Reset to defaults</button>
-                        </div>
-                        <!-- AP1: Room identity icon -->
-                        <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-icon-section">
-                            🏷️ Room icon <span class="text-muted" style="font-weight:normal;">(host only)</span> <span class="settings-section-chevron">▾</span>
-                        </div>
-                        <div id="room-icon-section" class="collapse">
-                            <div class="text-muted mt-2 mb-2" style="font-size:0.68rem;">Give this room a visual identity — shown in the navbar and browser tab for everyone.</div>
-                            <div class="d-flex flex-wrap gap-1 mb-2" id="rs-icon-grid"></div>
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <input type="file" id="rs-icon-image" accept="image/*" class="form-control form-control-sm" style="max-width:230px;" onchange="_rsRoomIconUpload && _rsRoomIconUpload(this)" title="Upload a room icon (≤200 KB)" />
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.setRoomIcon && setRoomIcon('')">Clear</button>
-                            </div>
-                        </div>
-                        <script>
-                        (function(){
-                            var icons = ['🃏','🚀','🎯','🧠','☕','🌊','🎲','🏆','🔥','⚡','🦄','🐝','🍕','🛸','🎸','🌟','🧩','📈'];
-                            var grid = document.getElementById('rs-icon-grid');
-                            if (grid && !grid._built) {
-                                grid._built = true;
-                                grid.innerHTML = icons.map(function(e){
-                                    return '<button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:1.1rem;line-height:1.3;padding:2px 7px;" onclick="window.setRoomIcon && setRoomIcon(\'' + e + '\')">' + e + '</button>';
-                                }).join('');
-                            }
-                            window._rsRoomIconUpload = function(input){
-                                var f = input.files && input.files[0]; if(!f) return;
-                                if(f.size > 200*1024){ alert('Please pick an image under 200 KB.'); input.value=''; return; }
-                                var rd = new FileReader();
-                                rd.onload = function(){ if(window.setRoomIcon) setRoomIcon(rd.result); };
-                                rd.readAsDataURL(f);
-                            };
-                        }());
-                        </script>
-                        <script>
-                        (function(){
-                            window._rsKeyActions = [['forward','Forward'],['back','Back'],['left','Left'],['right','Right'],['jump','Jump'],['crouch','Crouch'],['interact','Interact'],['walk','Toggle walk']];
-                            // Keys that are reserved by the page and will conflict with walk bindings.
-                            var _RS_PAGE_KEYS = { Space:'Reveal votes', Enter:'Reveal votes / confirm', KeyC:'(may conflict with page)', KeyV:'(may conflict)', Tab:'(browser)' };
-                            window._rsKeyLabel = function(code){
-                                if(!code) return '—';
-                                var MAP = { Space:'Space', AltLeft:'Alt', AltRight:'Alt', ControlLeft:'Ctrl', ControlRight:'Ctrl',
-                                            ShiftLeft:'Shift', ShiftRight:'Shift', ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→' };
-                                return MAP[code] || code.replace(/^Key/,'').replace(/^Digit/,'');
-                            };
-                            window._rsRenderKeyBinds = function(){
-                                if(!window.RoomScene || !RoomScene.getConfig) return;
-                                var wrap=document.getElementById('rs-keybinds'); if(!wrap) return;
-                                var kb=(RoomScene.getConfig().keyBindings)||{};
-                                // Sync walk-camera select to current config.
-                                var camSel=document.getElementById('rs-walk-cam-mode');
-                                if(camSel) camSel.value = (RoomScene.getConfig().walkCameraMode)||'first';
-                                wrap.innerHTML = window._rsKeyActions.map(function(a){
-                                    return '<button type="button" class="btn btn-sm btn-outline-secondary" data-rskey="'+a[0]+'" onclick="_rsCaptureKey(\''+a[0]+'\',this)" style="min-width:82px;text-align:center;">'
-                                        +'<span style="opacity:.7;font-size:.64rem;display:block;">'+a[1]+'</span><strong>'+window._rsKeyLabel(kb[a[0]])+'</strong></button>';
-                                }).join('');
-                            };
-                            // Tracks an in-progress key capture so Escape, blur, or a second
-                            // click of the same button can cancel it cleanly.
-                            var _rsCapturing = null; // { btn, onKey, onBlur, prevLabel }
-                            function _rsCancelCapture(){
-                                if(!_rsCapturing) return;
-                                var s=_rsCapturing.btn.querySelector('strong');
-                                if(s) s.textContent=_rsCapturing.prevLabel;
-                                document.removeEventListener('keydown', _rsCapturing.onKey, true);
-                                _rsCapturing.btn.removeEventListener('blur', _rsCapturing.onBlur);
-                                _rsCapturing = null;
-                            }
-                            window._rsCaptureKey = function(action, btn){
-                                // Clicking the button that's already capturing cancels it.
-                                if(_rsCapturing && _rsCapturing.btn === btn) { _rsCancelCapture(); return; }
-                                _rsCancelCapture();
-                                var s=btn.querySelector('strong');
-                                var prevLabel = s ? s.textContent : '';
-                                if(s) s.textContent='press a key (Esc cancels)';
-                                function onKey(e){
-                                    if(e.code === 'Escape') {
-                                        e.preventDefault(); e.stopPropagation();
-                                        _rsCancelCapture();
-                                        return;
-                                    }
-                                    e.preventDefault(); e.stopPropagation();
-                                    var code = e.code;
-                                    var kb=Object.assign({}, (RoomScene.getConfig().keyBindings)||{});
-                                    // Warn if the key is already assigned to a different action.
-                                    var conflict = null;
-                                    window._rsKeyActions.forEach(function(a){
-                                        if(a[0] !== action && kb[a[0]] === code) conflict = a[1];
-                                    });
-                                    if(conflict) {
-                                        if(!confirm('"'+window._rsKeyLabel(code)+'" is already used for "'+conflict+'". Reassign it here anyway?')) {
-                                            _rsCancelCapture();
-                                            return;
-                                        }
-                                        // Clear the old binding that used this key.
-                                        window._rsKeyActions.forEach(function(a){ if(a[0]!==action && kb[a[0]]===code) kb[a[0]]=''; });
-                                    }
-                                    // Warn if the key is reserved by the page.
-                                    var pageConflict = _RS_PAGE_KEYS[code];
-                                    if(pageConflict) {
-                                        if(!confirm('"'+window._rsKeyLabel(code)+'" is a page shortcut: '+pageConflict+'. It will still fire while in walk mode — consider a different key.')) {
-                                            _rsCancelCapture();
-                                            return;
-                                        }
-                                    }
-                                    kb[action]=code;
-                                    _rsCapturing = null;
-                                    RoomScene.updateConfig({ keyBindings: kb });
-                                    window._rsRenderKeyBinds();
-                                }
-                                function onBlur(){ _rsCancelCapture(); }
-                                document.addEventListener('keydown', onKey, true);
-                                btn.addEventListener('blur', onBlur);
-                                _rsCapturing = { btn: btn, onKey: onKey, onBlur: onBlur, prevLabel: prevLabel };
-                            };
-                            window._rsResetKeyBinds = function(){
-                                RoomScene.updateConfig({ keyBindings:{ forward:'ArrowUp',back:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',jump:'AltLeft',crouch:'ControlLeft',interact:'KeyE',walk:'KeyT' } });
-                                window._rsRenderKeyBinds();
-                            };
-                            document.addEventListener('DOMContentLoaded', function(){ if(window._rsRenderKeyBinds) window._rsRenderKeyBinds(); });
-                        }());
-                        </script>
+                        <p class="small text-muted mb-3">Room Scene settings (table, chairs, window view, furniture, walk controls, and more) now live in the <strong>Room Designer</strong> — a side panel that stays open next to the live 3D room while you tweak it.</p>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="openRoomDesigner()">🏠 Open room designer →</button>
                     </div><!-- end tab-room -->
 
                 </div><!-- end tab-content -->
             </div>
         </div>
     </div><!-- end settingsModal -->
+
+    <!-- ══════════════════════════════════════════
+         Room Designer offcanvas (P10) — lives next to the live 3D room
+         ══════════════════════════════════════════ -->
+    <div class="offcanvas offcanvas-end" data-bs-backdrop="false" data-bs-scroll="true" tabindex="-1" id="roomDesignerOffcanvas" aria-labelledby="roomDesignerLabel" style="width:400px;max-width:92vw;">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title fs-6 fw-bold" id="roomDesignerLabel">🏠 Room Designer</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <p class="small text-muted mb-3">Configure the <strong>🏠 Room Scene</strong>. Switch between <strong>2D</strong> and <strong>3D</strong> views with the buttons in the Room Scene panel header — these settings apply to every view that supports them.</p>
+
+            <h6 class="rs-group-header">👥 Room — everyone sees these</h6>
+            <p class="rs-shared-caption">Changes here update the room for every participant.</p>
+
+            <!-- Quick presets -->
+            <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-presets-section">
+                🎯 Quick presets <span class="settings-section-chevron">▾</span>
+            </div>
+            <div id="room-presets-section" class="collapse show mb-3">
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('huddle')"    title="6 office chairs, small round table">🤝 Huddle (6)</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('standard')"  title="8 office chairs, medium round table">📋 Standard (8)</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('boardroom')" title="12 office chairs, large rect table">🏛️ Boardroom (12)</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('gaming')"    title="6 gaming chairs, medium round table">🎮 Gaming (6)</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="_applyRoomPreset('lounge')"    title="4 bean bags, small round table">🛋️ Lounge (4)</button>
+                </div>
+            </div>
+
+            <!-- Appearance & layout -->
+            <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-layout-section">
+                🎨 Appearance &amp; layout <span class="settings-section-chevron">▾</span>
+            </div>
+            <div id="room-layout-section" class="collapse show mb-3">
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="form-label mb-1" for="rs-preset">Colour theme</label>
+                        <select id="rs-preset" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ preset: this.value })">
+                            <option value="conference">Conference</option>
+                            <option value="war-room">War room</option>
+                            <option value="cozy">Cozy</option>
+                            <option value="skyline">Skyline</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" for="rs-window-view">Window view <span class="rs-note">(3D GL)</span></label>
+                        <select id="rs-window-view" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ windowView: this.value })">
+                            <option value="skyline">🏙️ City skyline</option>
+                            <option value="beach">🏖️ Beach</option>
+                            <option value="mountains">🏔️ Mountains</option>
+                            <option value="night">🌃 Night city</option>
+                            <option value="forest">🌲 Forest</option>
+                            <option value="space">🌌 Space</option>
+                            <option value="custom">🎨 Custom image</option>
+                            <option value="none">🚪 No view</option>
+                        </select>
+                        <div class="form-check form-switch mt-1"><input class="form-check-input" type="checkbox" id="rs-window-anim" onchange="RoomScene.updateConfig({ windowAnimated: this.checked })" /><label class="form-check-label small" for="rs-window-anim">Animate (clouds, stars, sea)</label></div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <label class="form-label mb-0 small" for="rs-window-time" style="white-space:nowrap;">Time</label>
+                            <select id="rs-window-time" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ windowTimeOfDay: this.value })">
+                                <option value="day">☀️ Day</option>
+                                <option value="dusk">🌇 Dusk</option>
+                                <option value="night">🌙 Night</option>
+                                <option value="auto">🕒 Auto (local clock)</option>
+                            </select>
+                        </div>
+                        <div class="mt-1">
+                            <input type="file" id="rs-window-image" accept="image/*,video/mp4,video/webm,.mp4,.webm" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Images up to 5 MB, MP4/WebM video up to 15 MB" />
+                            <div class="form-text small mt-1">Images up to 5 MB, MP4/WebM video up to 15 MB</div>
+                            <button type="button" id="rs-window-migrate-btn" class="btn btn-sm btn-outline-primary mt-1 d-none" onclick="_rsWindowMediaMigrate && _rsWindowMediaMigrate()">📤 Share this window with the room</button>
+                            <select id="rs-window-media-lib" class="form-select form-select-sm mt-1" onchange="_rsWindowMediaSelect && _rsWindowMediaSelect(this)">
+                                <option value="">— room media library —</option>
+                            </select>
+                            <button type="button" id="rs-window-media-del" class="btn btn-sm btn-outline-danger mt-1 d-none" onclick="_rsWindowMediaDelete && _rsWindowMediaDelete()" title="Delete the selected media from this room">🗑️ Delete selected</button>
+                        </div>
+                    </div>
+                    <script>
+                    window._rsWindowImageUpload = function(input){
+                        var f = input.files && input.files[0]; if(!f) return;
+                        var isVideo = /^video\/(mp4|webm)$/.test(f.type);
+                        var maxBytes = isVideo ? 15*1024*1024 : 5*1024*1024;
+                        if(f.size > maxBytes){ alert('Please pick a ' + (isVideo ? 'video under 15 MB' : 'image under 5 MB') + '.'); input.value=''; return; }
+
+                        if (window.ROOM_CONFIG && window.ROOM_CONFIG.roomName) {
+                            _rsUploadWindowMedia(f, function(){ input.value=''; });
+                            return;
+                        }
+
+                        // Preview pages without a live room: fall back to a local data URL.
+                        var rd = new FileReader();
+                        rd.onload = function(){ if(window.RoomScene) RoomScene.updateConfig({ windowImage: rd.result, windowView: 'custom' }); var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom'; };
+                        rd.readAsDataURL(f);
+                    };
+
+                    // Uploads a file (Blob/File) to this room's window-media library and, on
+                    // success, switches the window to it and refreshes the library list.
+                    function _rsUploadWindowMedia(file, done) {
+                        var fd = new FormData();
+                        fd.append('file', file);
+                        fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media', { method: 'POST', body: fd })
+                            .then(function(resp){
+                                if (!resp.ok) throw new Error('Upload failed (' + resp.status + ')');
+                                return resp.json();
+                            })
+                            .then(function(e){
+                                if (window.RoomScene) RoomScene.updateConfig({ windowMediaId: e.id, windowMediaMime: e.mime, windowView: 'custom', windowImage: null });
+                                var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom';
+                                _rsRefreshMediaLibrary();
+                                if (done) done();
+                            })
+                            .catch(function(err){
+                                if (window._showToastAD) _showToastAD('Upload failed: ' + err.message, 'warning');
+                                else alert('Upload failed: ' + err.message);
+                                if (done) done();
+                            });
+                    }
+
+                    function _rsFormatBytes(n) {
+                        if (n < 1024) return n + ' B';
+                        if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+                        return (n/(1024*1024)).toFixed(1) + ' MB';
+                    }
+
+                    // Populates the room media library <select> with this room's uploaded
+                    // window media, and shows/hides the legacy-windowImage migration button.
+                    window._rsRefreshMediaLibrary = function() {
+                        var sel = document.getElementById('rs-window-media-lib');
+                        if (!sel || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
+                        fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media')
+                            .then(function(resp){ return resp.ok ? resp.json() : []; })
+                            .then(function(list){
+                                var cfg = window.RoomScene ? RoomScene.getConfig() : {};
+                                sel.innerHTML = '<option value="">— room media library —</option>';
+                                (list || []).forEach(function(e){
+                                    var opt = document.createElement('option');
+                                    opt.value = e.id;
+                                    opt.dataset.mime = e.mime || '';
+                                    opt.textContent = (e.name || e.id) + ' (' + _rsFormatBytes(e.size || 0) + ')';
+                                    if (cfg.windowMediaId === e.id) opt.selected = true;
+                                    sel.appendChild(opt);
+                                });
+                                var delBtn = document.getElementById('rs-window-media-del');
+                                if (delBtn) delBtn.classList.toggle('d-none', !cfg.windowMediaId);
+                            })
+                            .catch(function(){});
+
+                        var migrateBtn = document.getElementById('rs-window-migrate-btn');
+                        if (migrateBtn) {
+                            var cfg2 = window.RoomScene ? RoomScene.getConfig() : {};
+                            migrateBtn.classList.toggle('d-none', !cfg2.windowImage);
+                        }
+                    };
+
+                    // Switches the room's window to a previously uploaded media item.
+                    window._rsWindowMediaSelect = function(sel) {
+                        var id = sel.value;
+                        if (!id) return;
+                        var opt = sel.options[sel.selectedIndex];
+                        var mime = (opt && opt.dataset.mime) || null;
+                        if (window.RoomScene) RoomScene.updateConfig({ windowMediaId: id, windowMediaMime: mime, windowView: 'custom' });
+                        var view=document.getElementById('rs-window-view'); if(view) view.value='custom';
+                        var delBtn = document.getElementById('rs-window-media-del');
+                        if (delBtn) delBtn.classList.remove('d-none');
+                    };
+
+                    // Deletes the selected media from the room's library; if it was the
+                    // active window, falls back to the skyline view for everyone.
+                    window._rsWindowMediaDelete = function() {
+                        var sel = document.getElementById('rs-window-media-lib');
+                        var id = sel && sel.value;
+                        if (!id || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
+                        fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media/' + id, { method: 'DELETE' })
+                            .then(function(resp){
+                                if (!resp.ok && resp.status !== 404) throw new Error('Delete failed (' + resp.status + ')');
+                                var cfg = window.RoomScene ? RoomScene.getConfig() : {};
+                                if (cfg.windowMediaId === id && window.RoomScene) {
+                                    RoomScene.updateConfig({ windowMediaId: null, windowMediaMime: null, windowView: 'skyline' });
+                                    var view=document.getElementById('rs-window-view'); if(view) view.value='skyline';
+                                }
+                                _rsRefreshMediaLibrary();
+                            })
+                            .catch(function(err){
+                                if (window._showToastAD) _showToastAD('Delete failed: ' + err.message, 'warning');
+                                else alert('Delete failed: ' + err.message);
+                            });
+                    };
+
+                    // One-time migration: uploads a legacy local windowImage data URL to the
+                    // room's shared media library, then clears the legacy field.
+                    window._rsWindowMediaMigrate = function() {
+                        if (!window.RoomScene || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
+                        var dataUrl = RoomScene.getConfig().windowImage;
+                        if (!dataUrl) return;
+                        fetch(dataUrl).then(function(r){ return r.blob(); }).then(function(blob){
+                            var ext = /^data:video\/webm/.test(dataUrl) ? 'webm' : (/^data:video\//.test(dataUrl) ? 'mp4' : (/^data:image\/gif/.test(dataUrl) ? 'gif' : 'png'));
+                            var file = new File([blob], 'window.' + ext, { type: blob.type });
+                            _rsUploadWindowMedia(file, function(){
+                                RoomScene.updateConfig({ windowImage: null });
+                                var migrateBtn = document.getElementById('rs-window-migrate-btn');
+                                if (migrateBtn) migrateBtn.classList.add('d-none');
+                            });
+                        }).catch(function(){});
+                    };
+
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var offcanvasEl = document.getElementById('roomDesignerOffcanvas');
+                        if (offcanvasEl) offcanvasEl.addEventListener('shown.bs.offcanvas', _rsRefreshMediaLibrary);
+                    });
+                    </script>
+                    <div class="col-4">
+                        <label class="form-label mb-1" for="rs-table-shape">Table shape</label>
+                        <select id="rs-table-shape" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableShape: this.value })">
+                            <option value="round">⭕ Round</option>
+                            <option value="rect">▬ Rect</option>
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label mb-1" for="rs-table-size">Table size</label>
+                        <select id="rs-table-size" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableSize: this.value })">
+                            <option value="small">Small</option>
+                            <option value="medium">Medium</option>
+                            <option value="large">Large</option>
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label mb-1" for="rs-chair-count">Chairs</label>
+                        <input id="rs-chair-count" type="number" min="1" max="16" placeholder="auto" class="form-control form-control-sm"
+                               onchange="RoomScene.updateConfig({ chairCount: parseInt(this.value)||0 })" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label mb-1" for="rs-chair-type">Chair style</label>
+                        <select id="rs-chair-type" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ chairType: this.value })">
+                            <option value="office">🪑 Office</option>
+                            <option value="gaming">🎮 Gaming</option>
+                            <option value="beanbag">🛋️ Bean bag</option>
+                            <option value="stool">🪵 Stool</option>
+                            <option value="throne">👑 Throne</option>
+                            <option value="random">🎲 Random</option>
+                        </select>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label mb-1" for="rs-floor-mat">Floor</label>
+                        <select id="rs-floor-mat" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ floorMaterial: this.value })">
+                            <option value="preset">Preset</option>
+                            <option value="wood">🪵 Wood</option>
+                            <option value="carpet">🧶 Carpet</option>
+                            <option value="tile">⬜ Tile</option>
+                            <option value="concrete">🧱 Concrete</option>
+                        </select>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label mb-1" for="rs-table-mat">Table top</label>
+                        <select id="rs-table-mat" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ tableMaterial: this.value })">
+                            <option value="wood">🪵 Wood</option>
+                            <option value="glass">🪟 Glass</option>
+                            <option value="marble">⬜ Marble</option>
+                        </select>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label mb-1" for="rs-lighting">Lighting</label>
+                        <select id="rs-lighting" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ lighting: this.value })">
+                            <option value="normal">Normal</option>
+                            <option value="warm">🔆 Warm</option>
+                            <option value="cool">❄️ Cool</option>
+                            <option value="neon">🌈 Neon</option>
+                        </select>
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label mb-1" for="rs-wall-color">Walls</label>
+                        <input type="color" id="rs-wall-color" class="form-control form-control-sm form-control-color" value="#cfd3da"
+                               title="Wall colour (overrides preset)" onchange="RoomScene.updateConfig({ wallColor: this.value })" />
+                    </div>
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="form-label mb-1" for="rs-room-size">Room size</label>
+                        <select id="rs-room-size" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ roomSize: this.value })">
+                            <option value="small">Small</option>
+                            <option value="medium">Medium</option>
+                            <option value="large">Large</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" for="rs-floor-color">Floor</label>
+                        <input type="color" id="rs-floor-color" class="form-control form-control-sm form-control-color" value="#cfd3da"
+                               title="Floor colour (overrides preset/material)" onchange="RoomScene.updateConfig({ floorColor: this.value })" />
+                    </div>
+                </div>
+                <div class="rs-hint mt-2">In every mode: drag empty space to orbit the camera, and <strong>Shift+drag</strong> always orbits. When an item is selected, <strong>Delete</strong> removes it and <strong>Esc</strong> deselects.</div>
+            </div>
+
+            <!-- Features & furniture -->
+            <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-features-section">
+                🪴 Features &amp; furniture <span class="settings-section-chevron">▾</span>
+            </div>
+            <div id="room-features-section" class="collapse show mb-3">
+                <div class="d-flex gap-3 mt-2 mb-3">
+                    <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" id="rs-whiteboard" onchange="RoomScene.updateConfig({ whiteboard: this.checked })" /><label class="form-check-label small" for="rs-whiteboard">Whiteboard</label></div>
+                    <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" id="rs-plants" onchange="RoomScene.updateConfig({ plants: this.checked })" /><label class="form-check-label small" for="rs-plants">Plants</label></div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.toggleFurniturePanel()" title="Add furniture or reset its layout (3D GL — drag items to reposition)">🪑 Open furniture panel</button>
+            </div>
+
+            <!-- AP1: Room identity icon -->
+            <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-icon-section">
+                🏷️ Room icon <span class="rs-note">(host only)</span> <span class="settings-section-chevron">▾</span>
+            </div>
+            <div id="room-icon-section" class="collapse mb-3">
+                <div class="rs-hint mt-2 mb-2">Give this room a visual identity — shown in the navbar and browser tab for everyone.</div>
+                <div class="d-flex flex-wrap gap-1 mb-2" id="rs-icon-grid"></div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <input type="file" id="rs-icon-image" accept="image/*" class="form-control form-control-sm" style="max-width:230px;" onchange="_rsRoomIconUpload && _rsRoomIconUpload(this)" title="Upload a room icon (≤200 KB)" />
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.setRoomIcon && setRoomIcon('')">Clear</button>
+                </div>
+            </div>
+            <script>
+            (function(){
+                var icons = ['🃏','🚀','🎯','🧠','☕','🌊','🎲','🏆','🔥','⚡','🦄','🐝','🍕','🛸','🎸','🌟','🧩','📈'];
+                var grid = document.getElementById('rs-icon-grid');
+                if (grid && !grid._built) {
+                    grid._built = true;
+                    grid.innerHTML = icons.map(function(e){
+                        return '<button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:1.1rem;line-height:1.3;padding:2px 7px;" onclick="window.setRoomIcon && setRoomIcon(\'' + e + '\')">' + e + '</button>';
+                    }).join('');
+                }
+                window._rsRoomIconUpload = function(input){
+                    var f = input.files && input.files[0]; if(!f) return;
+                    if(f.size > 200*1024){ alert('Please pick an image under 200 KB.'); input.value=''; return; }
+                    var rd = new FileReader();
+                    rd.onload = function(){ if(window.setRoomIcon) setRoomIcon(rd.result); };
+                    rd.readAsDataURL(f);
+                };
+            }());
+            </script>
+
+            <h6 class="rs-group-header mt-3">👤 My view &amp; controls</h6>
+
+            <!-- View & interaction (personal — not shared with the room) -->
+            <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-view-section">
+                🖥️ View &amp; interaction <span class="settings-section-chevron">▾</span>
+            </div>
+            <div id="room-view-section" class="collapse show mb-3">
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="form-label mb-1" for="rs-2d-style">2D view style</label>
+                        <select id="rs-2d-style" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ twoDStyle: this.value })">
+                            <option value="topdown">⬇️ Top-down 3D (mirrors the 3D room)</option>
+                            <option value="flat">🗺️ Flat diagram</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" for="rs-dragmode">3D move / orbit control</label>
+                        <select id="rs-dragmode" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ dragMode: this.value })">
+                            <option value="select">Click to select, then drag</option>
+                            <option value="doubleselect">Double-click to select, then drag</option>
+                            <option value="direct">Drag item to move (Shift+drag orbits)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Avatar customization (P13) -->
+            <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-avatar-section">
+                🤖 My avatar <span class="rs-note">(3D room)</span> <span class="settings-section-chevron">▾</span>
+            </div>
+            <div id="room-avatar-section" class="collapse mb-3">
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="form-label mb-1" for="rs-avatar-hat">Hat / accessory</label>
+                        <select id="rs-avatar-hat" class="form-select form-select-sm" onchange="saveAvatar3dFromForm()">
+                            <option value="none">None</option>
+                            <option value="cap">🧢 Cap</option>
+                            <option value="antennaBobble">📡 Antenna bobble</option>
+                            <option value="crown">👑 Crown</option>
+                            <option value="headphones">🎧 Headphones</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" for="rs-avatar-eyes">Eyes</label>
+                        <select id="rs-avatar-eyes" class="form-select form-select-sm" onchange="saveAvatar3dFromForm()">
+                            <option value="round">Round</option>
+                            <option value="visor">Visor</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-flex align-items-center gap-2 mt-1">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="rs-avatar-team-color"
+                                onchange="document.getElementById('rs-avatar-tint').disabled = this.checked; saveAvatar3dFromForm()" />
+                            <label class="form-check-label" for="rs-avatar-team-color">Use my team colour</label>
+                        </div>
+                        <input type="color" class="form-control form-control-sm form-control-color" id="rs-avatar-tint"
+                            style="width:2.4rem;" onchange="saveAvatar3dFromForm()" title="Robot body colour" />
+                    </div>
+                </div>
+                <div class="rs-hint mt-2">Changes your robot's look for everyone in the room.</div>
+            </div>
+
+            <!-- Walk controls (first / third person) -->
+            <div class="settings-section-header" data-bs-toggle="collapse" data-bs-target="#room-walk-section">
+                🚶 Walk controls <span class="rs-note">(3D room)</span> <span class="settings-section-chevron">▾</span>
+            </div>
+            <div id="room-walk-section" class="collapse">
+                <div class="rs-hint mt-2 mb-2">In <strong>3D</strong>, click <strong>🚶 Walk</strong> (or press its key) to walk around. Move with the arrow keys, <strong>Alt</strong> to jump, <strong>Ctrl</strong> to crouch, <strong>E</strong> facing a chair to sit / furniture to grab. Drag to look around. Esc to exit. To rebind, click an action then press the new key.</div>
+                <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                    <label class="form-label mb-0" style="font-size:.76rem;min-width:80px;">Camera mode</label>
+                    <select class="form-select form-select-sm" style="max-width:190px;" id="rs-walk-cam-mode"
+                        onchange="window.RoomScene && RoomScene.updateConfig({ walkCameraMode: this.value })">
+                        <option value="first">👁️ First person</option>
+                        <option value="third">🎥 Third person</option>
+                    </select>
+                </div>
+                <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                    <label class="form-label mb-0" style="font-size:.76rem;min-width:80px;" for="rs-walk-speed">Walk speed</label>
+                    <input type="range" id="rs-walk-speed" min="1.5" max="4.5" step="0.1" style="width:120px;"
+                        onchange="window.RoomScene && RoomScene.updateConfig({ walkSpeed: parseFloat(this.value) })" />
+                </div>
+                <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                    <label class="form-label mb-0" style="font-size:.76rem;min-width:80px;" for="rs-look-sensitivity">Look speed</label>
+                    <input type="range" id="rs-look-sensitivity" min="0.002" max="0.012" step="0.001" style="width:120px;"
+                        onchange="window.RoomScene && RoomScene.updateConfig({ lookSensitivity: parseFloat(this.value) })" />
+                    <div class="form-check form-switch mb-0 ms-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="rs-invert-y"
+                            onchange="window.RoomScene && RoomScene.updateConfig({ invertY: this.checked })" />
+                        <label class="form-check-label" for="rs-invert-y" style="font-size:.76rem;">Invert Y</label>
+                    </div>
+                </div>
+                <div id="rs-keybinds" class="d-flex flex-wrap gap-2"></div>
+                <button type="button" class="btn btn-sm btn-link p-0 mt-2" onclick="_rsResetKeyBinds && _rsResetKeyBinds()">Reset to defaults</button>
+            </div>
+            <script>
+            (function(){
+                window._rsKeyActions = [['forward','Forward'],['back','Back'],['left','Left'],['right','Right'],['jump','Jump'],['crouch','Crouch'],['interact','Interact'],['walk','Toggle walk']];
+                // Keys that are reserved by the page and will conflict with walk bindings.
+                var _RS_PAGE_KEYS = { Space:'Reveal votes', Enter:'Reveal votes / confirm', KeyC:'(may conflict with page)', KeyV:'(may conflict)', Tab:'(browser)' };
+                window._rsKeyLabel = function(code){
+                    if(!code) return '—';
+                    var MAP = { Space:'Space', AltLeft:'Alt', AltRight:'Alt', ControlLeft:'Ctrl', ControlRight:'Ctrl',
+                                ShiftLeft:'Shift', ShiftRight:'Shift', ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→' };
+                    return MAP[code] || code.replace(/^Key/,'').replace(/^Digit/,'');
+                };
+                window._rsRenderKeyBinds = function(){
+                    if(!window.RoomScene || !RoomScene.getConfig) return;
+                    var wrap=document.getElementById('rs-keybinds'); if(!wrap) return;
+                    var kb=(RoomScene.getConfig().keyBindings)||{};
+                    // Sync walk-camera select to current config.
+                    var camSel=document.getElementById('rs-walk-cam-mode');
+                    if(camSel) camSel.value = (RoomScene.getConfig().walkCameraMode)||'first';
+                    wrap.innerHTML = window._rsKeyActions.map(function(a){
+                        return '<button type="button" class="btn btn-sm btn-outline-secondary" data-rskey="'+a[0]+'" onclick="_rsCaptureKey(\''+a[0]+'\',this)" style="min-width:82px;text-align:center;">'
+                            +'<span style="opacity:.7;font-size:.64rem;display:block;">'+a[1]+'</span><kbd>'+window._rsKeyLabel(kb[a[0]])+'</kbd></button>';
+                    }).join('');
+                };
+                // Tracks an in-progress key capture so Escape, blur, or a second
+                // click of the same button can cancel it cleanly.
+                var _rsCapturing = null; // { btn, onKey, onBlur, prevLabel }
+                function _rsCancelCapture(){
+                    if(!_rsCapturing) return;
+                    var s=_rsCapturing.btn.querySelector('kbd');
+                    if(s) s.textContent=_rsCapturing.prevLabel;
+                    document.removeEventListener('keydown', _rsCapturing.onKey, true);
+                    _rsCapturing.btn.removeEventListener('blur', _rsCapturing.onBlur);
+                    _rsCapturing = null;
+                }
+                window._rsCaptureKey = function(action, btn){
+                    // Clicking the button that's already capturing cancels it.
+                    if(_rsCapturing && _rsCapturing.btn === btn) { _rsCancelCapture(); return; }
+                    _rsCancelCapture();
+                    var s=btn.querySelector('kbd');
+                    var prevLabel = s ? s.textContent : '';
+                    if(s) s.textContent='press a key (Esc cancels)';
+                    function onKey(e){
+                        if(e.code === 'Escape') {
+                            e.preventDefault(); e.stopPropagation();
+                            _rsCancelCapture();
+                            return;
+                        }
+                        e.preventDefault(); e.stopPropagation();
+                        var code = e.code;
+                        var kb=Object.assign({}, (RoomScene.getConfig().keyBindings)||{});
+                        // Warn if the key is already assigned to a different action.
+                        var conflict = null;
+                        window._rsKeyActions.forEach(function(a){
+                            if(a[0] !== action && kb[a[0]] === code) conflict = a[1];
+                        });
+                        if(conflict) {
+                            if(!confirm('"'+window._rsKeyLabel(code)+'" is already used for "'+conflict+'". Reassign it here anyway?')) {
+                                _rsCancelCapture();
+                                return;
+                            }
+                            // Clear the old binding that used this key.
+                            window._rsKeyActions.forEach(function(a){ if(a[0]!==action && kb[a[0]]===code) kb[a[0]]=''; });
+                        }
+                        // Warn if the key is reserved by the page.
+                        var pageConflict = _RS_PAGE_KEYS[code];
+                        if(pageConflict) {
+                            if(!confirm('"'+window._rsKeyLabel(code)+'" is a page shortcut: '+pageConflict+'. It will still fire while in walk mode — consider a different key.')) {
+                                _rsCancelCapture();
+                                return;
+                            }
+                        }
+                        kb[action]=code;
+                        _rsCapturing = null;
+                        RoomScene.updateConfig({ keyBindings: kb });
+                        window._rsRenderKeyBinds();
+                    }
+                    function onBlur(){ _rsCancelCapture(); }
+                    document.addEventListener('keydown', onKey, true);
+                    btn.addEventListener('blur', onBlur);
+                    _rsCapturing = { btn: btn, onKey: onKey, onBlur: onBlur, prevLabel: prevLabel };
+                };
+                window._rsResetKeyBinds = function(){
+                    RoomScene.updateConfig({ keyBindings:{ forward:'ArrowUp',back:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',jump:'AltLeft',crouch:'ControlLeft',interact:'KeyE',walk:'KeyT' } });
+                    window._rsRenderKeyBinds();
+                };
+                document.addEventListener('DOMContentLoaded', function(){
+                    if(window._rsRenderKeyBinds) window._rsRenderKeyBinds();
+                    var offcanvasEl = document.getElementById('roomDesignerOffcanvas');
+                    if (offcanvasEl) offcanvasEl.addEventListener('shown.bs.offcanvas', function(){
+                        if (window.RoomScene && RoomScene.syncControls) RoomScene.syncControls();
+                        window._rsRenderKeyBinds();
+                        if (window.populateAvatar3dForm) window.populateAvatar3dForm();
+                    });
+                });
+            }());
+            </script>
+        </div><!-- end offcanvas-body -->
+    </div><!-- end roomDesignerOffcanvas -->
 
     <!-- ═══════════════════════════════════════════════════════
          Battle Arena overlay (hidden until triggerBattle fires)

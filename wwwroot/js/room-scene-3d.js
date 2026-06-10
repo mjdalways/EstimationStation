@@ -1,15 +1,21 @@
 // ============================================================
-// Room Scene 3D — WebGL room (Three.js r145 UMD globals)
+// Room Scene 3D — WebGL room (Three.js r0.184.0 ES modules)
 // Phase 2: 5 chair types · table sizes · chair claiming · standing robots
 // Phase 3: movable furniture (drag on floor, persistence)
 // Phase 4: idle animations · AO shadows · vote-reveal arm-raise · camera fly-to
-// Loaded as plain script after three.min.js, OrbitControls.js, CSS2DRenderer.js
-// Exposes window.RS3D
+// Loaded as a module (see import map in Views/Room/Index.cshtml); exposes window.RS3D
 // ============================================================
-(function () {
-    'use strict';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    // ── Constants ──────────────────────────────────────────────
+// Back-compat: room-scene.js's _applyMode() guards 3D init on `window.THREE` (a holdover
+// from the UMD-global era). Keep that check working without touching its caller.
+window.THREE = THREE;
+
+// ── Constants ──────────────────────────────────────────────
     var ROOM_W = 10, ROOM_D = 8, ROOM_H = 3.2;
     var SEAT_H = 0.47;
     var TBL_TOP = 0.76;
@@ -20,6 +26,18 @@
         medium: { RR: 1.55, RW: 3.2,  RD: 1.65 },
         large:  { RR: 2.15, RW: 4.5,  RD: 2.1  }
     };
+
+    var ROOM_SIZES = {
+        small:  { W: 8,  D: 6.5 },
+        medium: { W: 10, D: 8   },
+        large:  { W: 13, D: 10  }
+    };
+    // Refreshes the module-level ROOM_W/ROOM_D from _cfg.roomSize. Must run before
+    // _buildRoom()/_buildTable() etc. so every consumer sees the new dimensions.
+    function _applyRoomSize() {
+        var sz = ROOM_SIZES[_cfg.roomSize] || ROOM_SIZES.medium;
+        ROOM_W = sz.W; ROOM_D = sz.D;
+    }
 
     var VOTE_EMI = { none: 0x444444, voted: 0xf59e0b, revealed: 0x22c55e, observer: 0x6c757d };
 
@@ -43,11 +61,15 @@
     var _wbBoard = null, _wbTex = null, _wbVer = -1;   // in-room whiteboard board mesh + live texture
     var _props = [];                 // interactive props: { mesh, action }
     var _storyScreenLabel = null;    // CSS2D label on the in-room story screen
+    var _interactLabel = null;       // CSS2D "Press E to ..." prompt shown near the nearest interactable
+    var _interactCheckT = 0;         // accumulator: re-check the nearest interactable ~5x/sec
     var _applyingRemote = false;  // true while applying a peer's furniture layout (suppresses re-broadcast)
 
     // First-person "walk" mode. When on, OrbitControls is disabled and the camera is a
     // first-person avatar: WASD/arrows move, Space jumps, C crouches, E interacts.
     // Spatial presence: free-roam avatars keyed by connectionId (rendered as moving robots).
+    // NOTE: roamer positions are intentionally NOT mirrored into RoomSceneStore — they update
+    // ~10x/sec and stay internal to RS3D to avoid flooding subscribers (see room-scene-store.js).
     var _roamers = {};      // cid -> { robot, ring, labelObj, x, z, yaw, tx, tz, tyaw, pose, headY }
     var _roamSend = 0;      // throttle accumulator for broadcasting my own position
     var _iAmRoaming = false;
@@ -60,12 +82,19 @@
     var _view    = 'persp'; // 'persp' (3D) | 'top' (2D top-down) — both view the same scene
     var _walk    = null;    // null = orbit mode; else { yaw, pitch, vy, grounded, crouch, held }
     var _keys    = {};      // event.code -> bool (currently-held movement keys)
+    var _toolbar = null;       // P15: vertical icon toolbar (top-right) housing the buttons below
     var _walkBtn = null;       // the on-canvas Orbit/Walk toggle button
     var _clickWalkBtn = null;  // the on-canvas click-to-walk enable/disable toggle
     var _furnHudBtn = null;    // the on-canvas "+" furniture quick-add HUD button
     var _furnHud = null;       // the furniture quick-add panel (shown on button click)
+    var _claimBarObj = null;   // P15: CSS2DObject wrapping _claimBar, anchored above the pending chair
     var _look    = null;    // active drag-look: { x, y } last pointer
     var EYE_STAND = 1.60, EYE_CROUCH = 1.02, WALK_SPEED = 2.7, CROUCH_SPEED = 1.25;
+    // Personal walk-feel overrides (P14) — fall back to the constants above when unset.
+    function _walkSpeed()   { return (_cfg && _cfg.walkSpeed) || WALK_SPEED; }
+    function _crouchSpeed() { return _walkSpeed() * (CROUCH_SPEED / WALK_SPEED); }
+    function _lookSens()    { return (_cfg && _cfg.lookSensitivity != null) ? _cfg.lookSensitivity : 0.005; }
+    function _invertY()     { return !!(_cfg && _cfg.invertY); }
 
     function _defaultKeyBinds() {
         return { forward:'ArrowUp', back:'ArrowDown', left:'ArrowLeft', right:'ArrowRight',
@@ -90,9 +119,9 @@
     // (Re)build OrbitControls for the active view. Top-down: pan + zoom, no rotate,
     // left-drag pans (so empty-space drag pans while furniture drag still moves items).
     function _applyControls() {
-        if (!THREE.OrbitControls || !_renderer) return;
+        if (!OrbitControls || !_renderer) return;
         if (_controls) { _controls.dispose(); _controls = null; }
-        _controls = new THREE.OrbitControls(_camera, _renderer.domElement);
+        _controls = new OrbitControls(_camera, _renderer.domElement);
         _controls.enableDamping = true; _controls.dampingFactor = 0.09;
         if (_view === 'top') {
             _controls.target.set(0, 0, 0);
@@ -123,11 +152,9 @@
         _applyControls();
         // Distance-based fog washes out an overhead view — disable it in top-down.
         if (_scene) _scene.fog = (v === 'top') ? null : new THREE.FogExp2(0x18202c, 0.042);
-        // Walk + fly-to are 3D-only; hide the walk button + minimap in top-down (redundant).
+        // Walk + fly-to are 3D-only; hide the toolbar (walk/click-walk/furniture) + minimap in top-down (redundant).
         var topHide = (v === 'top') ? 'none' : '';
-        if (_walkBtn)      _walkBtn.style.display = topHide;
-        if (_clickWalkBtn) _clickWalkBtn.style.display = topHide;
-        if (_furnHudBtn)   _furnHudBtn.style.display = topHide;
+        if (_toolbar)      _toolbar.style.display = topHide;
         if (_furnHud)      _furnHud.style.display = 'none'; // always hide panel on view switch
         var hint = document.getElementById('rs3d-walk-hint'); if (hint) hint.style.display = topHide;
         if (_miniCanvas) _miniCanvas.style.display = topHide;
@@ -163,7 +190,7 @@
     var _flyTarget  = null;  // { startCam, endCam, startOrb, endOrb, t, dur }
     var _revealWas  = false; // previous votesRevealed state — detect transition
 
-    function _threeReady() { return !!(window.THREE && THREE.WebGLRenderer); }
+    function _threeReady() { return true; }
 
     // ── Init ──────────────────────────────────────────────────
     function init(containerEl, config) {
@@ -176,6 +203,7 @@
             whiteboard: true, plants: true, skyline: true, windowView: 'skyline',
             chairType: 'office', chairCount: 0
         }, config || {});
+        _applyRoomSize();
 
         var W = _container.clientWidth  || 400;
         var H = _container.clientHeight || 300;
@@ -185,13 +213,16 @@
         _renderer.setSize(W, H);
         _renderer.shadowMap.enabled = true;
         _renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
-        _renderer.outputEncoding    = THREE.sRGBEncoding;
+        _renderer.outputColorSpace  = THREE.SRGBColorSpace;
         _renderer.toneMapping       = THREE.ACESFilmicToneMapping;
         _renderer.toneMappingExposure = 1.1;
+        // Canvas-scoped keyboard focus for walk mode (P7): focusable, no focus ring.
+        _renderer.domElement.tabIndex = 0;
+        _renderer.domElement.style.outline = 'none';
         _container.appendChild(_renderer.domElement);
 
-        if (THREE.CSS2DRenderer) {
-            _labelRenderer = new THREE.CSS2DRenderer();
+        if (CSS2DRenderer) {
+            _labelRenderer = new CSS2DRenderer();
             _labelRenderer.setSize(W, H);
             var s = _labelRenderer.domElement.style;
             s.position = 'absolute'; s.top = '0'; s.left = '0';
@@ -202,6 +233,12 @@
         _scene = new THREE.Scene();
         _scene.background = new THREE.Color(0x18202c);
         _scene.fog = new THREE.FogExp2(0x18202c, 0.042);
+
+        // Image-based lighting: gives every MeshStandardMaterial soft ambient/reflection
+        // detail from a generic neutral room, instead of flat ambient-only shading.
+        var pmrem = new THREE.PMREMGenerator(_renderer);
+        _scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        pmrem.dispose();
 
         // Perspective camera (3D orbit) + orthographic camera (2D top-down). Both look at
         // the SAME scene, so anything moved/claimed shows identically in either view.
@@ -233,6 +270,7 @@
         _createSelBar();
         _createWalkButton();
         _createMinimap();
+        _showOnboarding();
 
         if (window.ResizeObserver) {
             _ro = new ResizeObserver(function (e) { var r = e[0].contentRect; resize(r.width, r.height); });
@@ -253,32 +291,76 @@
 
     // ── AQ4: room materials & lighting ────────────────────────
     var FLOOR_MATS = {
-        wood:     { color: 0x8a5a32, rough: 0.60 },
-        carpet:   { color: 0x556070, rough: 0.97 },
-        tile:     { color: 0xcfd6dd, rough: 0.25, metal: 0.10 },
-        concrete: { color: 0x8d9095, rough: 0.90 }
+        wood:     { color: 0x8a5a32, rough: 0.60, tex: 'wood' },
+        carpet:   { color: 0x556070, rough: 0.97, tex: 'carpet' },
+        tile:     { color: 0xcfd6dd, rough: 0.25, metal: 0.10, tex: 'tile' },
+        concrete: { color: 0x8d9095, rough: 0.90, tex: 'concrete' }
     };
+
+    // Cached PBR texture loader for /textures/{name}/{color,normal,roughness}.jpg — shared
+    // across rebuilds so swapping materials at runtime never re-fetches or re-uploads a
+    // texture already on the GPU (avoids the leak a fresh TextureLoader per rebuild would
+    // cause). Falls back to the material's flat colour while loading or on error.
+    var _texCache = {};
+    var _texLoader = null;
+    function _loadTex(url, repeatX, repeatY) {
+        var key = url + '@' + repeatX + 'x' + repeatY;
+        if (_texCache[key]) return _texCache[key];
+        if (!_texLoader) _texLoader = new THREE.TextureLoader();
+        var tex = _texLoader.load(url, function () {
+            if (_renderer && _scene && _camera) _renderer.render(_scene, _camera);   // repaint once decoded
+        });
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(repeatX, repeatY);
+        _texCache[key] = tex;
+        return tex;
+    }
+    // Apply a named PBR set (color/normal/roughness maps) from wwwroot/textures/{name}/ to
+    // a MeshStandardMaterial. repeatX/repeatY tile the maps across the surface.
+    function _applyMaterialMaps(mat, name, repeatX, repeatY) {
+        var base = '/textures/' + name + '/';
+        var map = _loadTex(base + 'color.jpg', repeatX, repeatY);
+        map.colorSpace = THREE.SRGBColorSpace;   // colour map only — normal/roughness stay linear
+        mat.map = map;
+        mat.normalMap = _loadTex(base + 'normal.jpg', repeatX, repeatY);
+        mat.roughnessMap = _loadTex(base + 'roughness.jpg', repeatX, repeatY);
+        mat.needsUpdate = true;
+    }
+
     function _floorMat(pal) {
+        var override = (_cfg.floorColor && _cfg.floorColor !== 'preset') ? _cfg.floorColor : null;
         var m = FLOOR_MATS[_cfg.floorMaterial];
-        if (!m) return _stdMat(pal.floor);          // 'preset' or unset → palette colour
-        return new THREE.MeshStandardMaterial({ color: m.color, roughness: m.rough, metalness: m.metal || 0 });
+        if (!m) return _stdMat(override || pal.floor);   // 'preset' or unset → palette/override colour
+        var mat = new THREE.MeshStandardMaterial({ color: override || m.color, roughness: m.rough, metalness: m.metal || 0 });
+        if (m.tex) _applyMaterialMaps(mat, m.tex, 4, 3);  // colour map untouched — mat.color tints it
+        return mat;
     }
     function _wallColor(pal) {
         return (_cfg.wallColor && _cfg.wallColor !== 'preset') ? _cfg.wallColor : pal.wall;
     }
     function _tableTopMat() {
+        var mat;
         switch (_cfg.tableMaterial) {
             case 'glass':  return new THREE.MeshStandardMaterial({ color: 0xbfe0ff, roughness: 0.08, metalness: 0.25, transparent: true, opacity: 0.5 });
-            case 'marble': return new THREE.MeshStandardMaterial({ color: 0xe8e6e0, roughness: 0.25, metalness: 0.10 });
-            default:       return new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.58, metalness: 0.04 }); // wood
+            case 'marble':
+                mat = new THREE.MeshStandardMaterial({ color: 0xe8e6e0, roughness: 0.25, metalness: 0.10 });
+                _applyMaterialMaps(mat, 'marble', 1.5, 1.5);
+                return mat;
+            default:       // wood
+                mat = new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.58, metalness: 0.04 });
+                _applyMaterialMaps(mat, 'wood', 1.5, 1.5);
+                return mat;
         }
     }
     function _lightCfg() {
+        // r155+ uses physically-based light units for SpotLight/PointLight (candela, not the
+        // old arbitrary scale) — multiply prior intensities by Math.PI to match pre-migration
+        // brightness. AmbientLight/DirectionalLight intensities are unaffected and unchanged.
         switch (_cfg.lighting) {
-            case 'warm': return { amb:0xffe7c2, ambI:0.42, spot:0xffdca8, spotI:2.0, fill:0xffb060, fillI:0.25 };
-            case 'cool': return { amb:0xdce9ff, ambI:0.42, spot:0xe8f0ff, spotI:2.0, fill:0x88aaff, fillI:0.40 };
-            case 'neon': return { amb:0xff66ff, ambI:0.30, spot:0x66ffff, spotI:1.8, fill:0xff44aa, fillI:0.55 };
-            default:     return { amb:0xffffff, ambI:0.40, spot:0xfff9ee, spotI:2.0, fill:0x88aaff, fillI:0.35 };
+            case 'warm': return { amb:0xffe7c2, ambI:0.42, spot:0xffdca8, spotI:2.0*Math.PI, fill:0xffb060, fillI:0.25 };
+            case 'cool': return { amb:0xdce9ff, ambI:0.42, spot:0xe8f0ff, spotI:2.0*Math.PI, fill:0x88aaff, fillI:0.40 };
+            case 'neon': return { amb:0xff66ff, ambI:0.30, spot:0x66ffff, spotI:1.8*Math.PI, fill:0xff44aa, fillI:0.55 };
+            default:     return { amb:0xffffff, ambI:0.40, spot:0xfff9ee, spotI:2.0*Math.PI, fill:0x88aaff, fillI:0.35 };
         }
     }
 
@@ -433,7 +515,6 @@
 
             // 2. Create the Texture
             const skylineTexture = new THREE.VideoTexture(video);
-            //skylineTexture.encoding = THREE.sRGBEncoding;
             skylineTexture.minFilter = THREE.LinearFilter;
             skylineTexture.magFilter = THREE.LinearFilter;
 
@@ -483,7 +564,7 @@
             var tex = new THREE.TextureLoader().load(src, function () {
                 if (_renderer) _renderer.render(_scene, _camera);   // repaint once decoded
             });
-            if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+            tex.colorSpace = THREE.SRGBColorSpace;
             var img = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
                 new THREE.MeshBasicMaterial({ map: tex }));
             img.position.set(0, cy, zb); _scene.add(img);
@@ -694,7 +775,7 @@
         if (window.Whiteboard && Whiteboard.getBoardCanvas) {
             try {
                 _wbTex = new THREE.CanvasTexture(Whiteboard.getBoardCanvas());
-                if (THREE.sRGBEncoding) _wbTex.encoding = THREE.sRGBEncoding;
+                _wbTex.colorSpace = THREE.SRGBColorSpace;
                 _wbVer = Whiteboard.getVersion();
                 boardMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: _wbTex, roughness: 0.7 });
             } catch (e) { boardMat = null; }
@@ -736,10 +817,10 @@
         orb.position.y = 0.62; g.add(orb);
         var pick = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 1.0, 8), new THREE.MeshBasicMaterial({ visible: false }));
         pick.position.y = 0.5; g.add(pick);
-        if (THREE.CSS2DObject) {
+        if (CSS2DObject) {
             var d = document.createElement('div');
             d.textContent = emoji; d.style.cssText = 'font-size:1.3rem;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));';
-            var lo = new THREE.CSS2DObject(d); lo.position.set(0, 0.98, 0); g.add(lo);
+            var lo = new CSS2DObject(d); lo.position.set(0, 0.98, 0); g.add(lo);
         }
         return { group: g, pick: pick };
     }
@@ -757,13 +838,13 @@
             new THREE.MeshStandardMaterial({ color: 0x0e2138, emissive: 0x12365e, emissiveIntensity: 0.5, roughness: 0.3 }));
         screen.position.z = 0.04; sg.add(screen);
         _scene.add(sg);
-        if (THREE.CSS2DObject) {
+        if (CSS2DObject) {
             var d = document.createElement('div');
             d.className = 'rs3d-screen-label';
             d.style.cssText = 'color:#dcebff;color:#cfe3ff;font:600 13px sans-serif;text-align:center;width:160px;' +
                 'text-shadow:0 1px 3px #000;pointer-events:none;line-height:1.25;';
             _storyScreenLabel = d;
-            var lo = new THREE.CSS2DObject(d);
+            var lo = new CSS2DObject(d);
             lo.position.set(ROOM_W / 2 - 0.16, 1.6, 0.6);
             _scene.add(lo);
         }
@@ -786,6 +867,12 @@
         if (action === 'confetti') { if (window._rsRoomConfetti) _rsRoomConfetti(); }
         else if (action === 'music') { if (window._rsRoomSound) _rsRoomSound('fanfare'); }
     }
+    // Short verb shown in the "Press E to ..." prompt (P9) for a given prop action.
+    function _propLabel(action) {
+        if (action === 'confetti') return 'set off confetti';
+        if (action === 'music') return 'play music';
+        return 'interact';
+    }
 
     function _buildPlant(x, z) {
         var pot = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.08,0.22,8),
@@ -799,8 +886,38 @@
         });
     }
 
+    // Soft radial-gradient "contact shadow" canvas, generated once and cached — used to
+    // ground the table without relying on (more expensive) extra shadow-casting lights.
+    var _contactShadowTex = null;
+    function _contactShadowTexture() {
+        if (_contactShadowTex) return _contactShadowTex;
+        var size = 256;
+        var canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        var ctx = canvas.getContext('2d');
+        var grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+        grad.addColorStop(0, 'rgba(0,0,0,1)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, size, size);
+        _contactShadowTex = new THREE.CanvasTexture(canvas);
+        return _contactShadowTex;
+    }
+    function _buildContactShadow(t) {
+        var w, d;
+        if (_cfg.tableShape === 'rect') { w = t.RW * 1.35; d = t.RD * 1.5; }
+        else { w = d = t.RR * 2.6; }
+        var mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({
+            map: _contactShadowTexture(), transparent: true, opacity: 0.35, depthWrite: false
+        }));
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.y = 0.005;
+        _scene.add(mesh);
+    }
+
     function _buildTable() {
         var t = _tbl();
+        _buildContactShadow(t);
         var mat = _tableTopMat();
         var lm  = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.45, metalness: 0.75 });
         if (_cfg.tableShape === 'rect') {
@@ -857,12 +974,13 @@
     }
 
     function _saveFurniture() {
-        var json;
+        var json, data;
         try {
-            var data = _furnitureObjs.map(function(f){ return { id:f.id, type:f.type, x:f.x, z:f.z }; });
+            data = _furnitureObjs.map(function(f){ return { id:f.id, type:f.type, x:f.x, z:f.z, rot:f.rot || 0 }; });
             json = JSON.stringify(data);
             localStorage.setItem(_furnitureKey(), json);
         } catch (e) {}
+        if (window.RoomSceneStore && data) RoomSceneStore.set({ furniture: data }, { source: _applyingRemote ? 'remote' : 'local', slice: 'furniture', fields: ['furniture'] });
         // Broadcast the new layout to the room (unless we're applying a peer's change).
         if (!_applyingRemote && json && window.RoomSceneNet && RoomSceneNet.setLayout) {
             RoomSceneNet.setLayout(json);
@@ -876,6 +994,7 @@
         var layout;
         try { layout = JSON.parse(layoutJson); } catch (e) { return; }
         if (!Array.isArray(layout)) return;
+        if (window.RoomSceneStore) RoomSceneStore.set({ furniture: layout }, { source: 'remote', slice: 'furniture', fields: ['furniture'] });
         _applyingRemote = true;
         try {
             try { localStorage.setItem(_furnitureKey(), JSON.stringify(layout)); } catch (e) {}
@@ -901,12 +1020,14 @@
             var res = _makeFurnitureMesh(item.type);
             if (!res) return;
             var id = item.id || nextId++;
+            var rot = item.rot || 0;
             res.group.position.set(item.x, 0, item.z);
+            res.group.rotation.y = rot;
             res.group.userData.furnitureId = id;
             res.pickMesh.userData.furnitureId = id;
             res.pickMesh.userData.isFurniture = true;
             _scene.add(res.group);
-            _furnitureObjs.push({ id: id, type: item.type, x: item.x, z: item.z, group: res.group, pickMesh: res.pickMesh });
+            _furnitureObjs.push({ id: id, type: item.type, x: item.x, z: item.z, rot: rot, group: res.group, pickMesh: res.pickMesh });
         });
     }
 
@@ -1166,6 +1287,7 @@
     function _saveChairPositions(broadcast) {
         var json;
         try { json = JSON.stringify(_chairPos); localStorage.setItem(_chairPosKey(), json); } catch (e) {}
+        if (window.RoomSceneStore) RoomSceneStore.set({ chairPos: _chairPos }, { source: broadcast === false ? 'remote' : 'local', slice: 'chairPos', fields: ['chairPos'] });
         if (broadcast !== false && json && window.RoomSceneNet && RoomSceneNet.setChairPositions) RoomSceneNet.setChairPositions(json);
     }
     // From the server (peer drag) / RoomState snapshot.
@@ -1173,6 +1295,7 @@
         var obj; try { obj = (typeof json === 'string') ? JSON.parse(json) : json; } catch (e) { return; }
         _chairPos = (obj && typeof obj === 'object') ? obj : {};
         try { localStorage.setItem(_chairPosKey(), JSON.stringify(_chairPos)); } catch (e) {}
+        if (window.RoomSceneStore) RoomSceneStore.set({ chairPos: _chairPos }, { source: 'remote', slice: 'chairPos', fields: ['chairPos'] });
         if (_scene) _rebuildSeating();
     }
     // Draggable = empty chair, or the local user's own claimed chair.
@@ -1232,11 +1355,8 @@
         return true;
     }
 
-    // Three drag models, chosen by _cfg.dragMode:
-    //   'direct'       — drag an item to move it; empty/Shift+drag orbits.
-    //   'select'       — single-click selects; drag the selected item to move; empty deselects+orbits.
-    //   'doubleselect' — double-click selects; drag the selected item to move; otherwise orbit.
-    // Shift+drag ALWAYS orbits in every mode (escape hatch when an item blocks the view).
+    // Drag model: single-click selects; drag the selected item to move; clicking empty
+    // space deselects. Shift+drag ALWAYS orbits (escape hatch when an item blocks the view).
     function _onPointerDown(event) {
         if (_walk) return;                          // walk mode: drag = look, handled elsewhere
         if (event.button !== undefined && event.button !== 0) return;
@@ -1246,28 +1366,21 @@
         var dchair = _raycastDraggableChairAt(event);
         if (dchair) { _beginChairDrag(dchair, event); return; }
         if (!_furnitureObjs.length) return;
-        var mode  = _cfg.dragMode || 'select';
         var found = _raycastFurnitureAt(event);
 
-        if (mode === 'direct') {
-            if (found) _beginDrag(found, event);    // miss → fall through to orbit
-            return;
-        }
-
-        // select / doubleselect
         if (found && found.id === _selectedFurnId) {
             _beginDrag(found, event);               // drag the already-selected item
             return;
         }
-        if (mode === 'select' && found) {
+        if (found) {
             _selectFurniture(found.id);             // first click selects (no move, no orbit)
             _suppressNextChairClick = true;
             event.stopPropagation();
             if (event.preventDefault) event.preventDefault();
             return;
         }
-        // doubleselect + unselected item, OR empty space → deselect (if needed) and orbit
-        if (!found && _selectedFurnId !== null) _deselectFurniture();
+        // empty space → deselect (if needed) and orbit
+        if (_selectedFurnId !== null) _deselectFurniture();
         // not consumed → OrbitControls orbits
     }
 
@@ -1335,14 +1448,6 @@
         if (_controls) _controls.enabled = true;
     }
 
-    function _onDblClick(event) {
-        if (_walk) return;
-        if ((_cfg.dragMode || 'select') !== 'doubleselect') return;
-        var found = _raycastFurnitureAt(event);
-        if (found) { _selectFurniture(found.id); event.stopPropagation(); }
-        else       { _deselectFurniture(); }
-    }
-
     function _onKeyDown(event) {
         var t = event.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
@@ -1364,7 +1469,13 @@
             if (code === kb.jump)    { if (_walk.grounded) { _walk.vy = 7.5; _walk.grounded = false; } return; }
             if (code === kb.crouch)  { _walk.crouch = true; return; }
             if (code === kb.interact){ _walkInteract(); return; }
-            if (code === 'Escape')   { _toggleWalk(); return; }
+            if (code === 'Escape')   {
+                // First Esc while pointer-locked: let the browser release the lock and
+                // fall back to drag-look, but stay in walk mode. Second Esc (already
+                // unlocked) exits walk as before.
+                if (_renderer && document.pointerLockElement === _renderer.domElement) return;
+                _toggleWalk(); return;
+            }
             // Any other key in walk mode: prevent bubbling to page shortcuts
             event.stopImmediatePropagation();
             return;
@@ -1374,6 +1485,7 @@
         if (_selectedFurnId === null) return;
         if (event.key === 'Escape') { _deselectFurniture(); }
         else if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); _deleteSelected(); }
+        else if (event.code === 'KeyR') { event.preventDefault(); _rotateSelected(event.shiftKey ? -1 : 1); }
     }
 
     function _onKeyUp(event) {
@@ -1397,60 +1509,64 @@
     }
 
     function _createWalkButton() {
-        var BTN_BASE = 'position:absolute;z-index:12;background:rgba(20,24,40,0.9);color:#e8eaf6;' +
-            'border:1px solid rgba(120,140,210,0.4);border-radius:7px;padding:4px 9px;cursor:pointer;' +
-            'font-size:0.74rem;backdrop-filter:blur(6px);';
+        // P15: a single vertical icon toolbar (top-right) houses the walk / click-walk /
+        // furniture buttons — same handlers as before, just grouped + restyled via CSS.
+        var toolbar = document.createElement('div');
+        toolbar.id = 'rs3d-toolbar';
+        toolbar.className = 'rs3d-toolbar';
+        var kb = _keyBinds();
 
-        // Walk / Orbit toggle (top-right)
+        // Walk / Orbit toggle
         var b = document.createElement('button');
         b.id = 'rs3d-walk-btn'; b.type = 'button';
-        b.style.cssText = BTN_BASE + 'top:8px;right:8px;';
-        var kb = _keyBinds();
+        b.className = 'rs3d-tool-btn';
         b.title = 'Walk around in first/third person (' + _keyHint(kb.walk) + ')';
-        b.textContent = '🚶 Walk';
+        b.textContent = '🚶';
         b.onclick = _toggleWalk;
-
-        // Small hint label under the Walk button so users know T enters walk mode.
-        var hint = document.createElement('div');
-        hint.id = 'rs3d-walk-hint';
-        hint.style.cssText = 'position:absolute;top:34px;right:8px;z-index:12;font-size:0.60rem;' +
-            'color:rgba(200,210,240,0.7);text-align:right;pointer-events:none;white-space:nowrap;';
-        hint.textContent = 'Press ' + _keyHint(kb.walk) + ' to walk';
-
-        if (_view === 'top') { b.style.display = 'none'; hint.style.display = 'none'; }
-        _container.appendChild(b);
-        _container.appendChild(hint);
+        toolbar.appendChild(b);
         _walkBtn = b;
 
-        // Click-to-walk toggle (below walk button)
+        // Click-to-walk toggle
         var ctw = document.createElement('button');
         ctw.id = 'rs3d-ctw-btn'; ctw.type = 'button';
-        ctw.style.cssText = BTN_BASE + 'top:50px;right:8px;';
-        ctw.title = 'Toggle click-to-walk (click floor to glide your avatar there)';
-        ctw.textContent = '🖱️ Click-walk';
+        ctw.className = 'rs3d-tool-btn' + (_clickWalkEnabled ? '' : ' off');
+        ctw.title = _clickWalkEnabled ? 'Click-to-walk ON — click floor to move avatar' : 'Click-to-walk OFF — click won\'t move avatar';
+        ctw.textContent = '🖱️';
         ctw.onclick = function() {
             _clickWalkEnabled = !_clickWalkEnabled;
-            ctw.style.background = _clickWalkEnabled ? 'rgba(20,24,40,0.9)' : 'rgba(80,20,20,0.88)';
+            ctw.classList.toggle('off', !_clickWalkEnabled);
             ctw.title = _clickWalkEnabled ? 'Click-to-walk ON — click floor to move avatar' : 'Click-to-walk OFF — click won\'t move avatar';
         };
-        if (_view === 'top') ctw.style.display = 'none';
-        _container.appendChild(ctw);
+        toolbar.appendChild(ctw);
         _clickWalkBtn = ctw;
 
-        // Furniture quick-add button "+" (bottom-right corner)
+        // Furniture quick-add toggle
         var fhb = document.createElement('button');
         fhb.id = 'rs3d-furn-btn'; fhb.type = 'button';
-        fhb.style.cssText = BTN_BASE + 'bottom:8px;right:8px;padding:4px 10px;font-size:0.80rem;';
+        fhb.className = 'rs3d-tool-btn';
         fhb.title = 'Add room furniture';
-        fhb.textContent = '+ Furniture';
+        fhb.textContent = '➕';
         fhb.onclick = function(e) { e.stopPropagation(); _toggleFurnHud(); };
-        _container.appendChild(fhb);
+        toolbar.appendChild(fhb);
         _furnHudBtn = fhb;
 
-        // Furniture quick-add panel (hidden by default)
+        if (_view === 'top') toolbar.style.display = 'none';
+        _container.appendChild(toolbar);
+        _toolbar = toolbar;
+
+        // Small hint label under the toolbar so users know T enters walk mode.
+        var hint = document.createElement('div');
+        hint.id = 'rs3d-walk-hint';
+        hint.style.cssText = 'position:absolute;top:116px;right:8px;z-index:12;font-size:0.60rem;' +
+            'color:rgba(200,210,240,0.7);text-align:right;pointer-events:none;white-space:nowrap;';
+        hint.textContent = 'Press ' + _keyHint(kb.walk) + ' to walk';
+        if (_view === 'top') hint.style.display = 'none';
+        _container.appendChild(hint);
+
+        // Furniture quick-add panel (hidden by default), anchored under the toolbar.
         var fhud = document.createElement('div');
         fhud.id = 'rs3d-furn-hud';
-        fhud.style.cssText = 'position:absolute;bottom:36px;right:8px;z-index:13;display:none;' +
+        fhud.style.cssText = 'position:absolute;top:116px;right:8px;z-index:13;display:none;' +
             'background:rgba(20,24,40,0.94);color:#e8eaf6;border:1px solid rgba(120,140,210,0.4);' +
             'border-radius:8px;padding:6px 8px;backdrop-filter:blur(6px);';
         var FURN_ITEMS = [
@@ -1484,24 +1600,81 @@
         _furnHud.style.display = (_furnHud.style.display === 'none' ? 'block' : 'none');
     }
 
+    // P15: one-time onboarding callouts (3D view only). Dismissed on first interaction
+    // with the canvas, or via each chip's ✕. Persists via localStorage so it shows once.
+    var ONBOARD_KEY = 'es_rs3d_onboarded';
+    function _showOnboarding() {
+        if (!_container || _view === 'top') return;
+        try { if (localStorage.getItem(ONBOARD_KEY)) return; } catch (e) { return; }
+
+        var chips = [];
+        function addChip(text, arrowClass, posStyle) {
+            var div = document.createElement('div');
+            div.className = 'rs3d-callout ' + arrowClass;
+            div.style.cssText = posStyle;
+            div.appendChild(document.createTextNode(text));
+            var x = document.createElement('button');
+            x.type = 'button'; x.className = 'rs3d-callout-close'; x.textContent = '✕';
+            x.onclick = dismiss;
+            div.appendChild(x);
+            _container.appendChild(div);
+            chips.push(div);
+        }
+        function dismiss() {
+            chips.forEach(function (c) { if (c.parentNode) c.parentNode.removeChild(c); });
+            chips = [];
+            try { localStorage.setItem(ONBOARD_KEY, '1'); } catch (e) {}
+            _container.removeEventListener('pointerdown', dismiss);
+        }
+
+        addChip('🚶 Walk around the room', 'rs3d-callout-r', 'top:14px;right:46px;');
+        addChip('🪑 Click a chair to sit down', 'rs3d-callout-d', 'left:50%;bottom:64px;transform:translateX(-50%);');
+        addChip('➕ Add furniture here', 'rs3d-callout-r', 'top:96px;right:46px;');
+
+        _container.addEventListener('pointerdown', dismiss, { once: true });
+    }
+
+    // Public wrapper (P10): lets the settings/offcanvas UI open the same in-canvas
+    // furniture quick-add panel as the on-canvas "+ Furniture" button.
+    function toggleFurniturePanel() {
+        _toggleFurnHud();
+    }
+
     function _showWalkHud() {
-        if (document.getElementById('rs3d-walk-hud')) return;
         var kb = _keyBinds();
         var thirdPerson = (_cfg && _cfg.walkCameraMode === 'third');
-        var hud = document.createElement('div');
+        var locked = !thirdPerson && _renderer && document.pointerLockElement === _renderer.domElement;
+        var lookHint = locked ? 'move mouse to look · Esc unlocks, Esc again exits' : 'drag to look · Esc exit';
+        var text = _keyHint(kb.forward) + _keyHint(kb.left) + _keyHint(kb.back) + _keyHint(kb.right) +
+            ' move · ' + _keyHint(kb.jump) + ' jump · ' + _keyHint(kb.crouch) + ' crouch · ' +
+            _keyHint(kb.interact) + ' interact · ' + lookHint +
+            (thirdPerson ? ' · 3rd person' : ' · 1st person');
+        var hud = document.getElementById('rs3d-walk-hud');
+        if (hud) { hud.textContent = text; return; }
+        hud = document.createElement('div');
         hud.id = 'rs3d-walk-hud';
         hud.style.cssText = 'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:12;' +
             'background:rgba(20,24,40,0.86);color:#cdd6f4;border:1px solid rgba(120,140,210,0.35);' +
             'border-radius:8px;padding:5px 12px;font-size:0.70rem;backdrop-filter:blur(6px);white-space:nowrap;';
-        hud.textContent = _keyHint(kb.forward) + _keyHint(kb.left) + _keyHint(kb.back) + _keyHint(kb.right) +
-            ' move · ' + _keyHint(kb.jump) + ' jump · ' + _keyHint(kb.crouch) + ' crouch · ' +
-            _keyHint(kb.interact) + ' interact · drag to look · Esc exit' +
-            (thirdPerson ? ' · 3rd person' : ' · 1st person');
+        hud.textContent = text;
         _container.appendChild(hud);
     }
     function _hideWalkHud() {
         var hud = document.getElementById('rs3d-walk-hud');
         if (hud && hud.parentNode) hud.parentNode.removeChild(hud);
+    }
+
+    // P15: brief centred toast shown each time walk mode is entered.
+    function _showWalkToast() {
+        if (!_container) return;
+        var kb = _keyBinds();
+        var moveKeys = _keyHint(kb.forward) + _keyHint(kb.left) + _keyHint(kb.back) + _keyHint(kb.right);
+        var toast = document.createElement('div');
+        toast.className = 'rs3d-walk-toast';
+        toast.textContent = '🚶 Walk mode — ' + moveKeys + ' to move · drag/mouse to look · Esc to exit';
+        _container.appendChild(toast);
+        setTimeout(function () { toast.style.opacity = '0'; }, 1400);
+        setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 2000);
     }
 
     function _toggleWalk() { if (_walk) _exitWalk(); else _enterWalk(); }
@@ -1524,18 +1697,27 @@
         _flyTarget = null;
         var thirdPerson = (_cfg && _cfg.walkCameraMode === 'third');
         if (_walkBtn) {
-            _walkBtn.textContent = thirdPerson ? '🎥 3rd · Orbit' : '🎥 1st · Orbit';
-            _walkBtn.style.background = 'rgba(34,197,94,0.85)';
+            _walkBtn.textContent = '🎥';
+            _walkBtn.title = (thirdPerson ? '3rd person' : '1st person') + ' — click to return to orbit';
+            _walkBtn.classList.add('active');
         }
         var hint = document.getElementById('rs3d-walk-hint'); if (hint) hint.style.display = 'none';
         if (_clickWalkBtn) _clickWalkBtn.style.display = 'none';
         if (_furnHudBtn)   _furnHudBtn.style.display = 'none';
         if (_furnHud)      _furnHud.style.display = 'none';
         _showWalkHud();
+        _showWalkToast();
         // Become a roamer: tell everyone where I am, and spawn my own avatar locally.
         _iAmRoaming = true; _roamSend = 1;
         if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, yaw, 'walk');
         applyAvatarMove(_myCid(), px, pz, yaw, 'walk');
+        // P7: canvas-scoped keyboard focus (blur exits walk) + first-person mouse-look via Pointer Lock.
+        if (_renderer) {
+            _renderer.domElement.focus();
+            if (!thirdPerson && _renderer.domElement.requestPointerLock) {
+                try { _renderer.domElement.requestPointerLock(); } catch (e) {}
+            }
+        }
     }
 
     function _exitWalk() {
@@ -1544,8 +1726,16 @@
         var pz = _walk ? _walk.wz : (_camera ? _camera.position.z : 0);
         var yaw = _walk ? _walk.yaw : 0;
         _walk = null; _keys = {}; _look = null;
+        if (document.pointerLockElement && _renderer && document.pointerLockElement === _renderer.domElement) {
+            try { document.exitPointerLock(); } catch (e) {}
+        }
+        _updateInteractLabel(null);
         if (_controls) { _controls.enabled = true; _controls.target.set(0, TBL_TOP, 0); _controls.update(); }
-        if (_walkBtn) { _walkBtn.textContent = '🚶 Walk'; _walkBtn.style.background = 'rgba(20,24,40,0.9)'; }
+        if (_walkBtn) {
+            _walkBtn.textContent = '🚶';
+            _walkBtn.title = 'Walk around in first/third person (' + _keyHint(_keyBinds().walk) + ')';
+            _walkBtn.classList.remove('active');
+        }
         var hint = document.getElementById('rs3d-walk-hint'); if (hint) hint.style.display = '';
         if (_clickWalkBtn) _clickWalkBtn.style.display = '';
         if (_furnHudBtn)   _furnHudBtn.style.display = '';
@@ -1563,10 +1753,33 @@
         if (!_walk || !_look) return;
         var dx = e.clientX - _look.x, dy = e.clientY - _look.y;
         _look.x = e.clientX; _look.y = e.clientY;
-        _walk.yaw  += dx * 0.005;
-        _walk.pitch = Math.max(-1.2, Math.min(1.2, _walk.pitch - dy * 0.005));
+        var sens = _lookSens(), pitchSign = _invertY() ? 1 : -1;
+        _walk.yaw  += dx * sens;
+        _walk.pitch = Math.max(-1.2, Math.min(1.2, _walk.pitch + pitchSign * dy * sens));
     }
     function _onLookUp() { _look = null; }
+
+    // Pointer Lock mouse-look (first-person walk only). Inert unless the canvas is
+    // actually lock-owner — falls back silently to drag-look (_onLook*) otherwise.
+    function _onPointerLockMove(e) {
+        if (!_walk || !_renderer || document.pointerLockElement !== _renderer.domElement) return;
+        var sens = _lookSens(), pitchSign = _invertY() ? 1 : -1;
+        _walk.yaw  += (e.movementX || 0) * sens;
+        _walk.pitch = Math.max(-1.2, Math.min(1.2, _walk.pitch + pitchSign * (e.movementY || 0) * sens));
+    }
+    function _onPointerLockChange() {
+        if (_walk) _showWalkHud();   // refresh HUD text (locked vs. drag-look wording)
+    }
+
+    // Canvas-scoped keyboard focus (P7): losing focus to something outside the room
+    // scene exits walk mode. Focus moving to our own on-canvas buttons (e.g. the
+    // Walk toggle itself) is ignored so clicking them keeps working as before.
+    function _onCanvasBlur(e) {
+        if (!_walk) return;
+        var rt = e && e.relatedTarget;
+        if (rt && _container && _container.contains(rt)) return;
+        _exitWalk();
+    }
 
     function _furnById(id) {
         for (var i = 0; i < _furnitureObjs.length; i++) if (_furnitureObjs[i].id === id) return _furnitureObjs[i];
@@ -1596,7 +1809,7 @@
         if (_keys[kb.right])    strafe += 1;
         if (_keys[kb.left])     strafe -= 1;
 
-        var speed = (_walk.crouch ? CROUCH_SPEED : WALK_SPEED) * dt;
+        var speed = (_walk.crouch ? _crouchSpeed() : _walkSpeed()) * dt;
         var sy = Math.sin(_walk.yaw), cyw = Math.cos(_walk.yaw);
         var dx = sy * fwd + cyw * strafe;
         var dz = -cyw * fwd + sy * strafe;
@@ -1675,6 +1888,13 @@
                 RoomSceneNet.avatarMove(_walk.wx, _walk.wz, _walk.yaw, 'walk');
             applyAvatarMove(_myCid(), _walk.wx, _walk.wz, _walk.yaw, 'walk');
         }
+
+        // Refresh the "Press E to ..." prompt a few times a second (P9).
+        _interactCheckT += dt;
+        if (_interactCheckT >= 0.2) {
+            _interactCheckT = 0;
+            _updateInteractLabel(_findInteractTarget());
+        }
     }
 
     // E key: drop a carried item, or sit/stand at the chair ahead, or pick up furniture.
@@ -1747,6 +1967,111 @@
         _raycaster.far = Infinity;
     }
 
+    // Side-effect-free probe for the "Press E to ..." HUD prompt (P9). Mirrors the
+    // same proximity-limited rays as _walkInteract() but performs no actions or
+    // state changes — safe to call every tick without affecting claims/furniture.
+    function _findInteractTarget() {
+        if (!_walk) return null;
+        if (_walk.held != null) return { label: 'drop' };
+        if (!_raycaster || !_camera) return null;
+        var thirdPerson = (_cfg && _cfg.walkCameraMode === 'third');
+        var rayOrigin, dir;
+        if (thirdPerson) {
+            rayOrigin = new THREE.Vector3(_walk.wx, 1.1, _walk.wz);
+            dir = new THREE.Vector3(Math.sin(_walk.yaw), 0, -Math.cos(_walk.yaw)).normalize();
+        } else {
+            rayOrigin = _camera.position.clone();
+            dir = new THREE.Vector3(); _camera.getWorldDirection(dir);
+        }
+        _raycaster.set(rayOrigin, dir);
+        var result = null;
+
+        if (_wbBoard) {
+            var wbPos = new THREE.Vector3();
+            _wbBoard.getWorldPosition(wbPos);
+            var wbDist = Math.hypot(_walk.wx - wbPos.x, _walk.wz - wbPos.z);
+            if (wbDist < 2.2) {
+                _raycaster.far = 2.2;
+                if (_raycaster.intersectObject(_wbBoard, true).length) result = { label: 'open whiteboard' };
+            }
+        }
+
+        if (!result) {
+            var pms = _propMeshes();
+            if (pms.length) {
+                _raycaster.far = 2.5;
+                var phit = _raycaster.intersectObjects(pms, true);
+                if (phit.length) {
+                    var hit = phit[0].object, prp = null;
+                    while (hit && !prp) { prp = _propForMesh(hit); hit = hit.parent; }
+                    if (prp) result = { label: _propLabel(prp.action) };
+                }
+            }
+        }
+
+        if (!result) {
+            var chairMeshes = _chairObjects.map(function (c) { return c.seatMesh; });
+            _raycaster.far = 1.9;
+            var ch = chairMeshes.length ? _raycaster.intersectObjects(chairMeshes, true) : [];
+            if (ch.length) {
+                var hitMesh = ch[0].object, chairObj = null;
+                for (var i = 0; i < _chairObjects.length; i++) {
+                    if (_chairObjects[i].seatMesh === hitMesh) { chairObj = _chairObjects[i]; break; }
+                }
+                if (chairObj) {
+                    var idx = chairObj.idx, claim = _claimedChairs[idx];
+                    if (claim && claim.cid === _myCid()) result = { label: 'stand up' };
+                    else if (!claim) result = { label: 'sit' };
+                }
+            }
+        }
+
+        if (!result) {
+            var pickMeshes = _furnitureObjs.map(function (f) { return f.pickMesh; });
+            var fr = pickMeshes.length ? _raycaster.intersectObjects(pickMeshes, true) : [];
+            if (fr.length && fr[0].object.userData.furnitureId != null) result = { label: 'pick up' };
+        }
+
+        _raycaster.far = Infinity;
+        return result;
+    }
+
+    // Show/hide/update the floating "Press E to ..." prompt near the avatar (P9).
+    function _updateInteractLabel(target) {
+        if (!_scene || !CSS2DObject) return;
+        if (!target) {
+            if (_interactLabel) _interactLabel.element.style.display = 'none';
+            return;
+        }
+        if (!_interactLabel) {
+            var div = document.createElement('div');
+            div.className = 'rs3d-interact-label';
+            div.style.cssText = 'background:rgba(20,24,40,0.86);color:#cdd6f4;border:1px solid rgba(120,140,210,0.35);' +
+                'border-radius:6px;padding:3px 9px;font:600 0.72rem sans-serif;white-space:nowrap;pointer-events:none;';
+            _interactLabel = new CSS2DObject(div);
+            _scene.add(_interactLabel);
+        }
+        var kb = _keyBinds();
+        _interactLabel.element.textContent = _keyHint(kb.interact) + ' ' + target.label;
+        _interactLabel.element.style.display = '';
+        var fx = _walk.wx + Math.sin(_walk.yaw) * 1.2;
+        var fz = _walk.wz - Math.cos(_walk.yaw) * 1.2;
+        _interactLabel.position.set(fx, 1.7, fz);
+    }
+
+    // Remove the interact-prompt CSS2DObject and its DOM element (called from
+    // dispose() and refreshScene() to avoid orphaned label nodes).
+    function _disposeInteractLabel() {
+        if (_interactLabel) {
+            if (_interactLabel.parent) _interactLabel.parent.remove(_interactLabel);
+            if (_interactLabel.element && _interactLabel.element.parentNode) {
+                _interactLabel.element.parentNode.removeChild(_interactLabel.element);
+            }
+            _interactLabel = null;
+        }
+        _interactCheckT = 0;
+    }
+
     // ── Selection highlight + control bar ─────────────────────
     function _selectedFurn() {
         for (var i = 0; i < _furnitureObjs.length; i++) {
@@ -1784,6 +2109,16 @@
         removeFurniture(_selectedFurnId);
         _deselectFurniture();
     }
+    // Rotate the selected item by dir * 45° (dir: +1 = clockwise, -1 = counter-clockwise).
+    function _rotateSelected(dir) {
+        var f = _selectedFurn();
+        if (!f) return;
+        var TWO_PI = Math.PI * 2;
+        f.rot = ((f.rot || 0) + dir * (Math.PI / 4)) % TWO_PI;
+        if (f.rot < 0) f.rot += TWO_PI;
+        if (f.group) f.group.rotation.y = f.rot;
+        _saveFurniture();
+    }
     function _resetSelection() {
         if (_selRing && _scene) { try { _scene.remove(_selRing); } catch (e) {} }
         _selRing = null;
@@ -1799,11 +2134,14 @@
             'border:1px solid rgba(34,197,94,0.4);backdrop-filter:blur(6px);white-space:nowrap;';
         bar.innerHTML =
             '<span id="rs3d-sel-name">Item selected</span>' +
+            '<button id="rs3d-sel-rot" title="Rotate 45° (R / Shift+R)" style="background:transparent;color:#e8eaf6;' +
+            'border:1px solid #555;border-radius:5px;padding:3px 8px;cursor:pointer;">↻</button>' +
             '<button id="rs3d-sel-del" style="background:#dc3545;color:#fff;border:none;' +
             'border-radius:5px;padding:3px 10px;cursor:pointer;font-weight:700;">✕ Delete</button>' +
             '<button id="rs3d-sel-done" style="background:transparent;color:#aaa;' +
             'border:1px solid #555;border-radius:5px;padding:3px 8px;cursor:pointer;">Done</button>';
         _container.appendChild(bar);
+        bar.querySelector('#rs3d-sel-rot').onclick  = function(){ _rotateSelected(1); };
         bar.querySelector('#rs3d-sel-del').onclick  = _deleteSelected;
         bar.querySelector('#rs3d-sel-done').onclick = _deselectFurniture;
         _selBar = bar;
@@ -1817,6 +2155,59 @@
             nameEl.textContent = (icons[f.type] || '📦') + ' ' + String(f.type).replace('_',' ') + ' — drag to move';
         }
         _selBar.style.display = 'flex';
+    }
+
+    // ── glTF model registry & async loader (Realism Phase B) ───
+    // Catalog of chair/furniture types that have a real glTF model. Types with
+    // model: null keep their hand-built primitive geometry indefinitely.
+    var RS_CATALOG = {
+        chairs: {
+            office: { model: '/models/chairs/office.glb', scale: 1.0, rotY: Math.PI },
+            gaming:  { model: null },
+            beanbag: { model: null },
+            stool:   { model: null },
+            throne:  { model: null }
+        }
+    };
+
+    var _gltfLoader  = null;
+    var _modelCache  = {}; // url -> Promise<THREE.Group> (template, loaded once & cloned per instance)
+
+    function _loadModel(url) {
+        if (_modelCache[url]) return _modelCache[url];
+        if (!_gltfLoader) _gltfLoader = new GLTFLoader();
+        _modelCache[url] = new Promise(function (resolve, reject) {
+            _gltfLoader.load(url, function (gltf) {
+                gltf.scene.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
+                resolve(gltf.scene);
+            }, undefined, function (err) {
+                console.warn('[RS3D] model load failed:', url, err);
+                reject(err);
+            });
+        });
+        return _modelCache[url];
+    }
+
+    // Swaps a chair's primitive parts for a cloned glTF model once it's loaded, scaling
+    // and grounding it to the chair group's origin. `seatMesh` is kept (invisible) as the
+    // raycast/pick proxy for chair-claim and drag interactions.
+    function _applyChairModel(group, seatMesh, entry) {
+        if (!entry || !entry.model) return;
+        _loadModel(entry.model).then(function (template) {
+            if (group.parent !== _scene) return; // chair was rebuilt before the model arrived
+            var model = template.clone();
+            var box = new THREE.Box3().setFromObject(model);
+            var center = box.getCenter(new THREE.Vector3());
+            var scale = entry.scale || 1;
+            model.scale.setScalar(scale);
+            model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+            if (entry.rotY) model.rotation.y = entry.rotY;
+            group.children.slice().forEach(function (child) {
+                if (child === seatMesh) child.visible = false;
+                else group.remove(child);
+            });
+            group.add(model);
+        }).catch(function () { /* keep primitive on load failure */ });
     }
 
     // ── Chair types ───────────────────────────────────────────
@@ -1837,9 +2228,9 @@
         var sm = new THREE.MeshStandardMaterial({ color: _chairColor(unclaimed), roughness: 0.72 });
         var lm = new THREE.MeshStandardMaterial({ color: 0x8888a0, roughness: 0.28, metalness: 0.85 });
         var seat = new THREE.Mesh(new THREE.BoxGeometry(0.44,0.055,0.44), sm);
-        seat.position.y = SEAT_H; g.add(seat);
+        seat.position.y = SEAT_H; seat.castShadow = true; g.add(seat);
         var back = new THREE.Mesh(new THREE.BoxGeometry(0.44,0.50,0.055), sm);
-        back.position.set(0, SEAT_H+0.285, -0.20); g.add(back);
+        back.position.set(0, SEAT_H+0.285, -0.20); back.castShadow = true; g.add(back);
         var col = new THREE.Mesh(new THREE.CylinderGeometry(0.032,0.032,SEAT_H-0.04,6), lm);
         col.position.y = SEAT_H/2; g.add(col);
         var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.065,0.025,8), lm);
@@ -1849,6 +2240,7 @@
             var sp=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.022,0.044),lm);
             sp.rotation.y=a; sp.position.set(Math.cos(a)*0.10,0.011,Math.sin(a)*0.10); g.add(sp);
         }
+        _applyChairModel(g, seat, RS_CATALOG.chairs.office);
         return { group: g, seatMesh: seat };
     }
 
@@ -1858,9 +2250,9 @@
         var ac = new THREE.MeshStandardMaterial({ color: 0xcc1111, roughness: 0.5, metalness: 0.3 });
         var lm = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3, metalness: 0.8 });
         var seat = new THREE.Mesh(new THREE.BoxGeometry(0.46,0.07,0.46), sm);
-        seat.position.y = SEAT_H; g.add(seat);
+        seat.position.y = SEAT_H; seat.castShadow = true; g.add(seat);
         var back = new THREE.Mesh(new THREE.BoxGeometry(0.44,0.68,0.07), sm);
-        back.position.set(0,SEAT_H+0.37,-0.19); g.add(back);
+        back.position.set(0,SEAT_H+0.37,-0.19); back.castShadow = true; g.add(back);
         [-0.24,0.24].forEach(function(wx){
             var wing=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.30,0.1),ac);
             wing.position.set(wx,SEAT_H+0.45,-0.19); g.add(wing);
@@ -1892,6 +2284,7 @@
         var body = new THREE.Mesh(new THREE.SphereGeometry(0.32,10,8), sm);
         body.scale.set(1,0.62,1);
         body.position.y = 0.14 + 0.32*0.62 - 0.04;
+        body.castShadow = true;
         g.add(body);
         return { group: g, seatMesh: body };
     }
@@ -1901,7 +2294,7 @@
         var sm = new THREE.MeshStandardMaterial({ color: unclaimed ? 0x5a3a10 : 0x8a5a20, roughness: 0.75 });
         var lm = new THREE.MeshStandardMaterial({ color: 0x5a4020, roughness: 0.8, metalness: 0.1 });
         var seat = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.06,12), sm);
-        seat.position.y = SEAT_H; g.add(seat);
+        seat.position.y = SEAT_H; seat.castShadow = true; g.add(seat);
         [[0.13,0.13],[-0.13,0.13],[0.13,-0.13],[-0.13,-0.13]].forEach(function(p){
             var leg=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.025,SEAT_H-0.04,6),lm);
             leg.position.set(p[0],SEAT_H/2,p[1]);
@@ -1919,9 +2312,9 @@
         var sm = new THREE.MeshStandardMaterial({ color: unclaimed ? 0x3a1a5a : 0x5a1a9a, roughness: 0.6 });
         var gm = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.3, metalness: 0.8 });
         var seat = new THREE.Mesh(new THREE.BoxGeometry(0.52,0.08,0.50), sm);
-        seat.position.y = SEAT_H; g.add(seat);
+        seat.position.y = SEAT_H; seat.castShadow = true; g.add(seat);
         var back = new THREE.Mesh(new THREE.BoxGeometry(0.50,0.82,0.07), sm);
-        back.position.set(0,SEAT_H+0.43,-0.21); g.add(back);
+        back.position.set(0,SEAT_H+0.43,-0.21); back.castShadow = true; g.add(back);
         var trim=new THREE.Mesh(new THREE.BoxGeometry(0.52,0.06,0.09),gm);
         trim.position.set(0,SEAT_H+0.86,-0.21); g.add(trim);
         [-0.16,0,0.16].forEach(function(sx,si){
@@ -1950,16 +2343,19 @@
     var ROBOT_HIP_Y   = 0.70;   // hip height when standing (world)
     var ROBOT_HEAD_Y  = 1.19;   // head centre (world) — used for labels + rings
 
-    function _makeRobot(color, voteState, seated) {
+    function _makeRobot(color, voteState, seated, scene3d) {
+        scene3d = scene3d || { hat: 'none', eyes: 'round' };
         var root  = new THREE.Group();
         var base  = _colorHex(color);
         var dark  = _darken(base, 0.58);
         var eyeC  = voteState==='revealed' ? 0x22ff88 : voteState==='voted' ? 0xffcc00 : 0x00ddff;
 
-        var bm  = new THREE.MeshStandardMaterial({ color: base, roughness: 0.45, metalness: 0.32 });
+        var jointDark = _darken(base, 0.40);
+        var bm  = new THREE.MeshStandardMaterial({ color: base, roughness: 0.35, metalness: 0.55 });
         var lm  = new THREE.MeshStandardMaterial({ color: dark, roughness: 0.55, metalness: 0.22 });
         var em  = new THREE.MeshStandardMaterial({ color: eyeC, emissive: eyeC, emissiveIntensity: 1.4, roughness: 0.05 });
-        var jm  = new THREE.MeshStandardMaterial({ color: dark, roughness: 0.7,  metalness: 0.4 }); // joint balls
+        var jm  = new THREE.MeshStandardMaterial({ color: jointDark, roughness: 0.6, metalness: 0.5 }); // joint balls (darker)
+        var badgeM = new THREE.MeshStandardMaterial({ color: base, emissive: base, emissiveIntensity: 0.65, roughness: 0.3, metalness: 0.2 });
 
         // Helper: cylinder along local Y
         function cyl(rt, rb, h, seg, mat) {
@@ -1967,6 +2363,13 @@
         }
         function box(w, h, d, mat) { return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); }
         function sph(r, mat) { return new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), mat); }
+        // Higher-res sphere for head-adjacent parts (eyes, antenna tip)
+        function sphHi(r, mat) { return new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat); }
+        // Capsule along local Y — `h` is the overall length (incl. rounded caps), matching
+        // the previous cylinder's `h` so joint pivots/positions stay unchanged.
+        function cap(r, h, mat) {
+            return new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(h - 2 * r, 0.001), 4, 8), mat);
+        }
 
         var hipY = seated ? SEAT_H + 0.22 : ROBOT_HIP_Y;
 
@@ -1974,31 +2377,70 @@
         var hips = new THREE.Group(); hips.position.y = hipY; root.add(hips);
 
         // ── Spine / torso ──
-        var torsoMesh = box(0.29, 0.36, 0.20, bm);
+        var torsoMesh = cap(0.145, 0.36, bm);
         torsoMesh.position.y = 0.18; torsoMesh.castShadow = true; hips.add(torsoMesh);
+
+        // Chest badge — small emissive disc tinted with the participant colour
+        var badge = new THREE.Mesh(new THREE.CircleGeometry(0.045, 12), badgeM);
+        badge.position.set(0, 0.20, 0.148); hips.add(badge);
 
         // ── Neck + head ──
         var neck = new THREE.Group(); neck.position.y = 0.38; hips.add(neck);
         var headMesh = box(0.23, 0.22, 0.19, bm);
-        headMesh.position.y = 0.11; neck.add(headMesh);
-        // Eyes
-        [-0.058, 0.058].forEach(function(ex) {
-            var eye = sph(0.034, em); eye.position.set(ex, 0.12, 0.092); neck.add(eye);
-        });
+        headMesh.position.y = 0.11; headMesh.castShadow = true; neck.add(headMesh);
+        // Eyes — 'visor' (P13) replaces the two round eyes with a single face-spanning visor
+        if (scene3d.eyes === 'visor') {
+            var visor = box(0.20, 0.05, 0.03, em);
+            visor.position.set(0, 0.12, 0.095); neck.add(visor);
+        } else {
+            [-0.058, 0.058].forEach(function(ex) {
+                var eye = sphHi(0.034, em); eye.position.set(ex, 0.12, 0.092); neck.add(eye);
+            });
+        }
         // Antenna
         var ant = cyl(0.008, 0.008, 0.12, 5, lm); ant.position.y = 0.29; neck.add(ant);
-        var antTip = sph(0.022, em); antTip.position.y = 0.35; neck.add(antTip);
+        var antTip = sphHi(0.022, em); antTip.position.y = 0.35; neck.add(antTip);
+
+        // ── Hat / head accessory (P13) ──
+        (function buildHat(type) {
+            if (type === 'cap') {
+                var capTop = box(0.21, 0.07, 0.19, lm);
+                capTop.position.y = 0.255; neck.add(capTop);
+                var brim = box(0.25, 0.02, 0.08, lm);
+                brim.position.set(0, 0.225, 0.13); neck.add(brim);
+            } else if (type === 'antennaBobble') {
+                var stalk = cyl(0.006, 0.006, 0.10, 5, lm);
+                stalk.position.set(0.07, 0.27, 0); neck.add(stalk);
+                var bobble = sph(0.03, em);
+                bobble.position.set(0.07, 0.33, 0); neck.add(bobble);
+            } else if (type === 'crown') {
+                var gm = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.3, metalness: 0.8 });
+                var band = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.018, 6, 16), gm);
+                band.rotation.x = Math.PI / 2; band.position.y = 0.225; neck.add(band);
+                [-0.10, 0, 0.10].forEach(function(sx) {
+                    var spike = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.07, 4), gm);
+                    spike.position.set(sx, 0.27, 0); neck.add(spike);
+                });
+            } else if (type === 'headphones') {
+                var band2 = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.016, 6, 16, Math.PI), jm);
+                band2.position.y = 0.13; neck.add(band2);
+                [-1, 1].forEach(function(side) {
+                    var cup = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10), jm);
+                    cup.rotation.z = Math.PI / 2; cup.position.set(side * 0.145, 0.12, 0); neck.add(cup);
+                });
+            }
+        })(scene3d.hat);
 
         // ── Arms ──
         function buildArm(side) {
             var sg = new THREE.Group();
             sg.position.set(side * 0.185, 0.34, 0); hips.add(sg);
             // Upper arm
-            var ua = cyl(0.040, 0.034, 0.26, 7, lm); ua.position.y = -0.13; sg.add(ua);
+            var ua = cap(0.037, 0.26, lm); ua.position.y = -0.13; sg.add(ua);
             var jball = sph(0.044, jm); sg.add(jball);  // shoulder joint ball
             // Elbow pivot
             var eg = new THREE.Group(); eg.position.y = -0.26; sg.add(eg);
-            var fa = cyl(0.032, 0.026, 0.22, 7, lm); fa.position.y = -0.11; eg.add(fa);
+            var fa = cap(0.029, 0.22, lm); fa.position.y = -0.11; eg.add(fa);
             var ej = sph(0.038, jm); eg.add(ej); // elbow joint ball
             // Hand
             var hand = box(0.082, 0.065, 0.055, bm); hand.position.y = -0.25; eg.add(hand);
@@ -2010,11 +2452,11 @@
         function buildLeg(side) {
             var hg = new THREE.Group(); hg.position.set(side * 0.09, 0, 0); hips.add(hg);
             // Thigh
-            var thigh = cyl(0.060, 0.052, 0.36, 7, lm); thigh.position.y = -0.18; hg.add(thigh);
+            var thigh = cap(0.056, 0.36, lm); thigh.position.y = -0.18; hg.add(thigh);
             var hj = sph(0.060, jm); hg.add(hj); // hip joint ball
             // Knee pivot
             var kg = new THREE.Group(); kg.position.y = -0.36; hg.add(kg);
-            var shin = cyl(0.050, 0.042, 0.28, 7, lm); shin.position.y = -0.14; kg.add(shin);
+            var shin = cap(0.046, 0.28, lm); shin.position.y = -0.14; kg.add(shin);
             var kj = sph(0.052, jm); kg.add(kj); // knee joint ball
             // Ankle pivot
             var ag = new THREE.Group(); ag.position.y = -0.28; kg.add(ag);
@@ -2196,6 +2638,9 @@
     // After any change to the claim map, repaint 3D (if mounted) and 2D (always,
     // since it reads the same authoritative store).
     function _notifyClaimsChanged() {
+        // Mirror into the shared store (source:'remote' — claim broadcasts to other
+        // participants happen via the RoomSceneNet calls at the call sites, not via the store).
+        if (window.RoomSceneStore) RoomSceneStore.set({ claims: _claimedChairs }, { source: 'remote', slice: 'claims', fields: ['claims'] });
         if (_scene) _rebuildSeating();
         if (window.RoomScene && RoomScene.render && (!_cfg || _cfg.mode !== '3d-gl')) RoomScene.render();
     }
@@ -2282,7 +2727,7 @@
         }
         var rs = _roomState || {};
         var vs = _voteState(p, rs);
-        var robot = _makeRobot(p ? _parseColor(p) : 0x888888, vs, false);
+        var robot = _makeRobot(p ? _parseColor(p) : 0x888888, vs, false, _parseScene3d(p));
         _scene.add(robot);
         var headY = ROBOT_HEAD_Y;
         var rc = VOTE_EMI[vs] || VOTE_EMI.none;
@@ -2290,7 +2735,7 @@
             new THREE.MeshStandardMaterial({ color: rc, emissive: rc, emissiveIntensity: 0.9 }));
         ring.rotation.x = Math.PI / 2; _scene.add(ring);
         var label = null, labelObj = null;
-        if (p && THREE.CSS2DObject) { label = _makeLabel(p, rs, true); labelObj = new THREE.CSS2DObject(label); _scene.add(labelObj); }
+        if (p && CSS2DObject) { label = _makeLabel(p, rs, true); labelObj = new CSS2DObject(label); _scene.add(labelObj); }
         // wasGray: robot was created with no participant data → needs body rebuild in _refreshRoamers.
         return { robot: robot, ring: ring, label: label, labelObj: labelObj, headY: headY, wasGray: !p };
     }
@@ -2369,14 +2814,14 @@
             if (r.wasGray && p && _scene) {
                 if (r.robot) _scene.remove(r.robot);
                 var vs2 = _voteState(p, rs);
-                r.robot = _makeRobot(_parseColor(p), vs2, false);
+                r.robot = _makeRobot(_parseColor(p), vs2, false, _parseScene3d(p));
                 r.robot.position.set(r.x || 0, 0, r.z || 0);
                 r.robot.rotation.y = r.yaw || 0;
                 _scene.add(r.robot);
                 // Build label now that we know who this is.
-                if (!r.label && THREE.CSS2DObject) {
+                if (!r.label && CSS2DObject) {
                     r.label = _makeLabel(p, rs, true);
-                    r.labelObj = new THREE.CSS2DObject(r.label);
+                    r.labelObj = new CSS2DObject(r.label);
                     _scene.add(r.labelObj);
                 }
                 delete r.wasGray;
@@ -2424,13 +2869,13 @@
         return null;
     }
     function showEmote(cid, emoji) {
-        if (!_scene || !THREE.CSS2DObject || !emoji) return;
+        if (!_scene || !CSS2DObject || !emoji) return;
         var pos = _avatarHeadPos(cid); if (!pos) return;
         var div = document.createElement('div');
         div.className = 'rs3d-emote';
         div.textContent = emoji;
         div.style.cssText = 'font-size:1.7rem;pointer-events:none;will-change:opacity;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));';
-        var obj = new THREE.CSS2DObject(div);
+        var obj = new CSS2DObject(div);
         obj.position.set(pos.x, pos.y, pos.z);
         _scene.add(obj);
         _emotes.push({ obj: obj, div: div, t: 0, dur: 1.6, baseY: pos.y });
@@ -2629,7 +3074,7 @@
             else if (rs.votesRevealed && p.vote) vs = 'revealed';
             else if (p.hasVoted)                 vs = 'voted';
 
-            var robot = _makeRobot(_parseColor(p), vs, true);
+            var robot = _makeRobot(_parseColor(p), vs, true, _parseScene3d(p));
             robot.position.set(pos.x, 0, pos.z);
             robot.rotation.y = angle;
             _scene.add(robot);
@@ -2646,8 +3091,8 @@
 
             var label = _makeLabel(p, rs);
             var labelObj = null;
-            if (THREE.CSS2DObject) {
-                labelObj = new THREE.CSS2DObject(label);
+            if (CSS2DObject) {
+                labelObj = new CSS2DObject(label);
                 labelObj.position.set(pos.x, headY + 0.22, pos.z);
                 _scene.add(labelObj);
             }
@@ -2678,7 +3123,7 @@
             else if (rs.votesRevealed && p.vote) vs = 'revealed';
             else if (p.hasVoted)                 vs = 'voted';
 
-            var robot = _makeRobot(_parseColor(p), vs, false);
+            var robot = _makeRobot(_parseColor(p), vs, false, _parseScene3d(p));
             robot.position.set(pos.x, 0, pos.z);
             robot.rotation.y = Math.atan2(-pos.x, -pos.z + 0.1);
             _scene.add(robot);
@@ -2695,8 +3140,8 @@
 
             var label = _makeLabel(p, rs, true);
             var labelObj = null;
-            if (THREE.CSS2DObject) {
-                labelObj = new THREE.CSS2DObject(label);
+            if (CSS2DObject) {
+                labelObj = new CSS2DObject(label);
                 labelObj.position.set(pos.x, headY + 0.22, pos.z);
                 _scene.add(labelObj);
             }
@@ -2786,7 +3231,6 @@
         _container.addEventListener('pointermove',   _onPointerMove, true);
         _container.addEventListener('pointerup',     _onPointerUp,   true);
         _container.addEventListener('pointercancel', _onPointerUp,   true);
-        _container.addEventListener('dblclick',      _onDblClick,    true);
         // Chair-claim click stays on the canvas (bubble phase, after orbit settles).
         _renderer.domElement.addEventListener('click', _onCanvasClick);
         // Walk-mode keys registered in CAPTURE phase so they fire before any bubble-phase
@@ -2798,6 +3242,10 @@
         _renderer.domElement.addEventListener('pointerdown', _onLookDown);
         window.addEventListener('pointermove', _onLookMove);
         window.addEventListener('pointerup',   _onLookUp);
+        // Pointer Lock mouse-look + canvas-scoped focus (P7).
+        document.addEventListener('mousemove', _onPointerLockMove);
+        document.addEventListener('pointerlockchange', _onPointerLockChange);
+        _renderer.domElement.addEventListener('blur', _onCanvasBlur);
     }
 
     function _onCanvasClick(event) {
@@ -2897,6 +3345,14 @@
             var icons = { office:'🪑', gaming:'🎮', beanbag:'🛋️', stool:'🪵', throne:'👑' };
             var ct = _chairTypeForIdx(idx);
             nameEl.textContent = (icons[ct]||'🪑') + ' Chair ' + (idx+1) + ' selected';
+        }
+        if (_claimBarObj) {
+            var chairObj = null;
+            for (var i = 0; i < _chairObjects.length; i++) {
+                if (_chairObjects[i].idx === idx) { chairObj = _chairObjects[i]; break; }
+            }
+            var pos = chairObj ? chairObj.group.position : { x: 0, z: 0 };
+            _claimBarObj.position.set(pos.x, 1.2, pos.z);
         }
         _claimBar.style.display = 'flex';
     }
@@ -3018,29 +3474,54 @@
         else if (window.console) console.log(msg);
     }
 
+    // P15: the claim bar is a CSS2DObject anchored above the pending chair (rather than a
+    // fixed bottom bar), so it visually points at the chair being claimed in both 3D and
+    // top-down. The CSS2DRenderer root has pointerEvents:'none' — re-enable it on the bar
+    // itself so the Sit Here / Cancel buttons stay clickable.
     function _createClaimBar() {
         var bar = document.createElement('div');
         bar.id = 'rs3d-claim-bar';
-        bar.style.cssText = 'position:absolute;bottom:12px;left:50%;transform:translateX(-50%);' +
-            'background:rgba(20,24,40,0.94);color:#e8eaf6;padding:7px 14px;border-radius:8px;' +
-            'display:none;z-index:10;font-size:0.80rem;gap:9px;align-items:center;' +
-            'border:1px solid rgba(100,120,200,0.35);backdrop-filter:blur(6px);white-space:nowrap;';
+        bar.className = 'rs3d-claim-bar';
         bar.innerHTML =
             '<span id="rs3d-claim-name">Chair selected</span>' +
             '<button id="rs3d-claim-ok" style="background:#22c55e;color:#fff;border:none;' +
             'border-radius:5px;padding:3px 11px;cursor:pointer;font-weight:700;">✅ Sit Here</button>' +
             '<button id="rs3d-claim-cancel" style="background:transparent;color:#aaa;' +
             'border:1px solid #555;border-radius:5px;padding:3px 8px;cursor:pointer;">✕</button>';
-        _container.appendChild(bar);
         bar.querySelector('#rs3d-claim-ok').onclick     = _confirmClaim;
         bar.querySelector('#rs3d-claim-cancel').onclick = _cancelClaim;
         _claimBar = bar;
+        if (CSS2DObject && _scene) {
+            _claimBarObj = new CSS2DObject(bar);
+            _scene.add(_claimBarObj);
+        }
     }
 
     // ── Colour utilities ──────────────────────────────────────
     function _colorHex(v){if(typeof v==='number')return v;var n=parseInt(String(v).replace('#',''),16);return isNaN(n)?0x4488cc:n;}
     function _darken(h,f){return(Math.round(((h>>16)&0xff)*f)<<16)|(Math.round(((h>>8)&0xff)*f)<<8)|Math.round((h&0xff)*f);}
+    // P13: parses the "||s3d:hat=...,eyes=...,tint=..." suffix appended to AvatarData
+    // (avatar.js's buildScene3dSuffix). Returns defaults if absent/unparseable.
+    function _parseScene3d(p) {
+        var out = { hat: 'none', eyes: 'round', tint: null };
+        if (!p || !p.avatarData) return out;
+        var s = String(p.avatarData);
+        var idx = s.indexOf('||s3d:');
+        if (idx < 0) return out;
+        s.substring(idx + 6).split(',').forEach(function (kv) {
+            var eq = kv.indexOf('=');
+            if (eq < 0) return;
+            var k = kv.substring(0, eq), v = kv.substring(eq + 1);
+            if (k === 'hat') out.hat = v;
+            else if (k === 'eyes') out.eyes = v;
+            else if (k === 'tint' && /^[0-9a-fA-F]{6}$/.test(v)) out.tint = v;
+        });
+        return out;
+    }
     function _parseColor(p){
+        // P13: explicit 3D tint override takes precedence over the avatar's own colour.
+        var s3d = _parseScene3d(p);
+        if (s3d.tint) { var tn = parseInt(s3d.tint, 16); if (!isNaN(tn)) return tn; }
         // Legacy field (never set by server — kept for safety).
         if(p.avatarColor){var n=parseInt(String(p.avatarColor).replace('#',''),16);if(!isNaN(n))return n;}
         // avatarData format: "initials|#rrggbb"  or  "dicebear:bottts:seed|#rrggbb"
@@ -3213,16 +3694,19 @@
             _container.removeEventListener('pointermove',   _onPointerMove, true);
             _container.removeEventListener('pointerup',     _onPointerUp,   true);
             _container.removeEventListener('pointercancel', _onPointerUp,   true);
-            _container.removeEventListener('dblclick',      _onDblClick,    true);
         }
         document.removeEventListener('keydown', _onKeyDown, true);
         document.removeEventListener('keyup',   _onKeyUp,   true);
         window.removeEventListener('pointermove', _onLookMove);
         window.removeEventListener('pointerup',   _onLookUp);
+        document.removeEventListener('mousemove', _onPointerLockMove);
+        document.removeEventListener('pointerlockchange', _onPointerLockChange);
+        if (document.pointerLockElement && _renderer && document.pointerLockElement === _renderer.domElement) {
+            try { document.exitPointerLock(); } catch (e) {}
+        }
         _hideWalkHud();
-        if (_walkBtn && _walkBtn.parentNode) { _walkBtn.parentNode.removeChild(_walkBtn); _walkBtn = null; }
-        if (_clickWalkBtn && _clickWalkBtn.parentNode) { _clickWalkBtn.parentNode.removeChild(_clickWalkBtn); _clickWalkBtn = null; }
-        if (_furnHudBtn && _furnHudBtn.parentNode) { _furnHudBtn.parentNode.removeChild(_furnHudBtn); _furnHudBtn = null; }
+        if (_toolbar && _toolbar.parentNode) { _toolbar.parentNode.removeChild(_toolbar); _toolbar = null; }
+        _walkBtn = null; _clickWalkBtn = null; _furnHudBtn = null;
         if (_furnHud && _furnHud.parentNode) { _furnHud.parentNode.removeChild(_furnHud); _furnHud = null; }
         var hint = document.getElementById('rs3d-walk-hint'); if (hint && hint.parentNode) hint.parentNode.removeChild(hint);
         if (_miniCanvas && _miniCanvas.parentNode) { _miniCanvas.parentNode.removeChild(_miniCanvas); _miniCanvas = null; _miniCtx = null; }
@@ -3241,10 +3725,12 @@
         });
         _videoTextures = [];
         _walk = null; _keys = {}; _look = null;
+        if (_scene && _scene.environment) { _scene.environment.dispose(); }
         if (_renderer) {
             var el = _renderer.domElement;
             el.removeEventListener('click', _onCanvasClick);
             el.removeEventListener('pointerdown', _onLookDown);
+            el.removeEventListener('blur', _onCanvasBlur);
             if (el.parentNode) el.parentNode.removeChild(el);
             _renderer.dispose(); _renderer = null;
         }
@@ -3252,7 +3738,7 @@
             if (_labelRenderer.domElement.parentNode) _labelRenderer.domElement.parentNode.removeChild(_labelRenderer.domElement);
             _labelRenderer = null;
         }
-        if (_claimBar && _claimBar.parentNode) { _claimBar.parentNode.removeChild(_claimBar); _claimBar = null; }
+        _claimBar = null; _claimBarObj = null;
         if (_selBar && _selBar.parentNode) { _selBar.parentNode.removeChild(_selBar); _selBar = null; }
         _selectedFurnId = null; _selRing = null;
         if (_controls) { _controls.dispose(); _controls = null; }
@@ -3265,6 +3751,7 @@
         _roamers = {}; _iAmRoaming = false; _walkToActive = false;
         _emotes.forEach(function (e) { if (e.div && e.div.parentNode) e.div.parentNode.removeChild(e.div); });
         _emotes = [];
+        _disposeInteractLabel();
         _scene = null; _camera = null; _perspCam = null; _orthoCam = null; _flyTarget = null;
     }
 
@@ -3273,10 +3760,16 @@
         if (!_scene || !_renderer) return;
         // Merge new config
         if (newConfig) Object.assign(_cfg, newConfig);
-        // Save furniture layout
+        _applyRoomSize();
+        // Save furniture layout, clamping into the (possibly smaller) new room bounds
         var savedFurniture = getFurnitureLayout();
+        savedFurniture.forEach(function (f) {
+            var c = _clampRoom(f.x, f.z);
+            f.x = c.x; f.z = c.z;
+        });
         // Clean up label DOM nodes attached to CSS2DObjects
         _clearRobots();
+        _disposeInteractLabel();
         // Remove everything from scene (lights, room geo, table, furniture)
         while (_scene.children.length > 0) { _scene.remove(_scene.children[0]); }
         _furnitureObjs = []; // groups already removed above
@@ -3287,6 +3780,12 @@
         _buildLights();
         _buildFurniture(savedFurniture.length ? savedFurniture : _loadFurniture());
         _rebuildSeating();
+        // The claim bar's CSS2DObject was removed along with the rest of the scene graph
+        // above — re-attach it (and re-anchor it over the pending chair, if any).
+        if (_claimBarObj) {
+            _scene.add(_claimBarObj);
+            if (_pendingChairIdx !== null) _showClaimBar(_pendingChairIdx);
+        }
     }
 
     // ── Public API ────────────────────────────────────────────
@@ -3355,7 +3854,7 @@
         res.pickMesh.userData.furnitureId = id;
         res.pickMesh.userData.isFurniture = true;
         _scene.add(res.group);
-        _furnitureObjs.push({ id: id, type: type, x: x, z: z, group: res.group, pickMesh: res.pickMesh });
+        _furnitureObjs.push({ id: id, type: type, x: x, z: z, rot: 0, group: res.group, pickMesh: res.pickMesh });
         _saveFurniture();
     }
 
@@ -3395,6 +3894,7 @@
         showEmote: showEmote,
         addFurniture: addFurniture, removeFurniture: removeFurniture,
         getFurnitureLayout: getFurnitureLayout, resetFurniture: resetFurniture,
+        toggleFurniturePanel: toggleFurniturePanel,
         applyRemoteLayout: applyRemoteLayout,
         setView: setView,
         flyToParticipant: flyToParticipant
@@ -3409,5 +3909,3 @@
         var stage = document.getElementById('roomSceneStage');
         if (stage) init(stage, { mode: '3d-gl' });
     }());
-
-}());

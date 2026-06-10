@@ -112,7 +112,7 @@
                 <button type="button" class="rs-setup-btn" title="Open the shared whiteboard"
                         onclick="window.Whiteboard && Whiteboard.open()">🖊️ Whiteboard</button>
                 <button type="button" class="rs-setup-btn" title="Configure table, chairs, colours and furniture"
-                        onclick="openSettingsModal('room')">⚙️ Setup Room</button>
+                        onclick="openRoomDesigner()">⚙️ Setup Room</button>
             </div>
             <div id="roomSceneStage" class="room-scene-stage" aria-label="Room scene"></div>
         </div>
@@ -414,7 +414,7 @@
     }
 
     // Reveal the 🏠 Room settings tab (only present where the Room Scene exists)
-    // and sync its fields whenever the Settings modal is opened.
+    // and sync its fields whenever the Settings modal or Room Designer is opened.
     document.addEventListener('DOMContentLoaded', function() {
         if (!window.RoomScene) return;
         var li = document.getElementById('tab-room-li');
@@ -424,6 +424,18 @@
             if (RoomScene.syncControls) RoomScene.syncControls();
         });
     });
+
+    // Opens the Room Designer offcanvas (closing the Settings modal first if it's open).
+    function openRoomDesigner() {
+        var sm = document.getElementById('settingsModal');
+        if (sm) {
+            var modal = bootstrap.Modal.getInstance(sm);
+            if (modal) modal.hide();
+        }
+        var offcanvasEl = document.getElementById('roomDesignerOffcanvas');
+        if (!offcanvasEl) return;
+        bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl).show();
+    }
 
     async function copyInviteLink() {
         const inviteUrl = `${window.location.origin}/room/${encodeURIComponent(ROOM_CONFIG.roomName)}`;
@@ -436,12 +448,13 @@
     }
 </script>
 <script src="~/js/shame.js" asp-append-version="true"></script>
+<script src="~/js/room-scene-store.js" asp-append-version="true"></script>
 <script src="~/js/room-scene.js" asp-append-version="true"></script>
 <script src="~/js/room.js" asp-append-version="true"></script>
-<!-- Three.js r145 (UMD globals) + WebGL room scene — served locally -->
-<script src="~/lib/three/three.min.js"></script>
-<script src="~/lib/three/OrbitControls.js"></script>
-<script src="~/lib/three/CSS2DRenderer.js"></script>
-<script src="~/js/room-scene-3d.js" asp-append-version="true"></script>
+<!-- Three.js r0.184.0 ES modules — served locally; addons resolve via the import map -->
+<script type="importmap">
+{ "imports": { "three": "/lib/three/three.module.js", "three/addons/": "/lib/three/", "three/addons/loaders/GLTFLoader.js": "/lib/three/GLTFLoader.js" } }
+</script>
+<script type="module" src="~/js/room-scene-3d.js" asp-append-version="true"></script>
 <script src="~/js/whiteboard.js" asp-append-version="true"></script>
 }
