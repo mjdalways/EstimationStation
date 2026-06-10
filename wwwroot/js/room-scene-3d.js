@@ -328,149 +328,6 @@
         return (_cfg.skyline === false) ? 'none' : 'skyline';
     }
 
-    // The back wall IS a floor-to-ceiling window spanning its full width. The outdoor
-    // scene lives BEHIND the wall plane (more negative z); the old bug was an opaque
-    // wallB plane in front of it that hid everything. Here there's no opaque centre —
-    // ── Built-in GIF89a frame decoder ────────────────────────────────────
-    // Decodes a GIF data-URL into frames so we can drive animation ourselves,
-    // eliminating any dependency on Chrome's internal GIF animation pipeline.
-    // Returns { frames:[{imageData,delay}], width, height } or null.
-    function _gifDecode(dataUrl) {
-        try {
-            var b64 = dataUrl.split(',')[1]; if (!b64) return null;
-            var bin = atob(b64);
-            var bytes = new Uint8Array(bin.length);
-            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            var p = 0;
-            function rb()   { return bytes[p++]; }
-            function ru16() { var v = bytes[p]|(bytes[p+1]<<8); p+=2; return v; }
-            function skipSubs() { var n; while ((n = rb()) > 0) p += n; }
-            if (bytes[0]!==71||bytes[1]!==73||bytes[2]!==70) return null; // not GIF
-            p = 6;
-            var W = ru16(), H = ru16(), flags = rb();
-            var bgIdx = rb(); rb(); // background color index + pixel aspect ratio
-            var gctBytes = (flags&0x80) ? 3*(2<<(flags&7)) : 0;
-            var gct = bytes.slice(p, p+gctBytes); p += gctBytes;
-            var frames = [], delay = 100, transIdx = -1, disposal = 0;
-            var composite = new Uint8ClampedArray(W*H*4); // compositing buffer
-            // Pre-fill composite with GIF background color so transparent areas
-            // in early frames don't bleed through as black.
-            if (gct.length > 0) {
-                var bgCo = bgIdx * 3;
-                if (bgCo + 2 < gct.length) {
-                    for (var bi = 0; bi < W*H; bi++) {
-                        composite[bi*4]   = gct[bgCo];
-                        composite[bi*4+1] = gct[bgCo+1];
-                        composite[bi*4+2] = gct[bgCo+2];
-                        composite[bi*4+3] = 255;
-                    }
-                }
-            }
-            while (p < bytes.length) {
-                var b = rb();
-                if (b === 0x3B) break; // trailer
-                if (b === 0x21) {      // extension
-                    var ext = rb();
-                    if (ext === 0xF9) { // graphics control
-                        rb();           // block size (always 4)
-                        var gcf = rb();
-                        delay = ru16() * 10; if (delay < 20) delay = 100; // ms
-                        var ti = rb(); rb(); // transparent idx + terminator
-                        transIdx = (gcf & 1) ? ti : -1;
-                        disposal = (gcf >> 3) & 7;
-                    } else { skipSubs(); }
-                    continue;
-                }
-                if (b === 0x2C) {      // image descriptor
-                    var ix=ru16(), iy=ru16(), iw=ru16(), ih=ru16(), ifl=rb();
-                    var lctBytes = (ifl&0x80) ? 3*(2<<(ifl&7)) : 0;
-                    var ct = lctBytes ? bytes.slice(p,p+lctBytes) : gct; p += lctBytes;
-                    var interlaced = !!(ifl & 0x40);
-                    var minCode = rb();
-                    var pixels = _gifLzw(bytes, p, iw*ih, minCode);
-                    skipSubs();
-                    if (!pixels) { delay=100;transIdx=-1;disposal=0; continue; }
-                    if (interlaced) pixels = _gifDeinterlace(pixels, iw, ih);
-                    var prev = (disposal===3) ? new Uint8ClampedArray(composite) : null;
-                    for (var fy=0; fy<ih; fy++) {
-                        for (var fx=0; fx<iw; fx++) {
-                            var pidx = pixels[fy*iw+fx];
-                            if (pidx === transIdx) continue;
-                            var co = pidx*3, di = ((iy+fy)*W+(ix+fx))*4;
-                            if (di+3 < composite.length && co+2 < ct.length) {
-                                composite[di]=ct[co]; composite[di+1]=ct[co+1];
-                                composite[di+2]=ct[co+2]; composite[di+3]=255;
-                            }
-                        }
-                    }
-                    frames.push({ imageData: new ImageData(new Uint8ClampedArray(composite), W, H), delay: delay });
-                    if (disposal === 2) { // restore to background color
-                        var bgR=0,bgG=0,bgB=0,bgA=0;
-                        if (gct.length>0){var bgc2=bgIdx*3;if(bgc2+2<gct.length){bgR=gct[bgc2];bgG=gct[bgc2+1];bgB=gct[bgc2+2];bgA=255;}}
-                        for (var dy=iy; dy<iy+ih&&dy<H; dy++) for (var dx=ix; dx<ix+iw&&dx<W; dx++) {
-                            var ddi=((dy)*W+(dx))*4;
-                            composite[ddi]=bgR;composite[ddi+1]=bgG;composite[ddi+2]=bgB;composite[ddi+3]=bgA;
-                        }
-                    } else if (disposal === 3 && prev) { composite.set(prev); }
-                    delay=100; transIdx=-1; disposal=0;
-                }
-            }
-            return frames.length ? { frames:frames, width:W, height:H } : null;
-        } catch(e) { console.warn('_gifDecode:',e); return null; }
-    }
-    function _gifLzw(bytes, pos, count, minCode) {
-        // Read all sub-blocks into a flat data array first.
-        var data=[], sp=pos, bl;
-        while ((bl=bytes[sp++])>0) for (var i=0;i<bl;i++) data.push(bytes[sp++]);
-
-        var clear=1<<minCode, eoi=clear+1;
-        var cLen=minCode+1, cMask=(1<<cLen)-1;
-        // Initialise code table with base entries (colour indices only — 0..clear-1).
-        // Do NOT put clear/eoi in the table so any stray lookup yields nothing.
-        var table=new Array(clear);
-        for (var t=0;t<clear;t++) table[t]=[t];
-        var next=eoi+1, out=new Uint8Array(count), op=0;
-        var bitBuf=0, bitLen=0, dp=0, prev=-1;
-        // Read the next variable-length code (LSB-first, GIF bit order).
-        // Keep bitBuf as an unsigned 32-bit value via >>>0 after every accumulation
-        // so that >>>= (unsigned right shift) works correctly when discarding used bits.
-        function rc() {
-            while (bitLen<cLen&&dp<data.length){ bitBuf=((bitBuf|(data[dp++]<<bitLen))>>>0); bitLen+=8; }
-            var c=bitBuf&cMask; bitBuf>>>=cLen; bitLen-=cLen; return c;
-        }
-        while (op<count) {
-            var code=rc();
-            if (code===eoi||dp>data.length) break;
-            if (code===clear) {
-                cLen=minCode+1; cMask=(1<<cLen)-1;
-                table.length=clear; next=eoi+1; prev=-1;
-                continue;
-            }
-            var entry;
-            if (code<table.length)          entry=table[code];
-            else if (code===next&&prev>=0)  { var pe=table[prev]; entry=pe.concat(pe[0]); }
-            else if (prev>=0)               { entry=[table[prev][0]]; }  // corrupt stream – emit one safe pixel and carry on
-            else                            { prev=-1; continue; }
-            for (var ei=0;ei<entry.length&&op<count;ei++) out[op++]=entry[ei];
-            if (prev>=0&&next<4096) {
-                table[next++]=table[prev].concat(entry[0]);
-                if (next>cMask&&cLen<12) { cLen++;cMask=(1<<cLen)-1; }
-            }
-            prev=code;
-        }
-        return out;
-    }
-    function _gifDeinterlace(pixels, w, h) {
-        var out=new Uint8Array(pixels.length);
-        var passes=[[0,8],[4,8],[2,4],[1,2]], src=0;
-        for (var pi=0;pi<4;pi++) {
-            for (var y=passes[pi][0];y<h;y+=passes[pi][1]) {
-                for (var x=0;x<w;x++) out[y*w+x]=pixels[src*w+x];
-                src++;
-            }
-        }
-        return out;
-    }
 
     // just slim frame strips around a big sheet of glass, so the view is visible and
     // the "space outside" matches the selected window view.
@@ -494,58 +351,65 @@
         var V  = WINDOW_VIEWS[view] || WINDOW_VIEWS.skyline;
         var zb = zWall - 0.7;                // outdoor scene depth (set back for a sense of distance)
         var tod = _timeOfDay();
-
         if (view === 'custom' && _cfg.windowImage) {
             var _src = _cfg.windowImage;
-            var _isGif = _src.indexOf('data:image/gif') === 0 || _src.match(/\.gif(\?|$)/i);
-            if (_isGif) {
-                // 🎞️ Animated GIF: decode all frames with our built-in GIF89a parser,
-                // then drive playback in _tick using dt. No DOM element / browser tricks.
-                var _gifData = _gifDecode(_src);
-                var _gFrames = _gifData ? _gifData.frames : null;
-                var _gW = _gifData ? _gifData.width  : 1;
-                var _gH = _gifData ? _gifData.height : 1;
-                console.log('[GIF] decoded', _gFrames ? _gFrames.length : 0,
-                            'frames, natural size:', _gW + '×' + _gH);
+            var _isMp4 = _src.indexOf('data:video/mp4') === 0 || _src.match(/\.mp4(\?|$)/i);
+            if (_isMp4) {
+                // 1. Setup the Video Element
+                const video = document.createElement('video');
+                video.src = _src;
+                video.crossOrigin = 'anonymous';    // Fixes CORS issues if loading from a server
+                video.loop = true;
+                video.muted = true;
+                video.setAttribute('playsinline', '');
+                video.style.display = 'none';
 
-                // Native-size canvas for putImageData; scales into the 512×512 texture canvas.
-                var _tmpC = document.createElement('canvas');
-                _tmpC.width = _gW; _tmpC.height = _gH;
-                var _tmpCtx = _tmpC.getContext('2d');
+                // Force attachment to DOM (fixes Safari/iOS black screen)
+                document.body.appendChild(video);
 
-                var _gCanvas = document.createElement('canvas');
-                _gCanvas.width = 512; _gCanvas.height = 512;
-                var _gCtx = _gCanvas.getContext('2d');
+                // 2. Create the Texture
+                const skylineTexture = new THREE.VideoTexture(video);
+                //skylineTexture.encoding = THREE.sRGBEncoding;
+                skylineTexture.minFilter = THREE.LinearFilter;
+                skylineTexture.magFilter = THREE.LinearFilter;
 
-                var _gTex = new THREE.CanvasTexture(_gCanvas);
-                _gTex.generateMipmaps = false;
-                _gTex.wrapS = THREE.ClampToEdgeWrapping;
-                _gTex.wrapT = THREE.ClampToEdgeWrapping;
-                _gTex.minFilter = THREE.LinearFilter;
-                if (THREE.sRGBEncoding) _gTex.encoding = THREE.sRGBEncoding;
+                // 3. Apply to Material
+                const skylineMaterial = new THREE.MeshBasicMaterial({
+                    map: skylineTexture,
+                    side: THREE.DoubleSide
+                });
 
-                if (_gFrames && _gFrames.length > 0) {
-                    // Draw frame 0 immediately
-                    _tmpCtx.putImageData(_gFrames[0].imageData, 0, 0);
-                    _gCtx.drawImage(_tmpC, 0, 0, _gW, _gH, 0, 0, 512, 512);
-                } else {
-                    _gCtx.fillStyle = '#111'; _gCtx.fillRect(0, 0, 512, 512);
-                }
-                _gTex.needsUpdate = true;
+                // 1. Create the Geometry (A flat plane to act as the screen)
+                // The numbers (20, 10) are the Width and Height. Make it big enough to cover the window!
+                const skylineGeometry = new THREE.PlaneGeometry(OW, OH);
 
-                var _gPlane = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
-                    new THREE.MeshBasicMaterial({ map: _gTex }));
-                _gPlane.position.set(0, cy, zb);
-                _scene.add(_gPlane);
+                // 2. Combine the Geometry and the Material into a visible Mesh
+                const skylineMesh = new THREE.Mesh(skylineGeometry, skylineMaterial);
 
-                // Store all fields directly — tick accesses them without closures
-                _gifTextures.push({
-                    frames: _gFrames,
-                    gifW: _gW, gifH: _gH,
-                    tmpCanvas: _tmpC, tmpCtx: _tmpCtx,
-                    canvas: _gCanvas, ctx: _gCtx, tex: _gTex,
-                    frameIdx: 0, frameTime: 0,
-                    img: null   // kept for cleanup compat (parentNode check)
+                // 3. Position the Mesh behind the window
+                // You will need to tweak these XYZ coordinates to match your room's layout
+                skylineMesh.position.set(0, ROOM_H / 2, -4); // Example: Centered, halfway up, pushed back 5 units
+
+                // Optional: If the video looks backwards, you can flip the plane around
+                // skylineMesh.rotation.y = Math.PI;
+
+                // 4. Add the Mesh to your scene (CRITICAL)
+                _scene.add(skylineMesh);
+
+                // 4. Wait for data BEFORE playing
+                video.addEventListener('loadeddata', function () {
+                    video.play().catch(function (err) {
+                        console.warn("Autoplay blocked:", err);
+                    });
+                });
+
+                video.addEventListener('playing', function () {
+                    // Force WebGL to grab the frame now that it's moving
+                    skylineTexture.needsUpdate = true;
+                });
+
+                video.addEventListener('error', function (err) {
+                    console.error("Error loading video:", video.error);
                 });
             } else {
                 // 🎨 Static custom image fills the opening.
