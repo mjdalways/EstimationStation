@@ -1656,6 +1656,9 @@
                         <p class="mb-2"><strong>6/9/2026 (154)</strong></p>
                         <ul class="mb-2">
                             <li>🐛 <strong>Room scene bug fixes (P0)</strong>: large window-media uploads no longer crash silently when the local storage quota is exceeded; rebuilding the room while a custom video plays no longer leaves orphaned hidden <code>&lt;video&gt;</code> elements; the custom video window now fills the opening at the correct position (matching static images); upload help text now correctly reads "Images up to 600 KB, MP4 video up to 10 MB"; clicking your own chair to stand up is now a single code path; pressing <kbd>Esc</kbd> while capturing a key binding now cancels instead of binding Escape, and clicking away or re-clicking the button also cancels.</li>
+                            <li>🎬 <strong>WebM window video (P1)</strong>: the custom window upload now also accepts <code>.webm</code> video (looping, same 10 MB cap as MP4); existing MP4 windows are unaffected. If your browser can't play a chosen video format, you'll now see a message instead of a silent black window.</li>
+                            <li>🗄️ <strong>Server-side room media + persisted scene config (P2)</strong>: the server now has a per-room media library (<code>/api/rooms/&lt;room&gt;/window-media</code>) for window images/video, and room-scene settings (table, chairs, window view, etc.) are now saved on the server so they survive a restart and reach late joiners even if the original host has left. (Backend only — no new UI yet; the upload control still uses the old path until P3.)</li>
+                            <li>🖼️ <strong>Shared window media library (P3)</strong>: uploading a custom window image or video now saves it to the room's shared media library on the server (images up to 5 MB, MP4/WebM video up to 15 MB) instead of only your browser. A new dropdown under the upload button lets everyone pick from previously uploaded media or 🗑️ delete it from the room; deleting the active window reverts everyone to the skyline view. Room scene settings (including the window view) now sync from the server on join/reconnect, so late joiners see the same room without waiting for the host. If you previously set a custom window image locally, a "📤 Share this window with the room" button appears so you can migrate it to the shared library.</li>
                         </ul>
                         <p class="mb-2"><strong>6/7/2026 (153)</strong></p>
                         <ul class="mb-2">
@@ -2723,19 +2726,147 @@
                                         </select>
                                     </div>
                                     <div class="mt-1">
-                                        <input type="file" id="rs-window-image" accept="image/*,.mp4" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Images up to 600 KB, MP4 video up to 10 MB" />
-                                        <div class="form-text small mt-1">Images up to 600 KB, MP4 video up to 10 MB</div>
+                                        <input type="file" id="rs-window-image" accept="image/*,video/mp4,video/webm,.mp4,.webm" class="form-control form-control-sm" onchange="_rsWindowImageUpload && _rsWindowImageUpload(this)" title="Images up to 5 MB, MP4/WebM video up to 15 MB" />
+                                        <div class="form-text small mt-1">Images up to 5 MB, MP4/WebM video up to 15 MB</div>
+                                        <button type="button" id="rs-window-migrate-btn" class="btn btn-sm btn-outline-primary mt-1 d-none" onclick="_rsWindowMediaMigrate && _rsWindowMediaMigrate()">📤 Share this window with the room</button>
+                                        <select id="rs-window-media-lib" class="form-select form-select-sm mt-1" onchange="_rsWindowMediaSelect && _rsWindowMediaSelect(this)">
+                                            <option value="">— room media library —</option>
+                                        </select>
+                                        <button type="button" id="rs-window-media-del" class="btn btn-sm btn-outline-danger mt-1 d-none" onclick="_rsWindowMediaDelete && _rsWindowMediaDelete()" title="Delete the selected media from this room">🗑️ Delete selected</button>
                                     </div>
                                 </div>
                                 <script>
                                 window._rsWindowImageUpload = function(input){
                                     var f = input.files && input.files[0]; if(!f) return;
-                                    var maxBytes = f.type === 'video/mp4' ? 10*1024*1024 : 600*1024;
-                                    if(f.size > maxBytes){ alert('Please pick an image under ' + (f.type === 'video/mp4' ? '10 MB' : '600 KB') + '.'); input.value=''; return; }
+                                    var isVideo = /^video\/(mp4|webm)$/.test(f.type);
+                                    var maxBytes = isVideo ? 15*1024*1024 : 5*1024*1024;
+                                    if(f.size > maxBytes){ alert('Please pick a ' + (isVideo ? 'video under 15 MB' : 'image under 5 MB') + '.'); input.value=''; return; }
+
+                                    if (window.ROOM_CONFIG && window.ROOM_CONFIG.roomName) {
+                                        _rsUploadWindowMedia(f, function(){ input.value=''; });
+                                        return;
+                                    }
+
+                                    // Preview pages without a live room: fall back to a local data URL.
                                     var rd = new FileReader();
                                     rd.onload = function(){ if(window.RoomScene) RoomScene.updateConfig({ windowImage: rd.result, windowView: 'custom' }); var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom'; };
                                     rd.readAsDataURL(f);
                                 };
+
+                                // Uploads a file (Blob/File) to this room's window-media library and, on
+                                // success, switches the window to it and refreshes the library list.
+                                function _rsUploadWindowMedia(file, done) {
+                                    var fd = new FormData();
+                                    fd.append('file', file);
+                                    fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media', { method: 'POST', body: fd })
+                                        .then(function(resp){
+                                            if (!resp.ok) throw new Error('Upload failed (' + resp.status + ')');
+                                            return resp.json();
+                                        })
+                                        .then(function(e){
+                                            if (window.RoomScene) RoomScene.updateConfig({ windowMediaId: e.id, windowMediaMime: e.mime, windowView: 'custom', windowImage: null });
+                                            var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom';
+                                            _rsRefreshMediaLibrary();
+                                            if (done) done();
+                                        })
+                                        .catch(function(err){
+                                            if (window._showToastAD) _showToastAD('Upload failed: ' + err.message, 'warning');
+                                            else alert('Upload failed: ' + err.message);
+                                            if (done) done();
+                                        });
+                                }
+
+                                function _rsFormatBytes(n) {
+                                    if (n < 1024) return n + ' B';
+                                    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+                                    return (n/(1024*1024)).toFixed(1) + ' MB';
+                                }
+
+                                // Populates the room media library <select> with this room's uploaded
+                                // window media, and shows/hides the legacy-windowImage migration button.
+                                window._rsRefreshMediaLibrary = function() {
+                                    var sel = document.getElementById('rs-window-media-lib');
+                                    if (!sel || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
+                                    fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media')
+                                        .then(function(resp){ return resp.ok ? resp.json() : []; })
+                                        .then(function(list){
+                                            var cfg = window.RoomScene ? RoomScene.getConfig() : {};
+                                            sel.innerHTML = '<option value="">— room media library —</option>';
+                                            (list || []).forEach(function(e){
+                                                var opt = document.createElement('option');
+                                                opt.value = e.id;
+                                                opt.dataset.mime = e.mime || '';
+                                                opt.textContent = (e.name || e.id) + ' (' + _rsFormatBytes(e.size || 0) + ')';
+                                                if (cfg.windowMediaId === e.id) opt.selected = true;
+                                                sel.appendChild(opt);
+                                            });
+                                            var delBtn = document.getElementById('rs-window-media-del');
+                                            if (delBtn) delBtn.classList.toggle('d-none', !cfg.windowMediaId);
+                                        })
+                                        .catch(function(){});
+
+                                    var migrateBtn = document.getElementById('rs-window-migrate-btn');
+                                    if (migrateBtn) {
+                                        var cfg2 = window.RoomScene ? RoomScene.getConfig() : {};
+                                        migrateBtn.classList.toggle('d-none', !cfg2.windowImage);
+                                    }
+                                };
+
+                                // Switches the room's window to a previously uploaded media item.
+                                window._rsWindowMediaSelect = function(sel) {
+                                    var id = sel.value;
+                                    if (!id) return;
+                                    var opt = sel.options[sel.selectedIndex];
+                                    var mime = (opt && opt.dataset.mime) || null;
+                                    if (window.RoomScene) RoomScene.updateConfig({ windowMediaId: id, windowMediaMime: mime, windowView: 'custom' });
+                                    var view=document.getElementById('rs-window-view'); if(view) view.value='custom';
+                                    var delBtn = document.getElementById('rs-window-media-del');
+                                    if (delBtn) delBtn.classList.remove('d-none');
+                                };
+
+                                // Deletes the selected media from the room's library; if it was the
+                                // active window, falls back to the skyline view for everyone.
+                                window._rsWindowMediaDelete = function() {
+                                    var sel = document.getElementById('rs-window-media-lib');
+                                    var id = sel && sel.value;
+                                    if (!id || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
+                                    fetch('/api/rooms/' + encodeURIComponent(window.ROOM_CONFIG.roomName) + '/window-media/' + id, { method: 'DELETE' })
+                                        .then(function(resp){
+                                            if (!resp.ok && resp.status !== 404) throw new Error('Delete failed (' + resp.status + ')');
+                                            var cfg = window.RoomScene ? RoomScene.getConfig() : {};
+                                            if (cfg.windowMediaId === id && window.RoomScene) {
+                                                RoomScene.updateConfig({ windowMediaId: null, windowMediaMime: null, windowView: 'skyline' });
+                                                var view=document.getElementById('rs-window-view'); if(view) view.value='skyline';
+                                            }
+                                            _rsRefreshMediaLibrary();
+                                        })
+                                        .catch(function(err){
+                                            if (window._showToastAD) _showToastAD('Delete failed: ' + err.message, 'warning');
+                                            else alert('Delete failed: ' + err.message);
+                                        });
+                                };
+
+                                // One-time migration: uploads a legacy local windowImage data URL to the
+                                // room's shared media library, then clears the legacy field.
+                                window._rsWindowMediaMigrate = function() {
+                                    if (!window.RoomScene || !window.ROOM_CONFIG || !window.ROOM_CONFIG.roomName) return;
+                                    var dataUrl = RoomScene.getConfig().windowImage;
+                                    if (!dataUrl) return;
+                                    fetch(dataUrl).then(function(r){ return r.blob(); }).then(function(blob){
+                                        var ext = /^data:video\/webm/.test(dataUrl) ? 'webm' : (/^data:video\//.test(dataUrl) ? 'mp4' : (/^data:image\/gif/.test(dataUrl) ? 'gif' : 'png'));
+                                        var file = new File([blob], 'window.' + ext, { type: blob.type });
+                                        _rsUploadWindowMedia(file, function(){
+                                            RoomScene.updateConfig({ windowImage: null });
+                                            var migrateBtn = document.getElementById('rs-window-migrate-btn');
+                                            if (migrateBtn) migrateBtn.classList.add('d-none');
+                                        });
+                                    }).catch(function(){});
+                                };
+
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    var roomTabBtn = document.getElementById('tab-room-btn');
+                                    if (roomTabBtn) roomTabBtn.addEventListener('shown.bs.tab', _rsRefreshMediaLibrary);
+                                });
                                 </script>
                                 <div class="col-6">
                                     <label class="form-label mb-1" for="rs-2d-style">2D view style</label>

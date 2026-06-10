@@ -15,6 +15,7 @@ builder.Services.AddSignalR(o =>
 });
 builder.Services.AddSingleton<IRoomRepository, FileRoomRepository>();
 builder.Services.AddSingleton<RoomService>();
+builder.Services.AddSingleton<RoomMediaStore>();
 builder.Services.AddSingleton<LeaveRequestStore>();
 builder.Services.AddHostedService<RoomCleanupService>();
 builder.Services.AddHostedService<RoomPersistenceService>();
@@ -56,6 +57,10 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+
+// Attribute-routed API controllers (e.g. MediaController) aren't reached by the
+// conventional MapControllerRoute calls below.
+app.MapControllers();
 
 app.MapControllerRoute(
     name: "sitemap",

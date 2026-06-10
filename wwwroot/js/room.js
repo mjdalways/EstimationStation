@@ -136,7 +136,8 @@ function _syncRoomScene() {
 // Personal prefs (keyBindings, walkCameraMode, dragMode, twoDStyle, windowImage) are intentionally excluded.
 var _SCENE_SHARED_FIELDS = ['preset','tableShape','tableSize','chairType','chairCount',
     'floorMaterial','wallColor','tableMaterial','lighting',
-    'windowView','windowAnimated','windowTimeOfDay','whiteboard','plants'];
+    'windowView','windowAnimated','windowTimeOfDay','whiteboard','plants',
+    'windowMediaId','windowMediaMime'];
 function _sharedSceneConfig(cfg) {
     var out = {};
     _SCENE_SHARED_FIELDS.forEach(function(k){ if (cfg && cfg[k] !== undefined) out[k] = cfg[k]; });
@@ -228,6 +229,11 @@ function registerHandlers() {
         // AC1: Start timer for any story already active when user joins/reconnects
         acStartStoryTimer(state.currentStoryId || null);
 
+        // Room Scene: apply the server-persisted shared scene config so everyone renders
+        // the same room (chair count, window view, chair type, etc.) on join/reconnect.
+        if (state.sceneConfig && window.RoomScene && RoomScene.updateConfig) {
+            try { RoomScene.updateConfig(JSON.parse(state.sceneConfig), /*silent=*/true); } catch(e) {}
+        }
         // Room Scene: load the authoritative seating so we immediately see who sits where.
         if (window.RS3D && RS3D.setClaimsFromServer) RS3D.setClaimsFromServer(state.chairClaims || []);
         if (window.RS3D && RS3D.applyRemoteLayout && state.roomLayout) RS3D.applyRemoteLayout(state.roomLayout);
@@ -240,15 +246,6 @@ function registerHandlers() {
         roomState.participants.push(p);
         renderParticipants();
         appendChat('System', `${p.name} joined the room`, null);
-        // When the host sees a new participant join, push the current room scene config so
-        // everyone renders the same room (chair count, window view, chair type, etc.).
-        if (roomState.isHost && window.RoomScene && window.RoomSceneNet) {
-            try {
-                var _cfg = RoomScene.getConfig();
-                var _shared = _sharedSceneConfig(_cfg);
-                RoomSceneNet.broadcastSceneConfig(JSON.stringify(_shared));
-            } catch(e) {}
-        }
         _syncRoomScene();
     });
 

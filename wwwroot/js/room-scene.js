@@ -19,7 +19,9 @@
         windowView: 'skyline',// skyline | beach | mountains | night | forest | space | custom | none
         windowAnimated: true, // animate the window scene (clouds drift, stars twinkle, sea shimmers)
         windowTimeOfDay: 'day', // day | dusk | night | auto — tints daylight scenes (auto follows local clock)
-        windowImage: null,    // data URL for the 🎨 custom window view
+        windowImage: null,    // legacy data URL for the 🎨 custom window view (back-compat reads only)
+        windowMediaId: null,  // server-stored room media id for the 🎨 custom window view
+        windowMediaMime: null, // MIME type of the server-stored window media
         floorMaterial: 'preset', // preset | wood | carpet | tile | concrete
         wallColor: 'preset',  // 'preset' or a #hex
         tableMaterial: 'wood',// wood | glass | marble
@@ -403,7 +405,8 @@
     // Personal fields (keyBindings, walkCameraMode, dragMode, twoDStyle, windowImage) are excluded.
     var _SHARED_FIELDS = ['preset','tableShape','tableSize','chairType','chairCount',
         'floorMaterial','wallColor','tableMaterial','lighting',
-        'windowView','windowAnimated','windowTimeOfDay','whiteboard','plants'];
+        'windowView','windowAnimated','windowTimeOfDay','whiteboard','plants',
+        'windowMediaId','windowMediaMime'];
 
     // silent=true: received from another participant — apply locally but don't echo back.
     function updateConfig(patch, silent) {

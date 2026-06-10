@@ -22,12 +22,14 @@ public class RoomCleanupService : BackgroundService
             {
                 using var scope = _services.CreateScope();
                 var repo = scope.ServiceProvider.GetRequiredService<IRoomRepository>();
+                var mediaStore = scope.ServiceProvider.GetRequiredService<RoomMediaStore>();
                 var cutoff = DateTime.UtcNow - _ttl;
                 foreach (var room in repo.GetAllRooms())
                 {
                     if (room.LastActivity < cutoff)
                     {
                         repo.DeleteRoom(room.Name);
+                        mediaStore.DeleteRoom(room.Name);
                         _logger.LogInformation("Deleted stale room: {Room}", room.Name);
                     }
                 }

@@ -362,77 +362,17 @@
         var V  = WINDOW_VIEWS[view] || WINDOW_VIEWS.skyline;
         var zb = zWall - 0.7;                // outdoor scene depth (set back for a sense of distance)
         var tod = _timeOfDay();
-        if (view === 'custom' && _cfg.windowImage) {
-            var _src = _cfg.windowImage;
-            var _isMp4 = _src.indexOf('data:video/mp4') === 0 || _src.match(/\.mp4(\?|$)/i);
-            if (_isMp4) {
-                // 1. Setup the Video Element
-                const video = document.createElement('video');
-                video.src = _src;
-                video.crossOrigin = 'anonymous';    // Fixes CORS issues if loading from a server
-                video.loop = true;
-                video.muted = true;
-                video.setAttribute('playsinline', '');
-                video.style.display = 'none';
-
-                // Force attachment to DOM (fixes Safari/iOS black screen)
-                document.body.appendChild(video);
-
-                // 2. Create the Texture
-                const skylineTexture = new THREE.VideoTexture(video);
-                //skylineTexture.encoding = THREE.sRGBEncoding;
-                skylineTexture.minFilter = THREE.LinearFilter;
-                skylineTexture.magFilter = THREE.LinearFilter;
-
-                // 3. Apply to Material
-                const skylineMaterial = new THREE.MeshBasicMaterial({
-                    map: skylineTexture,
-                    side: THREE.DoubleSide
-                });
-
-                // 1. Create the Geometry (A flat plane to act as the screen)
-                // The numbers (20, 10) are the Width and Height. Make it big enough to cover the window!
-                const skylineGeometry = new THREE.PlaneGeometry(OW, OH);
-
-                // 2. Combine the Geometry and the Material into a visible Mesh
-                const skylineMesh = new THREE.Mesh(skylineGeometry, skylineMaterial);
-
-                // 3. Position the Mesh behind the window — same spot the static-image
-                // branch uses, so video and image fill the opening identically.
-                skylineMesh.position.set(0, cy, zb);
-
-                // Optional: If the video looks backwards, you can flip the plane around
-                // skylineMesh.rotation.y = Math.PI;
-
-                // 4. Add the Mesh to your scene (CRITICAL)
-                _scene.add(skylineMesh);
-                _videoTextures.push({ video: video, tex: skylineTexture });
-
-                // 4. Wait for data BEFORE playing
-                video.addEventListener('loadeddata', function () {
-                    video.play().catch(function (err) {
-                        console.warn("Autoplay blocked:", err);
-                    });
-                });
-
-                video.addEventListener('playing', function () {
-                    // Force WebGL to grab the frame now that it's moving
-                    skylineTexture.needsUpdate = true;
-                });
-
-                video.addEventListener('error', function (err) {
-                    console.error("Error loading video:", video.error);
-                });
+        if (view === 'custom' && (_cfg.windowMediaId || _cfg.windowImage)) {
+            var _src, _mime;
+            if (_cfg.windowMediaId) {
+                var _room = (window.ROOM_CONFIG && window.ROOM_CONFIG.roomName) || '';
+                _src = '/api/rooms/' + encodeURIComponent(_room) + '/window-media/' + _cfg.windowMediaId;
+                _mime = _cfg.windowMediaMime || null;
             } else {
-                // 🎨 Static custom image fills the opening.
-                var tex = new THREE.TextureLoader().load(_src, function () {
-                    if (_renderer) _renderer.render(_scene, _camera);   // repaint once decoded
-                });
-                if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
-                var img = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
-                    new THREE.MeshBasicMaterial({ map: tex }));
-                img.position.set(0, cy, zb); _scene.add(img);
+                _src = _cfg.windowImage;
+                _mime = null;
             }
+            _buildCustomWindowMedia(_src, _mime, OW, OH, cy, zb);
         } else {
             // Large sky backdrop, wider/taller than the opening so the view reads as open sky.
             var sky = new THREE.Mesh(new THREE.PlaneGeometry(OW * 1.8, OH * 2.4),
@@ -470,6 +410,84 @@
         var glass = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
             new THREE.MeshStandardMaterial({ color: V.glass || 0x8ac8ff, transparent: true, opacity: 0.10, roughness: 0 }));
         glass.position.set(0, cy, zWall + 0.04); _scene.add(glass);
+    }
+
+    // Renders the 🎨 custom window media (uploaded image or looping video) filling the
+    // window opening. `mime` comes from the server media entry when available; falls back
+    // to sniffing `src` (data URL or file extension) for legacy windowImage data URLs.
+    function _buildCustomWindowMedia(src, mime, OW, OH, cy, zb) {
+        var _isVideo = mime ? /^video\/(mp4|webm)$/.test(mime)
+            : (/^data:video\/(mp4|webm)/.test(src) || /\.(mp4|webm)(\?|$)/i.test(src));
+        if (_isVideo) {
+            // 1. Setup the Video Element
+            const video = document.createElement('video');
+            video.src = src;
+            video.crossOrigin = 'anonymous';    // Fixes CORS issues if loading from a server
+            video.loop = true;
+            video.muted = true;
+            video.setAttribute('playsinline', '');
+            video.style.display = 'none';
+
+            // Force attachment to DOM (fixes Safari/iOS black screen)
+            document.body.appendChild(video);
+
+            // 2. Create the Texture
+            const skylineTexture = new THREE.VideoTexture(video);
+            //skylineTexture.encoding = THREE.sRGBEncoding;
+            skylineTexture.minFilter = THREE.LinearFilter;
+            skylineTexture.magFilter = THREE.LinearFilter;
+
+            // 3. Apply to Material
+            const skylineMaterial = new THREE.MeshBasicMaterial({
+                map: skylineTexture,
+                side: THREE.DoubleSide
+            });
+
+            // 1. Create the Geometry (A flat plane to act as the screen)
+            // The numbers (20, 10) are the Width and Height. Make it big enough to cover the window!
+            const skylineGeometry = new THREE.PlaneGeometry(OW, OH);
+
+            // 2. Combine the Geometry and the Material into a visible Mesh
+            const skylineMesh = new THREE.Mesh(skylineGeometry, skylineMaterial);
+
+            // 3. Position the Mesh behind the window — same spot the static-image
+            // branch uses, so video and image fill the opening identically.
+            skylineMesh.position.set(0, cy, zb);
+
+            // Optional: If the video looks backwards, you can flip the plane around
+            // skylineMesh.rotation.y = Math.PI;
+
+            // 4. Add the Mesh to your scene (CRITICAL)
+            _scene.add(skylineMesh);
+            _videoTextures.push({ video: video, tex: skylineTexture });
+
+            // 4. Wait for data BEFORE playing
+            video.addEventListener('loadeddata', function () {
+                video.play().catch(function (err) {
+                    console.warn("Autoplay blocked:", err);
+                });
+            });
+
+            video.addEventListener('playing', function () {
+                // Force WebGL to grab the frame now that it's moving
+                skylineTexture.needsUpdate = true;
+            });
+
+            video.addEventListener('error', function (err) {
+                console.error("Error loading video:", video.error);
+                if (window._showToastAD) window._showToastAD("This browser can't play this video format.", 'warning');
+                else alert("This browser can't play this video format.");
+            });
+        } else {
+            // 🎨 Static custom image fills the opening.
+            var tex = new THREE.TextureLoader().load(src, function () {
+                if (_renderer) _renderer.render(_scene, _camera);   // repaint once decoded
+            });
+            if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+            var img = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
+                new THREE.MeshBasicMaterial({ map: tex }));
+            img.position.set(0, cy, zb); _scene.add(img);
+        }
     }
 
     // Window-scene primitives. Coordinates are LOCAL to _winGroup, which is positioned

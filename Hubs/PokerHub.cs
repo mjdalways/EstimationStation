@@ -370,13 +370,40 @@ public class PokerHub : Hub
     }
 
     /// <summary>Broadcasts room-scene visual config (chair count, table shape, window view, etc.)
-    /// so all participants render the same room. Each client stores its own local copy.</summary>
+    /// so all participants render the same room. The patch is merged into the room's persisted
+    /// SceneConfigJson (server-authoritative) so late joiners get the current state via
+    /// BuildRoomState without depending on the host being online.</summary>
     public async Task BroadcastSceneConfig(string configJson)
     {
         if (string.IsNullOrEmpty(configJson) || configJson.Length > 4000) return;
         if (RateLimited("sceneConfig", TimeSpan.FromMilliseconds(500))) return;
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+
+        try
+        {
+            var patch = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(configJson);
+            if (patch == null) return;
+            lock (room)
+            {
+                var merged = string.IsNullOrEmpty(room.SceneConfigJson)
+                    ? new Dictionary<string, System.Text.Json.JsonElement>()
+                    : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(room.SceneConfigJson)
+                        ?? new Dictionary<string, System.Text.Json.JsonElement>();
+                foreach (var kv in patch) merged[kv.Key] = kv.Value;
+                room.SceneConfigJson = System.Text.Json.JsonSerializer.Serialize(merged);
+            }
+        }
+        catch
+        {
+            return; // malformed patch — drop rather than corrupt the persisted config
+        }
+
+        _roomService.SaveRoom(room);
+        // Originator already shows its own change live — only update the others. Send the
+        // patch (not the merged blob); each client merges it into its own local config.
         await Clients.OthersInGroup(roomName).SendAsync("SceneConfigUpdated", configJson);
     }
 
@@ -1408,7 +1435,8 @@ public class PokerHub : Hub
             roomLayout = room.RoomLayoutJson,
             whiteboardStrokes = room.WhiteboardStrokes,
             roomIcon = room.RoomIcon,
-            chairPositions = room.ChairPositionsJson
+            chairPositions = room.ChairPositionsJson,
+            sceneConfig = room.SceneConfigJson
         };
     }
 
