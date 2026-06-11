@@ -87,7 +87,6 @@ window.THREE = THREE;
     var _clickWalkBtn = null;  // the on-canvas click-to-walk enable/disable toggle
     var _furnHudBtn = null;    // the on-canvas "+" furniture quick-add HUD button
     var _furnHud = null;       // the furniture quick-add panel (shown on button click)
-    var _claimBarObj = null;   // P15: CSS2DObject wrapping _claimBar, anchored above the pending chair
     var EYE_STAND = 1.60, EYE_CROUCH = 1.02, WALK_SPEED = 2.7, CROUCH_SPEED = 1.25;
     // Personal walk-feel overrides (P14) — fall back to the constants above when unset.
     function _walkSpeed()   { return (_cfg && _cfg.walkSpeed) || WALK_SPEED; }
@@ -165,7 +164,6 @@ window.THREE = THREE;
     var _claimedChairs   = {};   // idx -> { name, color, cid }
     var _myChairIdx      = null;
     var _pendingChairIdx = null;
-    var _claimBar        = null;
     var _raycaster       = null;
     // True once the server has delivered the authoritative claim map this session,
     // so 2D (which reads via getSeatingPlan) trusts _claimedChairs even when the
@@ -295,7 +293,6 @@ window.THREE = THREE;
         _buildLights();
         _buildFurniture(_loadFurniture());
         _setupInteraction();
-        _createClaimBar();
         _createSelBar();
         _createWalkButton();
         _createMinimap();
@@ -1438,7 +1435,7 @@ window.THREE = THREE;
             key = 'avatar_' + (av.cid || av.name || 'ghost');
             var apv = new THREE.Vector3(); av.group.getWorldPosition(apv);
             if (av.mine) {
-                tip = 'Click to stand up'; cursor = 'pointer';
+                tip = 'Double-click to stand up'; cursor = 'pointer';
                 pos = { x: apv.x, y: _avatarTipY(av), z: apv.z };
             } else if (av.name) {
                 var rsv = _roomState || {};
@@ -1466,9 +1463,9 @@ window.THREE = THREE;
                 }
                 if (cObj) {
                     var claim = _claimedChairs[cObj.idx];
-                    if (!claim)                                tip = '🪑 Click to sit';
-                    else if (claim.cid === _myCid())           tip = 'Click to stand up';
-                    else if (_isHost())                        tip = '👑 Click to free this seat';
+                    if (!claim)                                tip = '🪑 Double-click to sit • Drag to move';
+                    else if (claim.cid === _myCid())           tip = 'Double-click to stand up';
+                    else if (_isHost())                        tip = '👑 Double-click to free this seat';
                     if (tip) {
                         key = 'chair_' + cObj.idx; root = cObj.group; cursor = 'pointer';
                         pos = { x: cObj.group.position.x, y: 1.15, z: cObj.group.position.z };
@@ -1481,7 +1478,7 @@ window.THREE = THREE;
         if (!key && _wbBoard && _raycaster.intersectObject(_wbBoard, false).length) {
             key = 'wb'; root = _wbBoard; cursor = 'pointer';
             var wp = new THREE.Vector3(); _wbBoard.getWorldPosition(wp);
-            tip = '📋 Click to open'; pos = { x: wp.x, y: wp.y + 0.75, z: wp.z };
+            tip = '📋 Double-click to open'; pos = { x: wp.x, y: wp.y + 0.75, z: wp.z };
         }
 
         // Interactive props (confetti / jukebox)
@@ -1494,7 +1491,7 @@ window.THREE = THREE;
                     if (pr) {
                         key = 'prop_' + pr.action; root = pr.mesh; cursor = 'pointer';
                         var pp = new THREE.Vector3(); pr.mesh.getWorldPosition(pp);
-                        tip = '✨ Click to use'; pos = { x: pp.x, y: pp.y + 0.55, z: pp.z };
+                        tip = '✨ Double-click to use'; pos = { x: pp.x, y: pp.y + 0.55, z: pp.z };
                     }
                 }
             }
@@ -1865,7 +1862,7 @@ window.THREE = THREE;
         }
 
         addChip('🚶 Walk around the room', 'rs3d-callout-r', 'top:14px;right:46px;');
-        addChip('🪑 Click a chair to sit down', 'rs3d-callout-d', 'left:50%;bottom:64px;transform:translateX(-50%);');
+        addChip('🪑 Double-click a chair to sit down', 'rs3d-callout-d', 'left:50%;bottom:64px;transform:translateX(-50%);');
         addChip('➕ Add furniture here', 'rs3d-callout-r', 'top:96px;right:46px;');
 
         _container.addEventListener('pointerdown', dismiss, { once: true });
@@ -3718,6 +3715,22 @@ window.THREE = THREE;
         _renderer.domElement.addEventListener('blur', _onCanvasBlur);
     }
 
+    // P3: manual double-click arbiter. Single click on an interactive target only
+    // selects/highlights (the hover tooltip already shows the affordance); a SECOND
+    // click on the SAME target within DBLCLICK_MS performs the action. Manual (not
+    // native dblclick) so double-tap on touch works and there's no listener race.
+    var _lastClickKey = null, _lastClickTime = 0;
+    var DBLCLICK_MS = 350;
+    function _armDoubleClick(key) {
+        var now = performance.now();
+        if (_lastClickKey === key && (now - _lastClickTime) < DBLCLICK_MS) {
+            _lastClickKey = null; _lastClickTime = 0;
+            return true;
+        }
+        _lastClickKey = key; _lastClickTime = now;
+        return false;
+    }
+
     function _onCanvasClick(event) {
         if (_walk) return;   // walk mode uses E-to-interact, not click-to-claim
         // If a furniture drag just finished, suppress chair pick
@@ -3730,12 +3743,15 @@ window.THREE = THREE;
 
         // P1: a click on someone ELSE's robot body must not fall through to the chair
         // or floor behind it. Clicking your own seated robot acts like clicking your
-        // own chair (stand up). Your own standing/roaming body never blocks your
-        // clicks — the click passes through to whatever is behind it.
+        // own chair (double-click to stand up). Your own standing/roaming body never
+        // blocks your clicks — the click passes through to whatever is behind it.
         var av = _raycastAvatarAt();
         if (av) {
             if (av.mine) {
-                if (av.seated) { releaseMySeat(); return; }
+                if (av.seated) {
+                    if (_armDoubleClick('avatar_mine')) releaseMySeat();
+                    return;
+                }
                 // own roamer/standing robot: fall through
             } else {
                 if (av.name) {
@@ -3747,20 +3763,23 @@ window.THREE = THREE;
             }
         }
 
-        // Click the in-room whiteboard → open it to draw.
+        // Double-click the in-room whiteboard → open it to draw.
         if (_wbBoard && _raycaster.intersectObject(_wbBoard, false).length) {
-            if (window.Whiteboard) Whiteboard.open();
+            if (_armDoubleClick('wb') && window.Whiteboard) Whiteboard.open();
             return;
         }
-        // Click an interactive prop (confetti / jukebox).
+        // Double-click an interactive prop (confetti / jukebox).
         var pm = _propMeshes();
         if (pm.length) {
             var ph = _raycaster.intersectObjects(pm, false);
-            if (ph.length) { var pr = _propForMesh(ph[0].object); if (pr) { _runProp(pr.action); return; } }
+            if (ph.length) {
+                var pr = _propForMesh(ph[0].object);
+                if (pr) { if (_armDoubleClick('prop_' + pr.action)) _runProp(pr.action); return; }
+            }
         }
         if (!_chairObjects.length) return;
 
-        // Allow clicking your own claimed chair to stand up (release seat).
+        // Double-click your own claimed chair to stand up (release seat).
         if (_myChairIdx !== null) {
             var myMesh = null;
             for (var mi = 0; mi < _chairObjects.length; mi++) {
@@ -3769,14 +3788,14 @@ window.THREE = THREE;
             if (myMesh) {
                 var myHit = _raycaster.intersectObject(myMesh, false);
                 if (myHit.length) {
-                    releaseMySeat();
+                    if (_armDoubleClick('chair_mine')) releaseMySeat();
                     return;
                 }
             }
         }
 
         var testMeshes = _chairObjects
-            .filter(function(c){ return !_claimedChairs[c.idx] || (_pendingChairIdx === c.idx); })
+            .filter(function(c){ return !_claimedChairs[c.idx]; })
             .map(function(c){ return c.seatMesh; });
 
         var hits = _raycaster.intersectObjects(testMeshes, false);
@@ -3786,10 +3805,14 @@ window.THREE = THREE;
             for (var i = 0; i < _chairObjects.length; i++) {
                 if (_chairObjects[i].seatMesh === hitMesh) { chairObj = _chairObjects[i]; break; }
             }
-            if (chairObj) { _pendChair(chairObj.idx); return; }
+            if (chairObj) {
+                // Double-click an empty chair → sit directly (no confirm bar).
+                if (_armDoubleClick('chair_' + chairObj.idx)) { _pendingChairIdx = chairObj.idx; _confirmClaim(); }
+                return;
+            }
         }
 
-        // AQ2: host clicking an OCCUPIED chair (someone else's) can free it.
+        // AQ2: host double-clicking an OCCUPIED chair (someone else's) can free it.
         if (_isHost()) {
             var occMeshes = _chairObjects
                 .filter(function(c){ var cl=_claimedChairs[c.idx]; return cl && cl.cid !== _myCid(); })
@@ -3798,11 +3821,11 @@ window.THREE = THREE;
             if (oh.length) {
                 var om = oh[0].object, oc = null;
                 for (var j = 0; j < _chairObjects.length; j++) if (_chairObjects[j].seatMesh === om) { oc = _chairObjects[j]; break; }
-                if (oc) { _hostFreeSeat(oc.idx); return; }
+                if (oc) { if (_armDoubleClick('chair_occ_' + oc.idx)) _hostFreeSeat(oc.idx); return; }
             }
         }
-        if (_pendingChairIdx !== null) { _cancelClaim(); return; }
         // Click-to-walk: empty floor click → glide my avatar there (only when feature is enabled).
+        // Floor clicks are not part of the double-click arbiter — they fire instantly.
         if (!_walk && _clickWalkEnabled) {
             var fp = _floorIntersect(event);
             if (fp) _startWalkTo(fp.x, fp.z);
@@ -3819,40 +3842,6 @@ window.THREE = THREE;
         if (!window.confirm('Free ' + who + "'s seat? They'll need to pick a chair again.")) return;
         if (window.RoomSceneNet && RoomSceneNet.hostFreeChair) RoomSceneNet.hostFreeChair(idx);
         else { applyRelease(idx); }
-    }
-
-    function _pendChair(idx) {
-        _pendingChairIdx = idx;
-        _rebuildSeating();
-        _showClaimBar(idx);
-    }
-
-    // CSS2DRenderer rewrites _claimBar's inline display every frame from
-    // _claimBarObj.visible, so show/hide must go through the object flag —
-    // writing style.display directly is undone on the next rendered frame.
-    function _hideClaimBar() {
-        if (_claimBarObj) _claimBarObj.visible = false;
-        if (_claimBar) _claimBar.style.display = 'none';
-    }
-
-    function _showClaimBar(idx) {
-        if (!_claimBar) return;
-        var nameEl = _claimBar.querySelector('#rs3d-claim-name');
-        if (nameEl) {
-            var icons = { office:'🪑', gaming:'🎮', beanbag:'🛋️', stool:'🪵', throne:'👑' };
-            var ct = _chairTypeForIdx(idx);
-            nameEl.textContent = (icons[ct]||'🪑') + ' Chair ' + (idx+1) + ' selected';
-        }
-        if (_claimBarObj) {
-            var chairObj = null;
-            for (var i = 0; i < _chairObjects.length; i++) {
-                if (_chairObjects[i].idx === idx) { chairObj = _chairObjects[i]; break; }
-            }
-            var pos = chairObj ? chairObj.group.position : { x: 0, z: 0 };
-            _claimBarObj.position.set(pos.x, 1.2, pos.z);
-            _claimBarObj.visible = true;
-        }
-        _claimBar.style.display = 'flex';
     }
 
     function _colorToHex(c) {
@@ -3886,14 +3875,7 @@ window.THREE = THREE;
         _myChairIdx = idx;
         _pendingChairIdx = null;
         _saveClaims();
-        _hideClaimBar();
         _notifyClaimsChanged();
-    }
-
-    function _cancelClaim() {
-        _pendingChairIdx = null;
-        _hideClaimBar();
-        _rebuildSeating();
     }
 
     // ── Server-driven claim sync (called by room.js SignalR handlers) ─────
@@ -3931,7 +3913,6 @@ window.THREE = THREE;
         if (cid && cid === _myCid()) {
             _myChairIdx = idx;
             if (_pendingChairIdx === idx) _pendingChairIdx = null;
-            _hideClaimBar();
             // I successfully sat → stop roaming + tell the server to clear my pose.
             if (_iAmRoaming) { _iAmRoaming = false; if (window.RoomSceneNet && RoomSceneNet.avatarStop) RoomSceneNet.avatarStop(); }
         }
@@ -3969,38 +3950,11 @@ window.THREE = THREE;
 
     // I lost a race for a chair.
     function claimFailed(idx, winnerName) {
-        if (_pendingChairIdx === idx) {
-            _pendingChairIdx = null;
-            _hideClaimBar();
-        }
+        if (_pendingChairIdx === idx) _pendingChairIdx = null;
         if (_scene) _rebuildSeating();
         var msg = '😅 ' + (winnerName || 'Someone') + ' grabbed that chair first! Pick another.';
         if (window._showToastAD) window._showToastAD(msg, 'warning');
         else if (window.console) console.log(msg);
-    }
-
-    // P15: the claim bar is a CSS2DObject anchored above the pending chair (rather than a
-    // fixed bottom bar), so it visually points at the chair being claimed in both 3D and
-    // top-down. The CSS2DRenderer root has pointerEvents:'none' — re-enable it on the bar
-    // itself so the Sit Here / Cancel buttons stay clickable.
-    function _createClaimBar() {
-        var bar = document.createElement('div');
-        bar.id = 'rs3d-claim-bar';
-        bar.className = 'rs3d-claim-bar';
-        bar.innerHTML =
-            '<span id="rs3d-claim-name">Chair selected</span>' +
-            '<button id="rs3d-claim-ok" style="background:#22c55e;color:#fff;border:none;' +
-            'border-radius:5px;padding:3px 11px;cursor:pointer;font-weight:700;">✅ Sit Here</button>' +
-            '<button id="rs3d-claim-cancel" style="background:transparent;color:#aaa;' +
-            'border:1px solid #555;border-radius:5px;padding:3px 8px;cursor:pointer;">✕</button>';
-        bar.querySelector('#rs3d-claim-ok').onclick     = _confirmClaim;
-        bar.querySelector('#rs3d-claim-cancel').onclick = _cancelClaim;
-        _claimBar = bar;
-        if (CSS2DObject && _scene) {
-            _claimBarObj = new CSS2DObject(bar);
-            _claimBarObj.visible = false;   // hidden until a chair is pending
-            _scene.add(_claimBarObj);
-        }
     }
 
     // ── Colour utilities ──────────────────────────────────────
@@ -4249,7 +4203,6 @@ window.THREE = THREE;
             if (_labelRenderer.domElement.parentNode) _labelRenderer.domElement.parentNode.removeChild(_labelRenderer.domElement);
             _labelRenderer = null;
         }
-        _claimBar = null; _claimBarObj = null;
         if (_selBar && _selBar.parentNode) { _selBar.parentNode.removeChild(_selBar); _selBar = null; }
         _selectedFurnId = null; _selRing = null;
         if (_controls) { _controls.dispose(); _controls = null; }
@@ -4293,12 +4246,6 @@ window.THREE = THREE;
         _buildLights();
         _buildFurniture(savedFurniture.length ? savedFurniture : _loadFurniture());
         _rebuildSeating();
-        // The claim bar's CSS2DObject was removed along with the rest of the scene graph
-        // above — re-attach it (and re-anchor it over the pending chair, if any).
-        if (_claimBarObj) {
-            _scene.add(_claimBarObj);
-            if (_pendingChairIdx !== null) _showClaimBar(_pendingChairIdx);
-        }
     }
 
     // ── Public API ────────────────────────────────────────────

@@ -1439,20 +1439,6 @@ body.wgt-dragging #wgt-zone-Bot.wgt-zone-hover {
   opacity: 1; transition: opacity 0.6s ease;
 }
 
-/* P15: claim bar, now anchored above the pending chair via CSS2DObject (the
-   renderer applies its own positioning transform as an inline style each frame,
-   so no transform is set here). */
-.rs3d-claim-bar {
-  background: rgba(20,24,40,0.94); color: #e8eaf6;
-  padding: 7px 14px; border-radius: 8px;
-  /* CSS2DRenderer rewrites the element's inline display ('' shown / 'none' hidden)
-     every frame from the CSS2DObject's .visible flag, so the class must default
-     to the shown layout (flex) — visibility is driven from JS via .visible. */
-  display: flex; font-size: 0.80rem; gap: 9px; align-items: center;
-  border: 1px solid rgba(100,120,200,0.35); backdrop-filter: blur(6px);
-  white-space: nowrap; pointer-events: auto;
-}
-
 /* Setup Room button in header */
 .rs-setup-btn {
   background: transparent;
