@@ -451,10 +451,17 @@
 <script src="~/js/room-scene-store.js" asp-append-version="true"></script>
 <script src="~/js/room-scene.js" asp-append-version="true"></script>
 <script src="~/js/room.js" asp-append-version="true"></script>
-<!-- Three.js r0.184.0 ES modules — served locally; addons resolve via the import map -->
-<script type="importmap">
-{ "imports": { "three": "/lib/three/three.module.js", "three/addons/": "/lib/three/", "three/addons/loaders/GLTFLoader.js": "/lib/three/GLTFLoader.js" } }
-</script>
+<!-- Three.js r0.184.0 ES modules — served locally; addons resolve via the import map.
+     The ! opt-out keeps ImportMapTagHelper (net10 MVC) from stripping the type attribute. -->
+<!script type="importmap">
+{ "imports": {
+    "three": "/lib/three/three.module.js",
+    "three/addons/controls/OrbitControls.js": "/lib/three/OrbitControls.js",
+    "three/addons/renderers/CSS2DRenderer.js": "/lib/three/CSS2DRenderer.js",
+    "three/addons/environments/RoomEnvironment.js": "/lib/three/RoomEnvironment.js",
+    "three/addons/loaders/GLTFLoader.js": "/lib/three/GLTFLoader.js"
+} }
+</!script>
 <script type="module" src="~/js/room-scene-3d.js" asp-append-version="true"></script>
 <script src="~/js/whiteboard.js" asp-append-version="true"></script>
 }

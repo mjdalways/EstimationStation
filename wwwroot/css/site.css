@@ -1445,7 +1445,10 @@ body.wgt-dragging #wgt-zone-Bot.wgt-zone-hover {
 .rs3d-claim-bar {
   background: rgba(20,24,40,0.94); color: #e8eaf6;
   padding: 7px 14px; border-radius: 8px;
-  display: none; font-size: 0.80rem; gap: 9px; align-items: center;
+  /* CSS2DRenderer rewrites the element's inline display ('' shown / 'none' hidden)
+     every frame from the CSS2DObject's .visible flag, so the class must default
+     to the shown layout (flex) — visibility is driven from JS via .visible. */
+  display: flex; font-size: 0.80rem; gap: 9px; align-items: center;
   border: 1px solid rgba(100,120,200,0.35); backdrop-filter: blur(6px);
   white-space: nowrap; pointer-events: auto;
 }

@@ -104,10 +104,16 @@ public class PokerHub : Hub
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
+
+        // One-shot host onboarding: only the first joiner of a freshly created room is
+        // offered the settings-lock setup. The flag persists so later host logins
+        // (and host transfers) never see the prompt again.
+        bool showSetupPrompt = !room.SetupPromptShown;
+        if (showSetupPrompt) room.SetupPromptShown = true;
         _roomService.SaveRoom(room);
 
         // Send full state to the joining participant
-        await Clients.Caller.SendAsync("RoomState", BuildRoomState(room, Context.ConnectionId));
+        await Clients.Caller.SendAsync("RoomState", BuildRoomState(room, Context.ConnectionId, showSetupPrompt));
 
         // Notify others
         await Clients.OthersInGroup(roomName).SendAsync("ParticipantJoined", new
@@ -1365,7 +1371,7 @@ public class PokerHub : Hub
         return farthest.Count == 1 ? farthest[0].participant.ConnectionId : null;
     }
 
-    private static object BuildRoomState(Room room, string requestingConnectionId)
+    private static object BuildRoomState(Room room, string requestingConnectionId, bool showSetupPrompt = false)
     {
         string[] estimateValues;
         if (room.EstimateSet == "custom" && !string.IsNullOrEmpty(room.CustomEstimates))
@@ -1384,6 +1390,9 @@ public class PokerHub : Hub
         return new
         {
             name = room.Name,
+            // True only on the very first join of a freshly created room — gates the
+            // one-shot "you're the host" settings-lock prompt client-side.
+            showSetupPrompt,
             autoReveal = room.AutoReveal,
             votesRevealed = room.VotesRevealed,
             ghostModeEnabled = room.GhostModeEnabled,

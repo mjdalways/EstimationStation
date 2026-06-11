@@ -195,6 +195,9 @@ function registerHandlers() {
         const _pinBtn = document.getElementById('pinBtn');
         if (_pinBtn) _pinBtn.classList.toggle('btn-warning', !!state.hasPin);
 
+        // UI repaint is best-effort: RoomState can arrive before DOMContentLoaded, and a
+        // missing element must not abort the state application below (claims, layout, …).
+        try {
         renderCards();
         renderParticipants();
         renderStories();
@@ -203,8 +206,9 @@ function registerHandlers() {
         _updateSprintDashboard();
         // AD1 — Apply host/lock UI after render
         _applyHostLockUI();
-        // AD5 — Show setup prompt if host just created a fresh room (sole participant)
-        if (state.isHost && state.participants && state.participants.length === 1) {
+        // AD5 — Show setup prompt only on the very first join of a freshly created room
+        // (server-tracked one-shot flag), never on later host logins.
+        if (state.isHost && state.showSetupPrompt) {
             setTimeout(_showHostSetupPrompt, 800);
         }
 
@@ -216,6 +220,7 @@ function registerHandlers() {
 
         // AC1: Start timer for any story already active when user joins/reconnects
         acStartStoryTimer(state.currentStoryId || null);
+        } catch (e) { console.error('RoomState UI render failed:', e); }
 
         // Room Scene: apply the server-persisted shared scene config so everyone renders
         // the same room (chair count, window view, chair type, etc.) on join/reconnect.
@@ -223,9 +228,15 @@ function registerHandlers() {
             try { RoomScene.updateConfig(JSON.parse(state.sceneConfig), /*silent=*/true); } catch(e) {}
         }
         // Room Scene: load the authoritative seating so we immediately see who sits where.
-        if (window.RS3D && RS3D.setClaimsFromServer) RS3D.setClaimsFromServer(state.chairClaims || []);
-        if (window.RS3D && RS3D.applyRemoteLayout && state.roomLayout) RS3D.applyRemoteLayout(state.roomLayout);
-        if (window.RS3D && RS3D.applyChairPositions && state.chairPositions) RS3D.applyChairPositions(state.chairPositions);
+        // room-scene-3d.js is an ES module, so this RoomState can arrive before window.RS3D
+        // exists — buffer the snapshot and the module consumes it as soon as it loads.
+        if (window.RS3D && RS3D.setClaimsFromServer) {
+            RS3D.setClaimsFromServer(state.chairClaims || []);
+            if (state.roomLayout) RS3D.applyRemoteLayout(state.roomLayout);
+            if (state.chairPositions) RS3D.applyChairPositions(state.chairPositions);
+        } else {
+            window._rs3dPendingState = state;
+        }
         if (window.Whiteboard && Whiteboard.loadStrokes) Whiteboard.loadStrokes(state.whiteboardStrokes || []);
         _applyRoomIcon(state.roomIcon || null);
     });

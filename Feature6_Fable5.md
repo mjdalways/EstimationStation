@@ -457,6 +457,43 @@ Pipeline per model: download GLB → `npx @gltf-transform/cli optimize in.glb ou
 
 ---
 
+## Post-implementation fixes (2026-06-10, live-tested session)
+
+The P4–P15 batch above was verified build-check-only. A live two-browser session afterwards found and fixed the following (all verified in-browser, two users, fresh rooms):
+
+1. **Import map stripped by ASP.NET (page-breaking).** net10's `ImportMapTagHelper` (pulled in by `@addTagHelper *`) rewrites `<script type="importmap">` and dropped the `type` attribute, so the browser executed the JSON as JS (`Unexpected token ':'`) and `import "three"` failed to resolve. Fixed with the Razor tag-helper opt-out `<!script type="importmap">…</!script>` in `Views/Room/Index.cshtml`.
+2. **`three.core.js` was never vendored.** r167+ splits the build; `three.module.js` imports `./three.core.js` → 404. Vendored from npm `three@0.184.0`.
+3. **Import-map addon paths didn't match the flat vendor layout.** `three/addons/` prefix mapped to `/lib/three/` but the specifiers contain subfolders (`controls/…`). Replaced with exact per-file entries.
+4. **GLB office chair faced away from the table** — `RS_CATALOG.chairs.office.rotY` was `Math.PI`; correct value is `0`.
+5. **Chair click-to-claim was unreliable** — any 1px pointer jitter started a chair-drag, suppressed the claim click and committed a micro-reposition. Drag now activates only after ~5px of travel (`_beginChairDrag`/`_onPointerMove`).
+6. **The P15 "Sit Here" bar could never render** — `.rs3d-claim-bar { display:none }` + inline `style.display='flex'` fights CSS2DRenderer, which rewrites the element's inline `display` every frame from `CSS2DObject.visible`. CSS now defaults to `flex` and JS toggles `_claimBarObj.visible` (`_hideClaimBar()`).
+7. **Sit Here/✕ buttons were unclickable** — the container-capture `_onPointerDown` raycast through the DOM overlay began a chair drag and pointer-captured the canvas, stealing the button click and cancelling the pending claim. Scene pointer handling now ignores events whose target isn't the WebGL canvas.
+8. **Seated robots were never drawn for known participants** — `_rebuildSeating` pre-populates `seatedIds` for every claim, and the per-chair duplicate guard then skipped the claim's own chair. Guard now skips only when the participant is recorded against a *different* index.
+9. **Server-sent seat claims were lost on page load (late joiners saw everyone standing).** Root cause: SignalR `RoomState` can arrive before `DOMContentLoaded`; `renderParticipants → RoomScene → _renderCss()` threw on the not-yet-initialised stage (`state.root` null), aborting the whole handler before `setClaimsFromServer` ran. Fixes: `_renderCss()` guards null root/stage; the handler's UI-repaint section is try/caught so state application always runs; and if `RoomState` beats the ES module, the snapshot is buffered in `window._rs3dPendingState` and consumed at module load (room.js + module tail).
+10. **Phantom/gray walker after reload** — a reload leaves a stale same-name participant entry (old CID, `pose='walk'`) until its disconnect lands; `_seedRoamersFromParticipants` now never seeds a roamer matching my own player name, and `applyClaim` clears roamers keyed under a stale CID of the claimer.
+
+**Testing gotcha for future sessions:** `MapStaticAssets` fingerprints (`?v=`) are computed at build time and served immutable — editing `wwwroot/*.js` while `dotnet run` is up means browsers keep the cached old file. Restart the server (rebuild) after JS edits before re-testing in a browser.
+
+Deferred items (unchanged, by design): P7 item 1 (InputManager state machine), P9 item 2 (orbit hover highlight), real models for non-office chairs/furniture (P11 follow-up), Phase C2 humanoid avatars (Appendix C — only on explicit request), A* click-to-walk pathfinding, touch/gamepad (Appendix D).
+
+---
+
+## Deferred-items session (2026-06-10, second live-tested session — "everything except C2")
+
+All previously deferred items except Phase C2 implemented and live-tested (two browsers, fresh rooms, real + synthetic input):
+
+1. **P7.1 InputManager — DONE.** `Input` object (room-scene-3d.js, declared next to `_chairPos`) is the single owner of the pointer gesture: `mode: 'idle'|'chairDrag'|'furnDrag'|'look'`, per-gesture `data`, `suppressClick`, and `to(mode,data,ev)` which alone touches `_controls.enabled` + pointer capture. `_chairDrag`/`_furnitureDrag`/`_look`/`_suppressNextChairClick` variables are gone; handlers are dispatchers over `Input.mode`. `_walk` intentionally remains an app-mode (not a gesture) — 'look' is the drag-look gesture inside walk. Verified: chair drag (move+persist+suppressed click), furniture select/drag, claim click flow, walk enter/move/look/exit.
+2. **P9.2 hover highlight — DONE.** `_updateHover` (~30 Hz, orbit-only, canvas-target-only): emissive highlight via per-mesh cached material clones (`_setGroupHighlight` — clones so shared GLB materials never tint other instances) + one reusable CSS2D tooltip. Tips: empty chair "Click to sit", own chair "Click to stand up", other's chair (host) "Click to free this seat", whiteboard/prop "Click to open/use", furniture "Drag to move". Cleared on press, walk enter, canvas pointerleave, dispose/refresh.
+3. **A* click-to-walk — DONE.** `_routeBlockedAt` (walls+table via `_walkCollidesAt`, plus furniture r=0.55 and props r=0.5), `_findPath` (8-connected over `GRID` cells, no corner cutting, octile h, string-pulled via `_segmentClear`), `_startWalkTo` consumes waypoints; local roamer moves at constant `_walkSpeed()`; each waypoint re-broadcast so peers walk the same route; settles to one `idle` broadcast. Entering walk mode cancels a routed path. Verified visually: avatar rounds the table, never clips it.
+4. **Touch + gamepad (walk mode) — DONE (code-complete; no touch/pad hardware in the test rig).** Gamepad: `_pollGamepad` in `_tick` — left stick move (deadzone 0.18), right stick look (drag-look sign conventions), A jump / B crouch-hold / X interact / Start exit, edge-triggered. Touch: `_showTouchControls()` overlay on walk enter when `_isTouchDevice()` — joystick (pointer-captured) + Jump/Interact/Exit buttons; analog values merge into `_updateWalk`'s fwd/strafe (normalization only above unit length, keyboard behaviour unchanged).
+5. **P11 follow-up — PARTIAL (sourcing-limited).** Stool → KayKit Furniture Bits `chair_stool` (CC0, vendored at `wwwroot/models/chairs/stool/` as .gltf + .bin + shared texture; registry entry with exact-path import-map untouched since GLTFLoader resolves siblings relatively). Gaming/beanbag/throne keep stylized primitives — no style-matched CC0 GLB found in KayKit/Quaternius GitHub packs; revisit if the user supplies models.
+6. **Host setup prompt once per room (user request).** `Room.SetupPromptShown` (persisted), set on first `JoinRoom` of a new room; `BuildRoomState` emits one-shot `showSetupPrompt`; room.js gates `_showHostSetupPrompt` on it (old rooms without the flag prompt once more, then never).
+7. **Test/debug helpers:** `RS3D.__debug` (input state, worldToScreen, chairScreenXY, roamer, probePress) — used by automated checks; `__` prefix, not public API. Note for future automated tests: background tabs pause rAF (no movement/CSS2D updates) — foreground the tab (screenshot) before sampling; `chairScreenXY` projects at SEAT_H which can miss low seats (beanbag).
+
+Still deferred: **Phase C2 only** (Appendix C — humanoid glTF avatars, on explicit request).
+
+---
+
 ## Appendix A — Codebase wiring map (read before P2/P3/P6/P13/P14)
 
 ### Client files

@@ -1653,6 +1653,20 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/10/2026 (168)</strong></p>
+                        <ul class="mb-2">
+                            <li>👑 <strong>Host setup prompt only once</strong>: the "You're the host! choose a settings lock" prompt now appears only the first time a brand-new room is opened — not every time the host rejoins.</li>
+                            <li>💡 <strong>Hover hints in the 3D room</strong>: in orbit view, hovering a chair, the whiteboard, a prop, or furniture now gently highlights it and shows a tip ("Click to sit", "Click to stand up", "Click to open", "Drag to move").</li>
+                            <li>🧭 <strong>Smart click-to-walk</strong>: clicking across the room now walks your avatar <em>around</em> the table, furniture, and props instead of gliding through them (A* pathfinding on the room grid); everyone sees the same route.</li>
+                            <li>🎮 <strong>Gamepad support (walk mode)</strong>: left stick moves, right stick looks, A jumps, B crouches, X interacts, Start exits walk.</li>
+                            <li>📱 <strong>Touch controls (walk mode)</strong>: on touch devices, walk mode now shows an on-screen joystick plus Jump / Interact / Exit buttons; drag the room to look around.</li>
+                            <li>🪵 <strong>Real stool model</strong>: the stool chair style now renders as a real 3D model (KayKit, CC0). Gaming, bean bag, and throne keep their stylized look for now.</li>
+                            <li>🧰 <strong>Input engine cleanup</strong>: chair-drag / furniture-drag / look handling moved to a single input state machine — fixes stuck-orbit and swallowed-click edge cases.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/10/2026 (167)</strong></p>
+                        <ul class="mb-2">
+                            <li>🛠️ <strong>3D room fixes</strong>: the 3D view loads again (the Three.js import map was being stripped by the server, and a missing engine file 404'd); the office chair model no longer faces away from the table; clicking a chair reliably shows the floating "Sit Here" bar (tiny mouse jitter no longer cancels it, and the bar itself was previously invisible); the Sit Here / ✕ buttons are clickable (clicks were being swallowed by the room canvas); sitting down now seats your robot immediately; and late joiners / reloads correctly see who is already seated (seat claims from the server were being lost during page load). Walking avatars keep their colour after reloads instead of leaving a gray ghost behind.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/10/2026 (166)</strong></p>
                         <ul class="mb-2">
                             <li>🧭 <strong>3D toolbar &amp; onboarding (P15)</strong>: the Walk, Click-to-walk, and Add Furniture buttons are now a single icon toolbar in the top-right of the 3D room, with active-state highlighting. First-time visitors to the 3D view see a few quick callout tips pointing at the key controls (dismiss anytime by clicking anywhere).</li>

@@ -43,6 +43,9 @@ public class Room
     // JSON object. Server-merged from BroadcastSceneConfig patches so late joiners get the
     // current state without relying on the host being online.
     public string? SceneConfigJson { get; set; }
+    // One-shot host onboarding: true once the first joiner has been sent the "you're the
+    // host — choose a settings lock" prompt, so it never re-appears on later host logins.
+    public bool SetupPromptShown { get; set; } = false;
 }
 
 public class ChairClaim

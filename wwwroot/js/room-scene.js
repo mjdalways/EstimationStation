@@ -197,6 +197,9 @@
     // Static placeholder shown only while RS3D hasn't taken over the stage yet
     // (e.g. before the module script has finished loading).
     function _renderCss() {
+        // SignalR state can arrive before DOMContentLoaded/init() — nothing to paint yet,
+        // and throwing here would abort the caller's whole RoomState handler.
+        if (!state.root || !state.stage) return;
         state.root.classList.remove('room-scene-3d-active');
         state.stage.innerHTML =
             '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8a93a6;font-size:0.85rem;">Loading room…</div>';

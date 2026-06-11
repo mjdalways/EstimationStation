@@ -88,7 +88,6 @@ window.THREE = THREE;
     var _furnHudBtn = null;    // the on-canvas "+" furniture quick-add HUD button
     var _furnHud = null;       // the furniture quick-add panel (shown on button click)
     var _claimBarObj = null;   // P15: CSS2DObject wrapping _claimBar, anchored above the pending chair
-    var _look    = null;    // active drag-look: { x, y } last pointer
     var EYE_STAND = 1.60, EYE_CROUCH = 1.02, WALK_SPEED = 2.7, CROUCH_SPEED = 1.25;
     // Personal walk-feel overrides (P14) — fall back to the constants above when unset.
     function _walkSpeed()   { return (_cfg && _cfg.walkSpeed) || WALK_SPEED; }
@@ -175,12 +174,40 @@ window.THREE = THREE;
     // Per-chair position overrides (idx -> {x,z}) when a chair has been dragged from its
     // default ring slot. Shared across the room and synced like the furniture layout.
     var _chairPos  = {};
-    var _chairDrag = null;   // active chair drag { idx, group, offsetX, offsetZ, pointerId, moved }
+
+    // ── P7.1 InputManager — single owner of the active pointer gesture ──────────
+    // mode: 'idle' | 'chairDrag' | 'furnDrag' | 'look'  (walk is an app mode, not a
+    // gesture — 'look' is the drag-look gesture *inside* walk mode). ONLY Input.to()
+    // touches _controls.enabled and pointer capture, so a gesture can never leak a
+    // disabled orbit or a stuck capture. data carries the per-gesture payload:
+    //   chairDrag: { idx, group, offsetX, offsetZ, pointerId, moved, startX, startY }
+    //   furnDrag:  { item, offsetX, offsetZ, pointerId, moved }
+    //   look:      { x, y }   (last pointer position)
+    var Input = {
+        mode: 'idle',
+        data: null,
+        suppressClick: false,   // swallow the click that ends a real drag / select press
+        is: function (m) { return this.mode === m; },
+        to: function (mode, data, ev) {
+            if (this.mode === 'chairDrag' || this.mode === 'furnDrag') {
+                try {
+                    if (ev && _renderer && ev.pointerId !== undefined) _renderer.domElement.releasePointerCapture(ev.pointerId);
+                } catch (e) {}
+                if (_controls) _controls.enabled = true;
+            }
+            this.mode = mode || 'idle';
+            this.data = (this.mode !== 'idle' && data) || null;
+            if (this.mode === 'chairDrag' || this.mode === 'furnDrag') {
+                if (_controls) _controls.enabled = false;
+                try {
+                    if (ev && _renderer && ev.pointerId !== undefined) _renderer.domElement.setPointerCapture(ev.pointerId);
+                } catch (e) {}
+            }
+        }
+    };
 
     // Phase 3: Furniture
     var _furnitureObjs         = [];   // { id, type, x, z, group, pickMesh }
-    var _furnitureDrag         = null; // active drag state
-    var _suppressNextChairClick = false;
     var _selectedFurnId        = null; // currently selected furniture id (select modes)
     var _selRing               = null; // highlight ring under selected item
     var _selBar                = null; // selected-item control overlay (delete / deselect)
@@ -212,7 +239,9 @@ window.THREE = THREE;
         _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         _renderer.setSize(W, H);
         _renderer.shadowMap.enabled = true;
-        _renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+        // PCFSoftShadowMap is deprecated in r184 (falls back to PCFShadowMap with a console
+        // warning per program compile) — use PCFShadowMap directly.
+        _renderer.shadowMap.type    = THREE.PCFShadowMap;
         _renderer.outputColorSpace  = THREE.SRGBColorSpace;
         _renderer.toneMapping       = THREE.ACESFilmicToneMapping;
         _renderer.toneMappingExposure = 1.1;
@@ -1279,6 +1308,146 @@ window.THREE = THREE;
         return null;
     }
 
+    // ── P9.2: orbit-mode hover highlight + tooltip ─────────────
+    // One hovered target at a time. Highlight = per-mesh material swap to a cached clone
+    // with a soft blue emissive (clones cached on the mesh so shared GLB materials never
+    // tint other instances). Tooltip = one reusable CSS2DObject.
+    var _hover = { key: null, root: null, lastCheck: 0 };
+    var _hoverTipObj = null;
+
+    function _setGroupHighlight(root, on) {
+        if (!root) return;
+        root.traverse(function (o) {
+            if (!o.isMesh || !o.material || o.userData.glowRing) return;
+            if (on) {
+                if (!o.userData._hiMat) {
+                    if (o.material.emissive === undefined) return;   // not emissive-capable
+                    o.userData._baseMat = o.material;
+                    var hm = o.material.clone();
+                    hm.emissive = new THREE.Color(0x335577);
+                    hm.emissiveIntensity = 0.6;
+                    o.userData._hiMat = hm;
+                }
+                o.material = o.userData._hiMat;
+            } else if (o.userData._baseMat) {
+                o.material = o.userData._baseMat;
+            }
+        });
+    }
+
+    function _showHoverTip(text, x, y, z) {
+        if (!CSS2DObject || !_scene) return;
+        if (!_hoverTipObj) {
+            var div = document.createElement('div');
+            div.className = 'rs3d-hover-tip';
+            div.style.cssText = 'background:rgba(20,24,40,0.86);color:#cdd6f4;border:1px solid rgba(120,140,210,0.35);' +
+                'border-radius:6px;padding:2px 8px;font:600 0.70rem sans-serif;white-space:nowrap;pointer-events:none;';
+            _hoverTipObj = new CSS2DObject(div);
+            _scene.add(_hoverTipObj);
+        }
+        _hoverTipObj.element.textContent = text;
+        _hoverTipObj.visible = true;
+        _hoverTipObj.position.set(x, y, z);
+    }
+
+    function _clearHover() {
+        if (_hover.root) _setGroupHighlight(_hover.root, false);
+        _hover.key = null; _hover.root = null;
+        if (_hoverTipObj) _hoverTipObj.visible = false;
+        if (_hoverCursor) { _hoverCursor = ''; if (_renderer) _renderer.domElement.style.cursor = ''; }
+    }
+
+    function _disposeHoverTip() {
+        _clearHover();
+        if (_hoverTipObj) {
+            if (_hoverTipObj.parent) _hoverTipObj.parent.remove(_hoverTipObj);
+            if (_hoverTipObj.element && _hoverTipObj.element.parentNode) {
+                _hoverTipObj.element.parentNode.removeChild(_hoverTipObj.element);
+            }
+            _hoverTipObj = null;
+        }
+    }
+
+    // Throttled (~30 Hz) hover probe: furniture → chairs → whiteboard → props.
+    function _updateHover(event) {
+        if (_walk || !_raycaster || !_camera || !_renderer) return;
+        if (event.shiftKey) { _clearHover(); return; }
+        var now = performance.now();
+        if (now - _hover.lastCheck < 33) return;
+        _hover.lastCheck = now;
+
+        var rect = _renderer.domElement.getBoundingClientRect();
+        var mx = ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+        var my = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+        _raycaster.setFromCamera(new THREE.Vector2(mx, my), _camera);
+
+        var key = null, root = null, tip = null, pos = null, cursor = '';
+
+        // Furniture (existing affordance, now with tooltip)
+        var f = _raycastFurnitureAt(event);
+        if (f) {
+            key = 'furn_' + f.id; root = f.group; cursor = 'move';
+            tip = 'Drag to move'; pos = { x: f.group.position.x, y: 1.05, z: f.group.position.z };
+        }
+
+        // Chairs (empty → sit; own → stand; other's → host can free)
+        if (!key && _chairObjects.length) {
+            var seatMeshes = _chairObjects.map(function (c) { return c.seatMesh; });
+            var ch = _raycaster.intersectObjects(seatMeshes, false);
+            if (ch.length) {
+                var cObj = null;
+                for (var i = 0; i < _chairObjects.length; i++) {
+                    if (_chairObjects[i].seatMesh === ch[0].object) { cObj = _chairObjects[i]; break; }
+                }
+                if (cObj) {
+                    var claim = _claimedChairs[cObj.idx];
+                    if (!claim)                                tip = '🪑 Click to sit';
+                    else if (claim.cid === _myCid())           tip = 'Click to stand up';
+                    else if (_isHost())                        tip = '👑 Click to free this seat';
+                    if (tip) {
+                        key = 'chair_' + cObj.idx; root = cObj.group; cursor = 'pointer';
+                        pos = { x: cObj.group.position.x, y: 1.15, z: cObj.group.position.z };
+                    }
+                }
+            }
+        }
+
+        // Whiteboard
+        if (!key && _wbBoard && _raycaster.intersectObject(_wbBoard, false).length) {
+            key = 'wb'; root = _wbBoard; cursor = 'pointer';
+            var wp = new THREE.Vector3(); _wbBoard.getWorldPosition(wp);
+            tip = '📋 Click to open'; pos = { x: wp.x, y: wp.y + 0.75, z: wp.z };
+        }
+
+        // Interactive props (confetti / jukebox)
+        if (!key) {
+            var pm = _propMeshes();
+            if (pm.length) {
+                var ph = _raycaster.intersectObjects(pm, false);
+                if (ph.length) {
+                    var pr = _propForMesh(ph[0].object);
+                    if (pr) {
+                        key = 'prop_' + pr.action; root = pr.mesh; cursor = 'pointer';
+                        var pp = new THREE.Vector3(); pr.mesh.getWorldPosition(pp);
+                        tip = '✨ Click to use'; pos = { x: pp.x, y: pp.y + 0.55, z: pp.z };
+                    }
+                }
+            }
+        }
+
+        if (key !== _hover.key) {
+            if (_hover.root) _setGroupHighlight(_hover.root, false);
+            _hover.key = key; _hover.root = root;
+            if (root) _setGroupHighlight(root, true);
+            if (key && tip) _showHoverTip(tip, pos.x, pos.y, pos.z);
+            else if (_hoverTipObj) _hoverTipObj.visible = false;
+        }
+        if (cursor !== _hoverCursor) {
+            _hoverCursor = cursor;
+            _renderer.domElement.style.cursor = cursor;
+        }
+    }
+
     // ── Chair dragging (own + empty chairs) ──────────────────
     function _chairPosKey() { return 'es_rs3d_chairpos_' + ((window.ROOM_CONFIG && window.ROOM_CONFIG.roomName) || 'default'); }
     function _loadChairPositions() {
@@ -1320,38 +1489,35 @@ window.THREE = THREE;
     function _beginChairDrag(chairObj, event) {
         var floorPt = _floorIntersect(event);
         if (!floorPt) return false;
-        _chairDrag = {
+        // NOTE: don't suppress the claim click yet — a no-move press should still claim an
+        // empty chair. The chairDrag move handler sets Input.suppressClick once the drag
+        // actually activates (pointer travels past the jitter threshold).
+        Input.to('chairDrag', {
             idx: chairObj.idx, group: chairObj.group,
             offsetX: chairObj.group.position.x - floorPt.x,
             offsetZ: chairObj.group.position.z - floorPt.z,
-            pointerId: event.pointerId, moved: false
-        };
-        // NOTE: don't suppress the claim click yet — a no-move press should still claim an
-        // empty chair. _onPointerMove sets _suppressNextChairClick once a drag actually starts.
-        if (_controls) _controls.enabled = false;
+            pointerId: event.pointerId, moved: false,
+            startX: event.clientX, startY: event.clientY
+        }, event);
         event.stopPropagation();
         if (event.preventDefault) event.preventDefault();
-        try { _renderer.domElement.setPointerCapture(event.pointerId); } catch (e) {}
         return true;
     }
 
     function _beginDrag(found, event) {
         var floorPt = _floorIntersect(event);
         if (!floorPt) return false;
-        _furnitureDrag = {
+        Input.to('furnDrag', {
             item: found,
             offsetX: found.x - floorPt.x,
             offsetZ: found.z - floorPt.z,
             pointerId: event.pointerId,
             moved: false
-        };
-        _suppressNextChairClick = true;
-        if (_controls) _controls.enabled = false;
-        // Stop OrbitControls (canvas listener) from ever seeing this pointerdown,
-        // and capture the pointer so moves/up keep coming to us.
+        }, event);
+        Input.suppressClick = true;
+        // Stop OrbitControls (canvas listener) from ever seeing this pointerdown.
         event.stopPropagation();
         if (event.preventDefault) event.preventDefault();
-        try { _renderer.domElement.setPointerCapture(event.pointerId); } catch (e) {}
         return true;
     }
 
@@ -1361,6 +1527,11 @@ window.THREE = THREE;
         if (_walk) return;                          // walk mode: drag = look, handled elsewhere
         if (event.button !== undefined && event.button !== 0) return;
         if (event.shiftKey) return;                 // Shift → let OrbitControls orbit
+        // Only treat presses on the WebGL canvas as scene interactions. Presses on DOM
+        // overlays (claim bar buttons, selection bar, toolbar) must reach their own
+        // handlers — raycasting "through" them steals the click via pointer capture.
+        if (_renderer && event.target !== _renderer.domElement) return;
+        _clearHover();   // a press starts an interaction — drop the hover affordance
         // Chair drag (own or empty chairs) takes precedence. A no-move press still lets the
         // click-to-claim fire; only actual movement commits a reposition.
         var dchair = _raycastDraggableChairAt(event);
@@ -1374,7 +1545,7 @@ window.THREE = THREE;
         }
         if (found) {
             _selectFurniture(found.id);             // first click selects (no move, no orbit)
-            _suppressNextChairClick = true;
+            Input.suppressClick = true;
             event.stopPropagation();
             if (event.preventDefault) event.preventDefault();
             return;
@@ -1386,53 +1557,53 @@ window.THREE = THREE;
 
     function _onPointerMove(event) {
         if (_walk) return;
-        if (_chairDrag) {
-            if (event.pointerId !== undefined && _chairDrag.pointerId !== undefined && event.pointerId !== _chairDrag.pointerId) return;
+        if (Input.is('chairDrag')) {
+            var cd = Input.data;
+            if (event.pointerId !== undefined && cd.pointerId !== undefined && event.pointerId !== cd.pointerId) return;
+            // Ignore sub-threshold jitter so a normal click still claims the chair
+            // instead of committing a 1-pixel "reposition" and eating the click.
+            if (!cd.moved &&
+                Math.abs(event.clientX - cd.startX) < 5 &&
+                Math.abs(event.clientY - cd.startY) < 5) return;
             var cfp = _floorIntersect(event); if (!cfp) return;
-            var c = _clampRoom(cfp.x + _chairDrag.offsetX, cfp.z + _chairDrag.offsetZ);
-            _chairDrag.group.position.x = c.x; _chairDrag.group.position.z = c.z;
+            var c = _clampRoom(cfp.x + cd.offsetX, cfp.z + cd.offsetZ);
+            cd.group.position.x = c.x; cd.group.position.z = c.z;
             // Carry the seated robot + ring + label with my own chair.
-            var claim = _claimedChairs[_chairDrag.idx];
+            var claim = _claimedChairs[cd.idx];
             if (claim && claim.cid === _myCid() && _robotMap[claim.cid]) {
                 var r = _robotMap[claim.cid];
                 ['robot', 'ring', 'labelObj'].forEach(function (k) { if (r[k]) { r[k].position.x = c.x; r[k].position.z = c.z; } });
             }
-            _chairDrag.moved = true; _suppressNextChairClick = true;
+            cd.moved = true; Input.suppressClick = true;
             event.stopPropagation();
             return;
         }
-        if (!_furnitureDrag) {
-            // Hover affordance: "move" cursor over a draggable item (skip while Shift-orbiting)
-            if (_furnitureObjs.length && !event.shiftKey) {
-                var over = _raycastFurnitureAt(event);
-                var want = over ? 'move' : '';
-                if (want !== _hoverCursor) {
-                    _hoverCursor = want;
-                    if (_renderer) _renderer.domElement.style.cursor = want;
-                }
-            }
+        if (!Input.is('furnDrag')) {
+            // P9.2 hover affordance: highlight + tooltip + cursor over interactive items.
+            // Only for pointers over the canvas itself (not DOM overlays).
+            if (event.target === (_renderer && _renderer.domElement)) _updateHover(event);
             return;
         }
-        if (_furnitureDrag.pointerId !== undefined && event.pointerId !== _furnitureDrag.pointerId) return;
+        var fd = Input.data;
+        if (fd.pointerId !== undefined && event.pointerId !== fd.pointerId) return;
         var floorPt = _floorIntersect(event);
         if (!floorPt) return;
-        var clamped = _clampRoom(floorPt.x + _furnitureDrag.offsetX, floorPt.z + _furnitureDrag.offsetZ);
+        var clamped = _clampRoom(floorPt.x + fd.offsetX, floorPt.z + fd.offsetZ);
         var nx = _snapGrid(clamped.x);
         var nz = _snapGrid(clamped.z);
-        if (nx !== _furnitureDrag.item.x || nz !== _furnitureDrag.item.z) _furnitureDrag.moved = true;
-        _furnitureDrag.item.x = nx;
-        _furnitureDrag.item.z = nz;
-        _furnitureDrag.item.group.position.set(nx, 0, nz);
+        if (nx !== fd.item.x || nz !== fd.item.z) fd.moved = true;
+        fd.item.x = nx;
+        fd.item.z = nz;
+        fd.item.group.position.set(nx, 0, nz);
         _updateSelRing();
         event.stopPropagation();
     }
 
     function _onPointerUp(event) {
-        if (_chairDrag) {
-            if (event && _chairDrag.pointerId !== undefined && event.pointerId !== _chairDrag.pointerId) return;
-            var cd = _chairDrag; _chairDrag = null;
-            try { if (event) _renderer.domElement.releasePointerCapture(event.pointerId); } catch (e) {}
-            if (_controls) _controls.enabled = true;
+        if (Input.is('chairDrag')) {
+            var cd = Input.data;
+            if (event && cd.pointerId !== undefined && event.pointerId !== cd.pointerId) return;
+            Input.to('idle', null, event);   // releases capture + re-enables orbit
             if (cd.moved) {
                 _chairPos[cd.idx] = { x: cd.group.position.x, z: cd.group.position.z };
                 _saveChairPositions(true);
@@ -1440,12 +1611,11 @@ window.THREE = THREE;
             }
             return;
         }
-        if (!_furnitureDrag) return;
-        if (event && _furnitureDrag.pointerId !== undefined && event.pointerId !== _furnitureDrag.pointerId) return;
-        if (_furnitureDrag.moved) _saveFurniture();
-        try { if (event) _renderer.domElement.releasePointerCapture(event.pointerId); } catch (e) {}
-        _furnitureDrag = null;
-        if (_controls) _controls.enabled = true;
+        if (!Input.is('furnDrag')) return;
+        var fd = Input.data;
+        if (event && fd.pointerId !== undefined && event.pointerId !== fd.pointerId) return;
+        if (fd.moved) _saveFurniture();
+        Input.to('idle', null, event);
     }
 
     function _onKeyDown(event) {
@@ -1664,6 +1834,100 @@ window.THREE = THREE;
         if (hud && hud.parentNode) hud.parentNode.removeChild(hud);
     }
 
+    // ── Touch joystick + Gamepad input (walk mode only) ────────
+    // Both are additive analog sources merged into _updateWalk's fwd/strafe; with neither
+    // present the keyboard path is byte-for-byte the old behaviour.
+    var _padMove   = null;   // {x,y} from gamepad left stick (-1..1, deadzoned)
+    var _padPrev   = {};     // previous button states for edge triggers
+    var _touchMove = null;   // {x,y} from the on-screen joystick
+    var _touchUi   = null;   // overlay root (joystick + action buttons)
+
+    function _isTouchDevice() { return ('ontouchstart' in window) || ((navigator.maxTouchPoints || 0) > 0); }
+
+    function _pollGamepad(dt) {
+        if (!_walk || !navigator.getGamepads) return;
+        var pads, gp = null;
+        try { pads = navigator.getGamepads(); } catch (e) { return; }
+        for (var i = 0; i < pads.length; i++) { if (pads[i] && pads[i].connected) { gp = pads[i]; break; } }
+        if (!gp) { _padMove = null; return; }
+        function dz(v) { return Math.abs(v) < 0.18 ? 0 : v; }
+        var mx = dz(gp.axes[0] || 0), my = dz(gp.axes[1] || 0);
+        _padMove = (mx || my) ? { x: mx, y: my } : null;
+        // Right stick look — same sign conventions as drag-look.
+        var rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
+        if (rx || ry) {
+            var pitchSign = _invertY() ? 1 : -1;
+            _walk.yaw  += rx * dt * 2.6;
+            _walk.pitch = Math.max(-1.2, Math.min(1.2, _walk.pitch + pitchSign * ry * dt * 1.9));
+        }
+        function pr(b) { return !!(gp.buttons[b] && gp.buttons[b].pressed); }
+        if (pr(0) && !_padPrev[0] && _walk.grounded) { _walk.vy = 7.5; _walk.grounded = false; }  // A → jump
+        if (pr(1) !== !!_padPrev[1]) _walk.crouch = pr(1);                                        // B → crouch (hold)
+        if (pr(2) && !_padPrev[2]) _walkInteract();                                               // X → interact
+        var exitNow = pr(9) && !_padPrev[9];                                                      // Start → exit walk
+        _padPrev = { 0: pr(0), 1: pr(1), 2: pr(2), 9: pr(9) };
+        if (exitNow) { _padMove = null; _exitWalk(); }
+    }
+
+    function _showTouchControls() {
+        if (_touchUi || !_container) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'rs3d-touch-ui';
+        wrap.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:30;';
+        // Joystick (bottom-left)
+        var joy = document.createElement('div');
+        joy.style.cssText = 'position:absolute;left:18px;bottom:18px;width:104px;height:104px;border-radius:50%;' +
+            'background:rgba(40,48,70,0.35);border:2px solid rgba(130,150,210,0.5);pointer-events:auto;touch-action:none;';
+        var knob = document.createElement('div');
+        knob.style.cssText = 'position:absolute;left:32px;top:32px;width:40px;height:40px;border-radius:50%;' +
+            'background:rgba(130,150,210,0.85);pointer-events:none;';
+        joy.appendChild(knob);
+        var joyId = null;
+        function setKnob(dx, dy) { knob.style.left = (32 + dx * 32) + 'px'; knob.style.top = (32 + dy * 32) + 'px'; }
+        function joyMove(e) {
+            if (e.pointerId !== joyId) return;
+            var r = joy.getBoundingClientRect();
+            var dx = ((e.clientX - r.left) / r.width) * 2 - 1;
+            var dy = ((e.clientY - r.top) / r.height) * 2 - 1;
+            var len = Math.hypot(dx, dy); if (len > 1) { dx /= len; dy /= len; }
+            _touchMove = { x: dx, y: dy };
+            setKnob(dx, dy);
+        }
+        function joyEnd(e) { if (e.pointerId !== joyId) return; joyId = null; _touchMove = null; setKnob(0, 0); }
+        joy.addEventListener('pointerdown', function (e) {
+            joyId = e.pointerId;
+            try { joy.setPointerCapture(e.pointerId); } catch (err) {}
+            e.preventDefault(); e.stopPropagation();
+            joyMove(e);
+        });
+        joy.addEventListener('pointermove', joyMove);
+        joy.addEventListener('pointerup', joyEnd);
+        joy.addEventListener('pointercancel', joyEnd);
+        wrap.appendChild(joy);
+        // Action buttons (bottom-right): jump, interact, exit
+        function mkBtn(txt, right, bottom, fn) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = txt;
+            b.style.cssText = 'position:absolute;right:' + right + 'px;bottom:' + bottom + 'px;width:54px;height:54px;' +
+                'border-radius:50%;border:2px solid rgba(130,150,210,0.55);background:rgba(40,48,70,0.55);color:#dde3f8;' +
+                'font:700 0.85rem sans-serif;pointer-events:auto;touch-action:none;';
+            b.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); fn(); });
+            wrap.appendChild(b);
+        }
+        var kb = _keyBinds();
+        mkBtn('⤒', 86, 84, function () { if (_walk && _walk.grounded) { _walk.vy = 7.5; _walk.grounded = false; } });
+        mkBtn(_keyHint(kb.interact), 24, 84, function () { if (_walk) _walkInteract(); });
+        mkBtn('✕', 55, 18, function () { _exitWalk(); });
+        _container.appendChild(wrap);
+        _touchUi = wrap;
+    }
+    function _hideTouchControls() {
+        _touchMove = null;
+        if (_touchUi && _touchUi.parentNode) _touchUi.parentNode.removeChild(_touchUi);
+        _touchUi = null;
+    }
+
     // P15: brief centred toast shown each time walk mode is entered.
     function _showWalkToast() {
         if (!_container) return;
@@ -1681,6 +1945,7 @@ window.THREE = THREE;
 
     function _enterWalk() {
         if (!_camera || _view === 'top') return;   // walk mode is 3D-only
+        _clearHover();                             // hover affordance is orbit-only
         var dir = new THREE.Vector3();
         _camera.getWorldDirection(dir);
         var yaw = Math.atan2(dir.x, -dir.z);
@@ -1707,7 +1972,11 @@ window.THREE = THREE;
         if (_furnHud)      _furnHud.style.display = 'none';
         _showWalkHud();
         _showWalkToast();
+        if (_isTouchDevice()) _showTouchControls();
         // Become a roamer: tell everyone where I am, and spawn my own avatar locally.
+        // Entering walk mode cancels any routed click-to-walk path — WASD owns movement now.
+        _walkToActive = false;
+        var _mr = _roamers[_myCid()]; if (_mr) _mr.path = null;
         _iAmRoaming = true; _roamSend = 1;
         if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, yaw, 'walk');
         applyAvatarMove(_myCid(), px, pz, yaw, 'walk');
@@ -1725,7 +1994,10 @@ window.THREE = THREE;
         var px = _walk ? _walk.wx : (_camera ? _camera.position.x : 0);
         var pz = _walk ? _walk.wz : (_camera ? _camera.position.z : 0);
         var yaw = _walk ? _walk.yaw : 0;
-        _walk = null; _keys = {}; _look = null;
+        _walk = null; _keys = {};
+        if (Input.is('look')) Input.to('idle');
+        _padMove = null; _padPrev = {};
+        _hideTouchControls();
         if (document.pointerLockElement && _renderer && document.pointerLockElement === _renderer.domElement) {
             try { document.exitPointerLock(); } catch (e) {}
         }
@@ -1748,16 +2020,17 @@ window.THREE = THREE;
     }
 
     // Drag-to-look (active only in walk mode).
-    function _onLookDown(e) { if (_walk) _look = { x: e.clientX, y: e.clientY }; }
+    function _onLookDown(e) { if (_walk) Input.to('look', { x: e.clientX, y: e.clientY }); }
     function _onLookMove(e) {
-        if (!_walk || !_look) return;
-        var dx = e.clientX - _look.x, dy = e.clientY - _look.y;
-        _look.x = e.clientX; _look.y = e.clientY;
+        if (!_walk || !Input.is('look')) return;
+        var lk = Input.data;
+        var dx = e.clientX - lk.x, dy = e.clientY - lk.y;
+        lk.x = e.clientX; lk.y = e.clientY;
         var sens = _lookSens(), pitchSign = _invertY() ? 1 : -1;
         _walk.yaw  += dx * sens;
         _walk.pitch = Math.max(-1.2, Math.min(1.2, _walk.pitch + pitchSign * dy * sens));
     }
-    function _onLookUp() { _look = null; }
+    function _onLookUp() { if (Input.is('look')) Input.to('idle'); }
 
     // Pointer Lock mouse-look (first-person walk only). Inert unless the canvas is
     // actually lock-owner — falls back silently to drag-look (_onLook*) otherwise.
@@ -1808,13 +2081,19 @@ window.THREE = THREE;
         if (_keys[kb.back])     fwd    -= 1;
         if (_keys[kb.right])    strafe += 1;
         if (_keys[kb.left])     strafe -= 1;
+        // Analog sources (gamepad left stick / touch joystick). Stick-up = forward.
+        if (_padMove)   { fwd -= _padMove.y;   strafe += _padMove.x; }
+        if (_touchMove) { fwd -= _touchMove.y; strafe += _touchMove.x; }
 
         var speed = (_walk.crouch ? _crouchSpeed() : _walkSpeed()) * dt;
         var sy = Math.sin(_walk.yaw), cyw = Math.cos(_walk.yaw);
         var dx = sy * fwd + cyw * strafe;
         var dz = -cyw * fwd + sy * strafe;
         var len = Math.hypot(dx, dz);
-        if (len > 0) { dx = dx / len * speed; dz = dz / len * speed; }
+        // Normalize only above unit length so analog inputs keep their gradation
+        // (keyboard axes are ±1 so diagonal still normalizes exactly as before).
+        if (len > 1) { dx /= len; dz /= len; }
+        dx *= speed; dz *= speed;
 
         // Sliding collision: try full move, then each axis separately.
         var nx = _walk.wx + dx, nz = _walk.wz + dz;
@@ -2162,10 +2441,11 @@ window.THREE = THREE;
     // model: null keep their hand-built primitive geometry indefinitely.
     var RS_CATALOG = {
         chairs: {
-            office: { model: '/models/chairs/office.glb', scale: 1.0, rotY: Math.PI },
+            office: { model: '/models/chairs/office.glb', scale: 1.0, rotY: 0 },
             gaming:  { model: null },
             beanbag: { model: null },
-            stool:   { model: null },
+            // KayKit Furniture Bits (CC0) — .gltf with sibling .bin + texture in the same folder.
+            stool:   { model: '/models/chairs/stool/chair_stool.gltf', scale: 1.0, rotY: 0 },
             throne:  { model: null }
         }
     };
@@ -2304,6 +2584,7 @@ window.THREE = THREE;
         });
         var ring=new THREE.Mesh(new THREE.TorusGeometry(0.17,0.015,6,16),lm);
         ring.position.y=SEAT_H*0.38; ring.rotation.x=Math.PI/2; g.add(ring);
+        _applyChairModel(g, seat, RS_CATALOG.chairs.stool);
         return { group: g, seatMesh: seat };
     }
 
@@ -2776,26 +3057,121 @@ window.THREE = THREE;
         }
         return { x: 0, z: ROOM_D / 2 - 1.2, yaw: 0 };
     }
-    // Click-to-walk: glide my avatar to a floor point and broadcast it (others lerp too).
+    // ── Click-to-walk A* routing over the snap grid ───────────
+    // Obstacles: walls + table (same test walk mode uses) plus furniture and interactive
+    // props, so the routed glide no longer passes through the table or a sofa.
+    function _routeBlockedAt(x, z) {
+        if (_walkCollidesAt(x, z)) return true;
+        for (var i = 0; i < _furnitureObjs.length; i++) {
+            var f = _furnitureObjs[i];
+            if (Math.hypot(f.group.position.x - x, f.group.position.z - z) < 0.55) return true;
+        }
+        for (var j = 0; j < _props.length; j++) {
+            var p = _props[j]; if (!p.mesh) continue;
+            if (Math.hypot(p.mesh.position.x - x, p.mesh.position.z - z) < 0.5) return true;
+        }
+        return false;
+    }
+    function _segmentClear(ax, az, bx, bz) {
+        var d = Math.hypot(bx - ax, bz - az), steps = Math.max(1, Math.ceil(d / 0.15));
+        for (var i = 1; i <= steps; i++) {
+            var t = i / steps;
+            if (_routeBlockedAt(ax + (bx - ax) * t, az + (bz - az) * t)) return false;
+        }
+        return true;
+    }
+    // A* over GRID-sized cells (8-connected, no corner cutting, octile heuristic),
+    // then string-pulled down to the few corner waypoints actually needed.
+    function _findPath(sx, sz, gx, gz) {
+        var cs = GRID, cols = Math.max(2, Math.round(ROOM_W / cs)), rows = Math.max(2, Math.round(ROOM_D / cs));
+        function cx(i) { return -ROOM_W / 2 + (i + 0.5) * cs; }
+        function cz(j) { return -ROOM_D / 2 + (j + 0.5) * cs; }
+        function ci(x) { return Math.max(0, Math.min(cols - 1, Math.floor((x + ROOM_W / 2) / cs))); }
+        function cj(z) { return Math.max(0, Math.min(rows - 1, Math.floor((z + ROOM_D / 2) / cs))); }
+        var blocked = new Array(cols * rows);
+        for (var j = 0; j < rows; j++) for (var i = 0; i < cols; i++) blocked[j * cols + i] = _routeBlockedAt(cx(i), cz(j));
+        function nearestFree(i0, j0) {
+            if (!blocked[j0 * cols + i0]) return [i0, j0];
+            for (var rad = 1; rad < Math.max(cols, rows); rad++) {
+                for (var dj = -rad; dj <= rad; dj++) for (var di = -rad; di <= rad; di++) {
+                    if (Math.max(Math.abs(di), Math.abs(dj)) !== rad) continue;
+                    var ni = i0 + di, nj = j0 + dj;
+                    if (ni < 0 || nj < 0 || ni >= cols || nj >= rows) continue;
+                    if (!blocked[nj * cols + ni]) return [ni, nj];
+                }
+            }
+            return null;
+        }
+        var s = nearestFree(ci(sx), cj(sz)), g = nearestFree(ci(gx), cj(gz));
+        if (!s || !g) return null;
+        var open = [{ i: s[0], j: s[1], g: 0, f: 0, parent: null }];
+        var bestG = {}; bestG[s[1] * cols + s[0]] = 0;
+        var found = null;
+        while (open.length) {
+            var bi = 0;
+            for (var oi = 1; oi < open.length; oi++) if (open[oi].f < open[bi].f) bi = oi;
+            var cur = open.splice(bi, 1)[0];
+            if (cur.i === g[0] && cur.j === g[1]) { found = cur; break; }
+            for (var dj2 = -1; dj2 <= 1; dj2++) for (var di2 = -1; di2 <= 1; di2++) {
+                if (!di2 && !dj2) continue;
+                var ni2 = cur.i + di2, nj2 = cur.j + dj2;
+                if (ni2 < 0 || nj2 < 0 || ni2 >= cols || nj2 >= rows) continue;
+                if (blocked[nj2 * cols + ni2]) continue;
+                if (di2 && dj2 && (blocked[cur.j * cols + ni2] || blocked[nj2 * cols + cur.i])) continue;
+                var ng = cur.g + ((di2 && dj2) ? 1.4142 : 1);
+                var keyN = nj2 * cols + ni2;
+                if (bestG[keyN] !== undefined && bestG[keyN] <= ng) continue;
+                bestG[keyN] = ng;
+                var dx = Math.abs(ni2 - g[0]), dz = Math.abs(nj2 - g[1]);
+                open.push({ i: ni2, j: nj2, g: ng, f: ng + (dx + dz) + (1.4142 - 2) * Math.min(dx, dz), parent: cur });
+            }
+        }
+        if (!found) return null;
+        var cells = [];
+        for (var n = found; n; n = n.parent) cells.unshift({ x: cx(n.i), z: cz(n.j) });
+        var path = [], a = { x: sx, z: sz }, idx = 0;
+        while (idx < cells.length) {
+            var far = idx;
+            for (var k2 = cells.length - 1; k2 > idx; k2--) {
+                if (_segmentClear(a.x, a.z, cells[k2].x, cells[k2].z)) { far = k2; break; }
+            }
+            a = cells[far]; path.push(a);
+            idx = far + 1;
+        }
+        return path;
+    }
+
+    // Click-to-walk: route my avatar to a floor point along the A* path; each waypoint is
+    // broadcast as it becomes the active target so peers walk the same route.
     function _startWalkTo(x, z) {
         if (!_scene) return;
         var m = 0.30;
         x = Math.max(-ROOM_W/2+m, Math.min(ROOM_W/2-m, x));
         z = Math.max(-ROOM_D/2+m, Math.min(ROOM_D/2-m, z));
         var start = _myStartPos();
-        var yaw = Math.atan2(x - start.x, z - start.z);   // face travel direction
         if (!_roamers[_myCid()]) applyAvatarMove(_myCid(), start.x, start.z, start.yaw, 'walk');
         var r = _roamers[_myCid()];
         if (!r) return;
-        r.tx = x; r.tz = z; r.tyaw = yaw;
+        var path = _findPath(r.x, r.z, x, z) || [{ x: x, z: z }];
+        // Finish on the exact click point when it's directly reachable from the last cell.
+        var last = path[path.length - 1];
+        if (!_routeBlockedAt(x, z) && _segmentClear(last.x, last.z, x, z)) path.push({ x: x, z: z });
+        var first = path.shift() || { x: x, z: z };
+        r.path = path;
+        r.tx = first.x; r.tz = first.z;
+        r.tyaw = Math.atan2(first.x - r.x, first.z - r.z);
         _iAmRoaming = true; _walkToActive = true;
-        if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(x, z, yaw, 'walk');
+        if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(first.x, first.z, r.tyaw, 'walk');
     }
     // Seed/clear roamers from a RoomState snapshot (late join / reconnect). Skips self.
     function _seedRoamersFromParticipants() {
         var my = _myCid();
+        var myName = window.ROOM_CONFIG && window.ROOM_CONFIG.playerName;
         _participants.forEach(function (p) {
             if (!p.connectionId || p.connectionId === my) return;
+            // A reload leaves a stale same-name entry (old CID, possibly pose='walk') on the
+            // server until its disconnect is processed — never seed a phantom "me" from it.
+            if (myName && p.name === myName) return;
             var roaming = (p.pose === 'walk' || p.pose === 'idle') && p.posX != null && p.posZ != null;
             if (roaming && !_roamers[p.connectionId]) applyAvatarMove(p.connectionId, p.posX, p.posZ, p.yaw || 0, p.pose);
             else if (!roaming && _roamers[p.connectionId]) clearRoamer(p.connectionId);
@@ -2837,7 +3213,17 @@ window.THREE = THREE;
         var k = Math.min(1, dt * 8), my = _myCid();
         Object.keys(_roamers).forEach(function (cid) {
             var r = _roamers[cid]; if (!r.robot) return;
-            r.x += (r.tx - r.x) * k; r.z += (r.tz - r.z) * k;
+            if (cid === my && _walkToActive && r.path) {
+                // Routed click-to-walk: constant walking speed toward the active waypoint
+                // (the proportional lerp below would crawl into corners between waypoints).
+                var ddx = r.tx - r.x, ddz = r.tz - r.z, dd = Math.hypot(ddx, ddz);
+                if (dd > 1e-4) {
+                    var stepLen = Math.min(_walkSpeed() * dt, dd);
+                    r.x += ddx / dd * stepLen; r.z += ddz / dd * stepLen;
+                }
+            } else {
+                r.x += (r.tx - r.x) * k; r.z += (r.tz - r.z) * k;
+            }
             var dy = r.tyaw - r.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
             r.yaw += dy * k;
             r.robot.position.set(r.x, 0, r.z); r.robot.rotation.y = r.yaw;
@@ -2850,13 +3236,21 @@ window.THREE = THREE;
             // Away-dim: fade the name tag of avatars idle for a while.
             if (r.label) r.label.style.opacity = ((_clock - (r.lastMove || 0)) > 45) ? '0.5' : '1';
         });
-        // Click-to-walk: when I reach the target, settle to idle (one broadcast).
+        // Click-to-walk: advance to the next routed waypoint, or settle to idle at the end.
         if (_walkToActive) {
             var me = _roamers[my];
             if (!me) { _walkToActive = false; }
-            else if (Math.hypot(me.tx - me.x, me.tz - me.z) < 0.06) {
-                _walkToActive = false;
-                if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(me.tx, me.tz, me.tyaw, 'idle');
+            else if (Math.hypot(me.tx - me.x, me.tz - me.z) < 0.1) {
+                if (me.path && me.path.length) {
+                    var nxt = me.path.shift();
+                    me.tx = nxt.x; me.tz = nxt.z;
+                    me.tyaw = Math.atan2(nxt.x - me.x, nxt.z - me.z);
+                    if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(nxt.x, nxt.z, me.tyaw, 'walk');
+                } else {
+                    _walkToActive = false;
+                    me.path = null;
+                    if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(me.tx, me.tz, me.tyaw, 'idle');
+                }
             }
         }
     }
@@ -3056,10 +3450,12 @@ window.THREE = THREE;
             var pRoaming = p && (_roamers[p.connectionId] ||
                 (_iAmRoaming && i === _myChairIdx));
             if (pRoaming) continue;
-            // Belt-and-suspenders: skip if this participant was already drawn in an earlier chair
-            // (handles stale localStorage CID leaving two claims for the same person).
-            if (p && p.connectionId && seatedIds.hasOwnProperty(p.connectionId)) continue;
-            if (p && p.name        && seatedIds.hasOwnProperty(p.name))         continue;
+            // Belt-and-suspenders: skip if this participant is recorded against a DIFFERENT
+            // chair (stale localStorage CID leaving two claims for the same person). seatedIds
+            // is pre-populated for every claim above, so an index match means "this is their
+            // chair — draw it", not a duplicate.
+            if (p && p.connectionId && seatedIds.hasOwnProperty(p.connectionId) && seatedIds[p.connectionId] !== i) continue;
+            if (p && p.name        && seatedIds.hasOwnProperty(p.name)         && seatedIds[p.name]         !== i) continue;
             if (!p) {
                 var ghost = _makeRobot(claim.color || 0x444444, 'none', true);
                 ghost.position.set(pos.x, 0, pos.z);
@@ -3233,6 +3629,8 @@ window.THREE = THREE;
         _container.addEventListener('pointercancel', _onPointerUp,   true);
         // Chair-claim click stays on the canvas (bubble phase, after orbit settles).
         _renderer.domElement.addEventListener('click', _onCanvasClick);
+        // P9.2: drop the hover highlight/tooltip when the pointer leaves the canvas.
+        _renderer.domElement.addEventListener('pointerleave', _clearHover);
         // Walk-mode keys registered in CAPTURE phase so they fire before any bubble-phase
         // page handler (Space=reveal-votes, Ctrl shortcuts, etc.). stopImmediatePropagation
         // inside the handler then blocks those page handlers from ever seeing the key.
@@ -3251,7 +3649,7 @@ window.THREE = THREE;
     function _onCanvasClick(event) {
         if (_walk) return;   // walk mode uses E-to-interact, not click-to-claim
         // If a furniture drag just finished, suppress chair pick
-        if (_suppressNextChairClick) { _suppressNextChairClick = false; return; }
+        if (Input.suppressClick) { Input.suppressClick = false; return; }
         if (!_raycaster || !_camera) return;
         var rect = _renderer.domElement.getBoundingClientRect();
         var mx = ((event.clientX - rect.left) / rect.width)  * 2 - 1;
@@ -3338,6 +3736,14 @@ window.THREE = THREE;
         _showClaimBar(idx);
     }
 
+    // CSS2DRenderer rewrites _claimBar's inline display every frame from
+    // _claimBarObj.visible, so show/hide must go through the object flag —
+    // writing style.display directly is undone on the next rendered frame.
+    function _hideClaimBar() {
+        if (_claimBarObj) _claimBarObj.visible = false;
+        if (_claimBar) _claimBar.style.display = 'none';
+    }
+
     function _showClaimBar(idx) {
         if (!_claimBar) return;
         var nameEl = _claimBar.querySelector('#rs3d-claim-name');
@@ -3353,6 +3759,7 @@ window.THREE = THREE;
             }
             var pos = chairObj ? chairObj.group.position : { x: 0, z: 0 };
             _claimBarObj.position.set(pos.x, 1.2, pos.z);
+            _claimBarObj.visible = true;
         }
         _claimBar.style.display = 'flex';
     }
@@ -3388,13 +3795,13 @@ window.THREE = THREE;
         _myChairIdx = idx;
         _pendingChairIdx = null;
         _saveClaims();
-        if (_claimBar) _claimBar.style.display = 'none';
+        _hideClaimBar();
         _notifyClaimsChanged();
     }
 
     function _cancelClaim() {
         _pendingChairIdx = null;
-        if (_claimBar) _claimBar.style.display = 'none';
+        _hideClaimBar();
         _rebuildSeating();
     }
 
@@ -3433,13 +3840,20 @@ window.THREE = THREE;
         if (cid && cid === _myCid()) {
             _myChairIdx = idx;
             if (_pendingChairIdx === idx) _pendingChairIdx = null;
-            if (_claimBar) _claimBar.style.display = 'none';
+            _hideClaimBar();
             // I successfully sat → stop roaming + tell the server to clear my pose.
             if (_iAmRoaming) { _iAmRoaming = false; if (window.RoomSceneNet && RoomSceneNet.avatarStop) RoomSceneNet.avatarStop(); }
         }
-        // Sitting down ends roaming — remove their free-roam avatar everywhere.
-        if (_roamers[cid]) clearRoamer(cid);
-        else _notifyClaimsChanged();
+        // Sitting down ends roaming — remove their free-roam avatar everywhere. Also clear
+        // roamers keyed under a STALE CID of the same person (pre-reload entry still in
+        // _participants), which would otherwise suppress their seated robot in _rebuildSeating.
+        var clearedAny = false;
+        Object.keys(_roamers).forEach(function (rcid) {
+            if (rcid === cid) { clearRoamer(rcid); clearedAny = true; return; }
+            var rp = _participantByCid(rcid);
+            if (rp && name && rp.name === name) { clearRoamer(rcid); clearedAny = true; }
+        });
+        if (!clearedAny) _notifyClaimsChanged();
     }
 
     function applyRelease(idx) {
@@ -3466,7 +3880,7 @@ window.THREE = THREE;
     function claimFailed(idx, winnerName) {
         if (_pendingChairIdx === idx) {
             _pendingChairIdx = null;
-            if (_claimBar) _claimBar.style.display = 'none';
+            _hideClaimBar();
         }
         if (_scene) _rebuildSeating();
         var msg = '😅 ' + (winnerName || 'Someone') + ' grabbed that chair first! Pick another.';
@@ -3493,6 +3907,7 @@ window.THREE = THREE;
         _claimBar = bar;
         if (CSS2DObject && _scene) {
             _claimBarObj = new CSS2DObject(bar);
+            _claimBarObj.visible = false;   // hidden until a chair is pending
             _scene.add(_claimBarObj);
         }
     }
@@ -3654,7 +4069,8 @@ window.THREE = THREE;
 
         if (_walk) {
             // First-person mode: our controller owns the camera; skip orbit/fly-to.
-            _updateWalk(dt);
+            _pollGamepad(dt);     // gamepad move/look/buttons feed _updateWalk via _padMove
+            if (_walk) _updateWalk(dt);   // (gamepad Start may have exited walk just now)
         } else {
             // Phase 4: camera fly-to
             if (_flyTarget && _controls) {
@@ -3697,6 +4113,7 @@ window.THREE = THREE;
         }
         document.removeEventListener('keydown', _onKeyDown, true);
         document.removeEventListener('keyup',   _onKeyUp,   true);
+        if (_renderer) _renderer.domElement.removeEventListener('pointerleave', _clearHover);
         window.removeEventListener('pointermove', _onLookMove);
         window.removeEventListener('pointerup',   _onLookUp);
         document.removeEventListener('mousemove', _onPointerLockMove);
@@ -3705,6 +4122,8 @@ window.THREE = THREE;
             try { document.exitPointerLock(); } catch (e) {}
         }
         _hideWalkHud();
+        _hideTouchControls();
+        Input.to('idle'); Input.suppressClick = false;
         if (_toolbar && _toolbar.parentNode) { _toolbar.parentNode.removeChild(_toolbar); _toolbar = null; }
         _walkBtn = null; _clickWalkBtn = null; _furnHudBtn = null;
         if (_furnHud && _furnHud.parentNode) { _furnHud.parentNode.removeChild(_furnHud); _furnHud = null; }
@@ -3724,7 +4143,8 @@ window.THREE = THREE;
             v.tex.dispose();
         });
         _videoTextures = [];
-        _walk = null; _keys = {}; _look = null;
+        _walk = null; _keys = {};
+        if (Input.is('look')) Input.to('idle');
         if (_scene && _scene.environment) { _scene.environment.dispose(); }
         if (_renderer) {
             var el = _renderer.domElement;
@@ -3752,6 +4172,7 @@ window.THREE = THREE;
         _emotes.forEach(function (e) { if (e.div && e.div.parentNode) e.div.parentNode.removeChild(e.div); });
         _emotes = [];
         _disposeInteractLabel();
+        _disposeHoverTip();
         _scene = null; _camera = null; _perspCam = null; _orthoCam = null; _flyTarget = null;
     }
 
@@ -3770,6 +4191,7 @@ window.THREE = THREE;
         // Clean up label DOM nodes attached to CSS2DObjects
         _clearRobots();
         _disposeInteractLabel();
+        _disposeHoverTip();
         // Remove everything from scene (lights, room geo, table, furniture)
         while (_scene.children.length > 0) { _scene.remove(_scene.children[0]); }
         _furnitureObjs = []; // groups already removed above
@@ -3897,8 +4319,47 @@ window.THREE = THREE;
         toggleFurniturePanel: toggleFurniturePanel,
         applyRemoteLayout: applyRemoteLayout,
         setView: setView,
-        flyToParticipant: flyToParticipant
+        flyToParticipant: flyToParticipant,
+        // Test/debug helpers (__ prefix — not part of the public contract). Used by
+        // automated UI checks to find scene objects on screen and inspect input state.
+        __debug: {
+            input: function () { return { mode: Input.mode, suppress: Input.suppressClick, walk: !!_walk, walkTo: _walkToActive }; },
+            worldToScreen: function (x, y, z) {
+                if (!_camera || !_renderer) return null;
+                var v = new THREE.Vector3(x, y || 0, z).project(_camera);
+                var r = _renderer.domElement.getBoundingClientRect();
+                return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
+            },
+            chairScreenXY: function (idx) {
+                for (var i = 0; i < _chairObjects.length; i++) {
+                    if (_chairObjects[i].idx === idx) {
+                        var p = _chairObjects[i].group.position;
+                        return RS3D.__debug.worldToScreen(p.x, SEAT_H, p.z);
+                    }
+                }
+                return null;
+            },
+            roamer: function (cid) {
+                var r = _roamers[cid || _myCid()];
+                return r ? { x: r.x, z: r.z, tx: r.tx, tz: r.tz, path: (r.path || []).length } : null;
+            },
+            probePress: function (x, y) {
+                var hit = _raycastDraggableChairAt({ clientX: x, clientY: y });
+                return { chairIdx: hit ? hit.idx : null, cam: _camera === _perspCam ? 'persp' : 'ortho', view: _view };
+            }
+        }
     };
+
+    // Consume a RoomState snapshot that arrived over SignalR before this module finished
+    // loading (room.js buffers it in window._rs3dPendingState when window.RS3D is absent).
+    (function () {
+        var pend = window._rs3dPendingState;
+        if (!pend) return;
+        delete window._rs3dPendingState;
+        setClaimsFromServer(pend.chairClaims || []);
+        if (pend.roomLayout) applyRemoteLayout(pend.roomLayout);
+        if (pend.chairPositions) applyChairPositions(pend.chairPositions);
+    }());
 
     // Auto-activate only when RoomScene isn't present to orchestrate (defensive). On the
     // room page RoomScene loads first and drives init()/setView() for every mode, so this
