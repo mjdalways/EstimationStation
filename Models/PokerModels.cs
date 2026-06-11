@@ -39,6 +39,10 @@ public class Room
     // Room Scene: per-chair position overrides (JSON map idx -> {x,z}) when chairs are
     // dragged off their default ring. Whole-map sync, like the furniture layout.
     public string? ChairPositionsJson { get; set; }
+    // Room Scene: décor position overrides (JSON map key -> {x,z[,rot]}) for the props
+    // (confetti/jukebox), whiteboard, and project screen when dragged from their default
+    // spots. Whole-map sync, like ChairPositionsJson.
+    public string? DecorPositionsJson { get; set; }
     // Room Scene: shared visual config (chair count, table shape, window view, etc.) as a
     // JSON object. Server-merged from BroadcastSceneConfig patches so late joiners get the
     // current state without relying on the host being online.

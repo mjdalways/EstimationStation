@@ -74,6 +74,7 @@ window.THREE = THREE;
     var _roamSend = 0;      // throttle accumulator for broadcasting my own position
     var _iAmRoaming = false;
     var _walkToActive = false;   // click-to-walk: gliding my avatar to a clicked floor point
+    var _topSteerActive = false; // 2D mode: WASD/arrow steering is currently moving my avatar
     var _clickWalkEnabled = true; // click-to-walk feature toggle (user can disable via button)
     var _emotes = [];            // floating emoji over avatars (spatial reactions)
     var _stillTime = 0;          // how long my avatar has been stationary (for walk-up-and-sit)
@@ -150,9 +151,11 @@ window.THREE = THREE;
         _applyControls();
         // Distance-based fog washes out an overhead view — disable it in top-down.
         if (_scene) _scene.fog = (v === 'top') ? null : new THREE.FogExp2(0x18202c, 0.042);
-        // Walk + fly-to are 3D-only; hide the toolbar (walk/click-walk/furniture) + minimap in top-down (redundant).
+        // First-person walk + fly-to are 3D-only; hide just the walk button + its key-bind
+        // hint, and the minimap (redundant overhead). Click-to-walk + furniture-add stay
+        // available in top-down (P6) — the toolbar itself remains visible.
         var topHide = (v === 'top') ? 'none' : '';
-        if (_toolbar)      _toolbar.style.display = topHide;
+        if (_walkBtn)      _walkBtn.style.display = topHide;
         if (_furnHud)      _furnHud.style.display = 'none'; // always hide panel on view switch
         var hint = document.getElementById('rs3d-walk-hint'); if (hint) hint.style.display = topHide;
         if (_miniCanvas) _miniCanvas.style.display = topHide;
@@ -172,14 +175,24 @@ window.THREE = THREE;
     // Per-chair position overrides (idx -> {x,z}) when a chair has been dragged from its
     // default ring slot. Shared across the room and synced like the furniture layout.
     var _chairPos  = {};
+    // Décor position overrides (key -> {x,z[,rot]}) for the confetti/jukebox props,
+    // whiteboard, and project screen when dragged from their default spots. Shared
+    // across the room and synced like _chairPos. Keys: 'confetti', 'music', 'wb', 'screen'.
+    var _decorPos = {};
+    var _wbGroup = null;       // whiteboard wrapper group (P4: draggable along walls)
+    var _screenGroup = null;   // project screen wrapper group (P4: draggable along walls)
+    var _screenMesh = null;    // project screen plane mesh (pick target for hover/drag)
+    var _tableGroup = null;    // main table wrapper group (P5: draggable on the floor; chairs follow)
 
     // ── P7.1 InputManager — single owner of the active pointer gesture ──────────
-    // mode: 'idle' | 'chairDrag' | 'furnDrag' | 'look'  (walk is an app mode, not a
-    // gesture — 'look' is the drag-look gesture *inside* walk mode). ONLY Input.to()
+    // mode: 'idle' | 'chairDrag' | 'furnDrag' | 'decorDrag' | 'look'  (walk is an app mode,
+    // not a gesture — 'look' is the drag-look gesture *inside* walk mode). ONLY Input.to()
     // touches _controls.enabled and pointer capture, so a gesture can never leak a
     // disabled orbit or a stuck capture. data carries the per-gesture payload:
     //   chairDrag: { idx, group, offsetX, offsetZ, pointerId, moved, startX, startY }
     //   furnDrag:  { item, offsetX, offsetZ, pointerId, moved }
+    //   decorDrag: { kind:'prop'|'wall', key, group, offset, margin, offsetX, offsetZ,
+    //                pointerId, moved, startX, startY }
     //   look:      { x, y }   (last pointer position)
     var Input = {
         mode: 'idle',
@@ -187,7 +200,7 @@ window.THREE = THREE;
         suppressClick: false,   // swallow the click that ends a real drag / select press
         is: function (m) { return this.mode === m; },
         to: function (mode, data, ev) {
-            if (this.mode === 'chairDrag' || this.mode === 'furnDrag') {
+            if (this.mode === 'chairDrag' || this.mode === 'furnDrag' || this.mode === 'decorDrag') {
                 try {
                     if (ev && _renderer && ev.pointerId !== undefined) _renderer.domElement.releasePointerCapture(ev.pointerId);
                 } catch (e) {}
@@ -195,7 +208,7 @@ window.THREE = THREE;
             }
             this.mode = mode || 'idle';
             this.data = (this.mode !== 'idle' && data) || null;
-            if (this.mode === 'chairDrag' || this.mode === 'furnDrag') {
+            if (this.mode === 'chairDrag' || this.mode === 'furnDrag' || this.mode === 'decorDrag') {
                 if (_controls) _controls.enabled = false;
                 try {
                     if (ev && _renderer && ev.pointerId !== undefined) _renderer.domElement.setPointerCapture(ev.pointerId);
@@ -206,8 +219,10 @@ window.THREE = THREE;
 
     // Phase 3: Furniture
     var _furnitureObjs         = [];   // { id, type, x, z, group, pickMesh }
-    var _selectedFurnId        = null; // currently selected furniture id (select modes)
+    // P8: unified selection — { kind: 'furniture'|'chair'|'decor', id: <furnId|chairIdx|decorKey> } or null.
+    var _sel                   = null;
     var _selRing               = null; // highlight ring under selected item
+    var _selHandle             = null; // free-rotate drag handle (shown when rotation step = 'free')
     var _selBar                = null; // selected-item control overlay (delete / deselect)
     var _hoverCursor           = '';   // current canvas cursor
 
@@ -288,6 +303,7 @@ window.THREE = THREE;
         _raycaster = new THREE.Raycaster();
         _loadClaims();
         _loadChairPositions();
+        _loadDecorPositions();
         _buildRoom();
         _buildTable();
         _buildLights();
@@ -792,8 +808,10 @@ window.THREE = THREE;
         // is rotated +90° about Y so its face points into the room (+x). The board surface
         // is textured with the live shared whiteboard, and clicking it opens it to draw.
         var g = new THREE.Group();
-        g.rotation.y = Math.PI / 2;
-        g.position.set(-ROOM_W / 2 + 0.06, 1.45, -0.6);
+        var wbP = _decorPos.wb;
+        g.rotation.y = (wbP && wbP.rot !== undefined) ? wbP.rot : Math.PI / 2;
+        g.position.set(wbP ? wbP.x : (-ROOM_W / 2 + 0.06), 1.45, wbP ? wbP.z : -0.6);
+        _wbGroup = g;
 
         if (_wbTex) { _wbTex.dispose(); }
         _wbTex = null; _wbVer = -1;
@@ -854,15 +872,20 @@ window.THREE = THREE;
         _props = [];
         _storyScreenLabel = null;
 
-        // Story screen on the RIGHT wall (faces into the room).
+        // Story screen — default on the RIGHT wall (faces into the room), draggable to
+        // any wall (P4: _decorPos.screen overrides position + rotation).
         var sg = new THREE.Group();
-        sg.position.set(ROOM_W / 2 - 0.05, 1.6, 0.6); sg.rotation.y = -Math.PI / 2;
+        var scP = _decorPos.screen;
+        sg.position.set(scP ? scP.x : (ROOM_W / 2 - 0.05), 1.6, scP ? scP.z : 0.6);
+        sg.rotation.y = (scP && scP.rot !== undefined) ? scP.rot : -Math.PI / 2;
+        _screenGroup = sg;
         var frame = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.1, 0.06),
             new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.45 }));
         sg.add(frame);
         var screen = new THREE.Mesh(new THREE.PlaneGeometry(1.74, 0.94),
             new THREE.MeshStandardMaterial({ color: 0x0e2138, emissive: 0x12365e, emissiveIntensity: 0.5, roughness: 0.3 }));
         screen.position.z = 0.04; sg.add(screen);
+        _screenMesh = screen;
         _scene.add(sg);
         if (CSS2DObject) {
             var d = document.createElement('div');
@@ -871,21 +894,26 @@ window.THREE = THREE;
                 'text-shadow:0 1px 3px #000;pointer-events:none;line-height:1.25;';
             _storyScreenLabel = d;
             var lo = new CSS2DObject(d);
-            lo.position.set(ROOM_W / 2 - 0.16, 1.6, 0.6);
-            _scene.add(lo);
+            // Local offset (0,0,0.11): with the screen group's local +z always pointing
+            // into the room (by construction of the wall-snap rotations below), this
+            // floats the label just in front of the screen on whichever wall it's on.
+            lo.position.set(0, 0, 0.11);
+            sg.add(lo);
         }
         _updateStoryScreen();
 
-        // Confetti + music props (clickable / E-interact).
+        // Confetti + music props (clickable / E-interact, draggable anywhere on the floor).
         var conf = _makeEmojiProp('🎉', 0xff4fa3);
-        conf.group.position.set(ROOM_W / 2 - 0.9, 0, -ROOM_D / 2 + 0.9);
+        var confP = _decorPos.confetti;
+        conf.group.position.set(confP ? confP.x : (ROOM_W / 2 - 0.9), 0, confP ? confP.z : (-ROOM_D / 2 + 0.9));
         _scene.add(conf.group);
-        _props.push({ mesh: conf.pick, action: 'confetti' });
+        _props.push({ mesh: conf.pick, group: conf.group, action: 'confetti', key: 'confetti' });
 
         var juke = _makeEmojiProp('🎵', 0x6b8cff);
-        juke.group.position.set(-ROOM_W / 2 + 0.9, 0, ROOM_D / 2 - 0.9);
+        var jukeP = _decorPos.music;
+        juke.group.position.set(jukeP ? jukeP.x : (-ROOM_W / 2 + 0.9), 0, jukeP ? jukeP.z : (ROOM_D / 2 - 0.9));
         _scene.add(juke.group);
-        _props.push({ mesh: juke.pick, action: 'music' });
+        _props.push({ mesh: juke.pick, group: juke.group, action: 'music', key: 'music' });
     }
     function _propMeshes() { return _props.filter(function (p) { return p.mesh && p.action; }).map(function (p) { return p.mesh; }); }
     function _propForMesh(m) { for (var i = 0; i < _props.length; i++) if (_props[i].mesh === m) return _props[i]; return null; }
@@ -929,7 +957,7 @@ window.THREE = THREE;
         _contactShadowTex = new THREE.CanvasTexture(canvas);
         return _contactShadowTex;
     }
-    function _buildContactShadow(t) {
+    function _buildContactShadow(t, group) {
         var w, d;
         if (_cfg.tableShape === 'rect') { w = t.RW * 1.35; d = t.RD * 1.5; }
         else { w = d = t.RR * 2.6; }
@@ -938,28 +966,33 @@ window.THREE = THREE;
         }));
         mesh.rotation.x = -Math.PI / 2;
         mesh.position.y = 0.005;
-        _scene.add(mesh);
+        group.add(mesh);
     }
 
     function _buildTable() {
         var t = _tbl();
-        _buildContactShadow(t);
+        var off = _tableOffset();
+        var g = new THREE.Group();
+        g.position.set(off.x, 0, off.z);
+        _tableGroup = g;
+        _buildContactShadow(t, g);
         var mat = _tableTopMat();
         var lm  = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.45, metalness: 0.75 });
         if (_cfg.tableShape === 'rect') {
             var top = new THREE.Mesh(new THREE.BoxGeometry(t.RW, 0.07, t.RD), mat);
-            top.position.y = TBL_TOP; top.castShadow = true; _scene.add(top);
+            top.position.y = TBL_TOP; top.castShadow = true; g.add(top);
             [[-t.RW/2+0.12,-t.RD/2+0.12],[t.RW/2-0.12,-t.RD/2+0.12],
              [-t.RW/2+0.12, t.RD/2-0.12],[t.RW/2-0.12, t.RD/2-0.12]].forEach(function(p){
                 var leg=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,TBL_TOP,8),lm);
-                leg.position.set(p[0],TBL_TOP/2,p[1]); _scene.add(leg);
+                leg.position.set(p[0],TBL_TOP/2,p[1]); g.add(leg);
             });
         } else {
             var top2 = new THREE.Mesh(new THREE.CylinderGeometry(t.RR,t.RR,0.07,36),mat);
-            top2.position.y = TBL_TOP; top2.castShadow = true; _scene.add(top2);
+            top2.position.y = TBL_TOP; top2.castShadow = true; g.add(top2);
             var ped = new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.19,TBL_TOP,8),lm);
-            ped.position.y = TBL_TOP/2; _scene.add(ped);
+            ped.position.y = TBL_TOP/2; g.add(ped);
         }
+        _scene.add(g);
     }
 
     function _buildLights() {
@@ -1025,8 +1058,7 @@ window.THREE = THREE;
         try {
             try { localStorage.setItem(_furnitureKey(), JSON.stringify(layout)); } catch (e) {}
             if (_scene) {
-                _deselectFurniture();
-                _selectedFurnId = null;
+                _deselectAll();
                 _buildFurniture(layout);
             }
         } finally {
@@ -1270,11 +1302,42 @@ window.THREE = THREE;
 
     // Furniture drag helpers
     function _snapGrid(v) { return Math.round(v / GRID) * GRID; }
-    function _clampRoom(x, z) {
+    function _clampRoom(x, z, margin) {
+        var m = margin || 0.5;
         return {
-            x: Math.max(-ROOM_W/2 + 0.5, Math.min(ROOM_W/2 - 0.5, x)),
-            z: Math.max(-ROOM_D/2 + 0.5, Math.min(ROOM_D/2 - 0.5, z))
+            x: Math.max(-ROOM_W/2 + m, Math.min(ROOM_W/2 - m, x)),
+            z: Math.max(-ROOM_D/2 + m, Math.min(ROOM_D/2 - m, z))
         };
+    }
+
+    // The main table's current offset from room-center (P5: _decorPos.table), or {0,0}.
+    function _tableOffset() {
+        var tp = _decorPos.table;
+        return tp ? { x: tp.x, z: tp.z } : { x: 0, z: 0 };
+    }
+    // Margin that keeps the whole table + chair ring inside the room when dragging it.
+    function _tableDragMargin() {
+        var t = _tbl();
+        var r = (_cfg.tableShape === 'round') ? t.RR : Math.max(t.RW, t.RD) / 2;
+        return r + 0.72 + 0.4;
+    }
+
+    // Wall-snap a dragged floor point to the nearest of the room's three walls (left,
+    // right, back — there's no front wall). `offset` is how far the item's group origin
+    // sits off the wall surface; `margin` keeps it clear of the corners. Returns the new
+    // group position + a rotation.y that faces the item into the room.
+    function _wallSnap(x, z, offset, margin) {
+        var distLeft = x + ROOM_W / 2;
+        var distRight = ROOM_W / 2 - x;
+        var distBack = z + ROOM_D / 2;
+        var minD = Math.min(distLeft, distRight, distBack);
+        if (minD === distLeft) {
+            return { x: -ROOM_W / 2 + offset, z: Math.max(-ROOM_D/2 + margin, Math.min(ROOM_D/2 - margin, z)), rot: Math.PI / 2 };
+        }
+        if (minD === distRight) {
+            return { x: ROOM_W / 2 - offset, z: Math.max(-ROOM_D/2 + margin, Math.min(ROOM_D/2 - margin, z)), rot: -Math.PI / 2 };
+        }
+        return { x: Math.max(-ROOM_W/2 + margin, Math.min(ROOM_W/2 - margin, x)), z: -ROOM_D / 2 + offset, rot: 0 };
     }
 
     function _floorIntersect(event) {
@@ -1478,7 +1541,14 @@ window.THREE = THREE;
         if (!key && _wbBoard && _raycaster.intersectObject(_wbBoard, false).length) {
             key = 'wb'; root = _wbBoard; cursor = 'pointer';
             var wp = new THREE.Vector3(); _wbBoard.getWorldPosition(wp);
-            tip = '📋 Double-click to open'; pos = { x: wp.x, y: wp.y + 0.75, z: wp.z };
+            tip = '📋 Double-click to open • Drag to move'; pos = { x: wp.x, y: wp.y + 0.75, z: wp.z };
+        }
+
+        // Project screen (drag along the walls)
+        if (!key && _screenMesh && _raycaster.intersectObject(_screenMesh, false).length) {
+            key = 'screen'; root = _screenGroup; cursor = 'move';
+            var scp = new THREE.Vector3(); _screenMesh.getWorldPosition(scp);
+            tip = '🖥️ Drag to move'; pos = { x: scp.x, y: scp.y + 0.6, z: scp.z };
         }
 
         // Interactive props (confetti / jukebox)
@@ -1491,10 +1561,17 @@ window.THREE = THREE;
                     if (pr) {
                         key = 'prop_' + pr.action; root = pr.mesh; cursor = 'pointer';
                         var pp = new THREE.Vector3(); pr.mesh.getWorldPosition(pp);
-                        tip = '✨ Double-click to use'; pos = { x: pp.x, y: pp.y + 0.55, z: pp.z };
+                        tip = '✨ Double-click to use • Drag to move'; pos = { x: pp.x, y: pp.y + 0.55, z: pp.z };
                     }
                 }
             }
+        }
+
+        // Main table (drag to move — chairs re-ring around it)
+        if (!key && _tableGroup && _raycaster.intersectObject(_tableGroup, true).length) {
+            key = 'table'; root = _tableGroup; cursor = 'move';
+            var tp = _tableGroup.position;
+            tip = '🪑 Drag to move'; pos = { x: tp.x, y: TBL_TOP + 0.15, z: tp.z };
         }
 
         if (key !== _hover.key) {
@@ -1528,6 +1605,24 @@ window.THREE = THREE;
         try { localStorage.setItem(_chairPosKey(), JSON.stringify(_chairPos)); } catch (e) {}
         if (window.RoomSceneStore) RoomSceneStore.set({ chairPos: _chairPos }, { source: 'remote', slice: 'chairPos', fields: ['chairPos'] });
         if (_scene) _rebuildSeating();
+    }
+
+    // ── Décor (props/whiteboard/screen) position overrides ────
+    function _decorPosKey() { return 'es_rs3d_decorpos_' + ((window.ROOM_CONFIG && window.ROOM_CONFIG.roomName) || 'default'); }
+    function _loadDecorPositions() {
+        try { var s = JSON.parse(localStorage.getItem(_decorPosKey()) || '{}'); if (s && typeof s === 'object') _decorPos = s; } catch (e) { _decorPos = {}; }
+    }
+    function _saveDecorPositions(broadcast) {
+        var json;
+        try { json = JSON.stringify(_decorPos); localStorage.setItem(_decorPosKey(), json); } catch (e) {}
+        if (broadcast !== false && json && window.RoomSceneNet && RoomSceneNet.setDecorPositions) RoomSceneNet.setDecorPositions(json);
+    }
+    // From the server (peer drag) / RoomState snapshot.
+    function applyDecorPositions(json) {
+        var obj; try { obj = (typeof json === 'string') ? JSON.parse(json) : json; } catch (e) { return; }
+        _decorPos = (obj && typeof obj === 'object') ? obj : {};
+        try { localStorage.setItem(_decorPosKey(), JSON.stringify(_decorPos)); } catch (e) {}
+        if (_scene) refreshScene();
     }
     // Draggable = empty chair, or the local user's own claimed chair.
     function _chairDraggable(idx) {
@@ -1586,6 +1681,54 @@ window.THREE = THREE;
         return true;
     }
 
+    // ── Décor dragging (props free-move; whiteboard/screen wall-snap) ─────────
+    function _raycastDecorAt(event) {
+        if (!_raycaster || !_camera) return null;
+        var rect = _renderer.domElement.getBoundingClientRect();
+        var mx = ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+        var my = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+        _raycaster.setFromCamera(new THREE.Vector2(mx, my), _camera);
+        if (_wbBoard && _wbGroup && _raycaster.intersectObject(_wbBoard, false).length) {
+            return { kind: 'wall', key: 'wb', group: _wbGroup, offset: 0.06, margin: 1.0 };
+        }
+        if (_screenMesh && _screenGroup && _raycaster.intersectObject(_screenMesh, false).length) {
+            return { kind: 'wall', key: 'screen', group: _screenGroup, offset: 0.05, margin: 1.0 };
+        }
+        var pm = _propMeshes();
+        if (pm.length) {
+            var ph = _raycaster.intersectObjects(pm, false);
+            if (ph.length) {
+                var pr = _propForMesh(ph[0].object);
+                if (pr && pr.group) return { kind: 'prop', key: pr.key, group: pr.group };
+            }
+        }
+        if (_tableGroup && _raycaster.intersectObject(_tableGroup, true).length) {
+            return { kind: 'table', key: 'table', group: _tableGroup, margin: _tableDragMargin() };
+        }
+        return null;
+    }
+
+    function _beginDecorDrag(found, event) {
+        var floorPt = _floorIntersect(event);
+        if (!floorPt) return false;
+        var data = {
+            kind: found.kind, key: found.key, group: found.group,
+            offset: found.offset, margin: found.margin,
+            pointerId: event.pointerId, moved: false,
+            startX: event.clientX, startY: event.clientY
+        };
+        if (found.kind === 'prop' || found.kind === 'table') {
+            data.offsetX = found.group.position.x - floorPt.x;
+            data.offsetZ = found.group.position.z - floorPt.z;
+        }
+        // NOTE: don't suppress the click yet — a no-move press should still let the
+        // double-click arbiter (whiteboard open / prop trigger) fire normally.
+        Input.to('decorDrag', data, event);
+        event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+        return true;
+    }
+
     // Drag model: single-click selects; drag the selected item to move; clicking empty
     // space deselects. Shift+drag ALWAYS orbits (escape hatch when an item blocks the view).
     function _onPointerDown(event) {
@@ -1597,24 +1740,47 @@ window.THREE = THREE;
         // handlers — raycasting "through" them steals the click via pointer capture.
         if (_renderer && event.target !== _renderer.domElement) return;
         _clearHover();   // a press starts an interaction — drop the hover affordance
+        // P8: dragging the free-rotate handle on the selection ring takes precedence
+        // over everything else (so it can be grabbed even over the selected item).
+        if (_sel && _raycastSelHandleAt(event)) { _beginRotateDrag(event); return; }
         // Chair drag (own or empty chairs) takes precedence. A no-move press still lets the
         // click-to-claim fire; only actual movement commits a reposition.
         var dchair = _raycastDraggableChairAt(event);
         if (dchair) { _beginChairDrag(dchair, event); return; }
-        if (!_furnitureObjs.length) return;
-        var found = _raycastFurnitureAt(event);
-
-        if (found) {
-            _beginDrag(found, event);               // drag immediately; a no-move release selects
-            return;
+        // Décor (whiteboard / project screen / props) drag — also takes precedence over
+        // furniture, and like chairs lets a no-move press fall through to its click action.
+        var decor = _raycastDecorAt(event);
+        if (decor) { _beginDecorDrag(decor, event); return; }
+        if (_furnitureObjs.length) {
+            var found = _raycastFurnitureAt(event);
+            if (found) {
+                _beginDrag(found, event);            // drag immediately; a no-move release selects
+                return;
+            }
         }
         // empty space → deselect (if needed) and orbit
-        if (_selectedFurnId !== null) _deselectFurniture();
+        if (_sel) _deselectAll();
         // not consumed → OrbitControls orbits
     }
 
     function _onPointerMove(event) {
         if (_walk) return;
+        if (Input.is('rotateDrag')) {
+            var rd = Input.data;
+            if (event.pointerId !== undefined && rd.pointerId !== undefined && event.pointerId !== rd.pointerId) return;
+            var rfp = _floorIntersect(event); if (!rfp) return;
+            var rot = Math.atan2(rfp.x - rd.pos.x, rfp.z - rd.pos.z);
+            var ref = _selRefs();
+            if (ref && ref.group) ref.group.rotation.y = rot;
+            if (_selHandle) {
+                var R = 0.6;
+                _selHandle.position.set(rd.pos.x + R * Math.sin(rot), 0.12, rd.pos.z + R * Math.cos(rot));
+            }
+            rd.rot = rot;
+            Input.suppressClick = true;
+            event.stopPropagation();
+            return;
+        }
         if (Input.is('chairDrag')) {
             var cd = Input.data;
             if (event.pointerId !== undefined && cd.pointerId !== undefined && event.pointerId !== cd.pointerId) return;
@@ -1633,6 +1799,28 @@ window.THREE = THREE;
                 ['robot', 'ring', 'labelObj'].forEach(function (k) { if (r[k]) { r[k].position.x = c.x; r[k].position.z = c.z; } });
             }
             cd.moved = true; Input.suppressClick = true;
+            event.stopPropagation();
+            return;
+        }
+        if (Input.is('decorDrag')) {
+            var dd = Input.data;
+            if (event.pointerId !== undefined && dd.pointerId !== undefined && event.pointerId !== dd.pointerId) return;
+            if (!dd.moved &&
+                Math.abs(event.clientX - dd.startX) < 5 &&
+                Math.abs(event.clientY - dd.startY) < 5) return;
+            var dfp = _floorIntersect(event); if (!dfp) return;
+            if (dd.kind === 'prop') {
+                var dc = _clampRoom(dfp.x + dd.offsetX, dfp.z + dd.offsetZ);
+                dd.group.position.x = dc.x; dd.group.position.z = dc.z;
+            } else if (dd.kind === 'table') {
+                var tc = _clampRoom(dfp.x + dd.offsetX, dfp.z + dd.offsetZ, dd.margin);
+                dd.group.position.x = tc.x; dd.group.position.z = tc.z;
+            } else {
+                var snap = _wallSnap(dfp.x, dfp.z, dd.offset, dd.margin);
+                dd.group.position.x = snap.x; dd.group.position.z = snap.z;
+                dd.group.rotation.y = snap.rot;
+            }
+            dd.moved = true; Input.suppressClick = true;
             event.stopPropagation();
             return;
         }
@@ -1663,15 +1851,52 @@ window.THREE = THREE;
     }
 
     function _onPointerUp(event) {
+        if (Input.is('rotateDrag')) {
+            var rd = Input.data;
+            if (event && rd.pointerId !== undefined && event.pointerId !== rd.pointerId) return;
+            Input.to('idle', null, event);
+            if (rd.rot !== undefined) {
+                var ref = _selRefs();
+                if (ref) ref.setRot(rd.rot);
+            }
+            _updateSelRing();
+            Input.suppressClick = true;
+            return;
+        }
         if (Input.is('chairDrag')) {
             var cd = Input.data;
             if (event && cd.pointerId !== undefined && event.pointerId !== cd.pointerId) return;
             Input.to('idle', null, event);   // releases capture + re-enables orbit
             if (cd.moved) {
-                _chairPos[cd.idx] = { x: cd.group.position.x, z: cd.group.position.z };
+                _chairPos[cd.idx] = Object.assign({}, _chairPos[cd.idx], { x: cd.group.position.x, z: cd.group.position.z });
                 _saveChairPositions(true);
                 _rebuildSeating();
+            } else {
+                // P8: a no-move press selects the chair (rotate bar); the double-click
+                // arbiter (in _onCanvasClick) still claims/releases it normally.
+                _selectItem('chair', cd.idx);
             }
+            return;
+        }
+        if (Input.is('decorDrag')) {
+            var dd = Input.data;
+            if (event && dd.pointerId !== undefined && event.pointerId !== dd.pointerId) return;
+            Input.to('idle', null, event);
+            if (dd.moved) {
+                var pos = Object.assign({}, _decorPos[dd.key], { x: dd.group.position.x, z: dd.group.position.z });
+                if (dd.kind === 'wall') pos.rot = dd.group.rotation.y;
+                _decorPos[dd.key] = pos;
+                _saveDecorPositions(true);
+                // Table move: re-ring default chairs/avatars around the new spot. Hand-
+                // dragged chairs (_chairPos) keep their absolute positions.
+                if (dd.kind === 'table') _rebuildSeating();
+            } else if (dd.kind === 'prop' || dd.kind === 'table') {
+                // P8: a no-move press on a prop or the table selects it (rotate bar);
+                // the double-click arbiter (prop trigger) still fires normally.
+                _selectItem('decor', dd.key);
+            }
+            // no-move release: let the click fall through (whiteboard open / prop trigger
+            // double-click arbiter, or absorbed screen click below).
             return;
         }
         if (!Input.is('furnDrag')) return;
@@ -1679,7 +1904,7 @@ window.THREE = THREE;
         if (event && fd.pointerId !== undefined && event.pointerId !== fd.pointerId) return;
         Input.to('idle', null, event);
         if (fd.moved) _saveFurniture();
-        else { _selectFurniture(fd.item.id); Input.suppressClick = true; }   // no-move press = click → select (sel/rotate/delete bar)
+        else { _selectItem('furniture', fd.item.id); Input.suppressClick = true; }   // no-move press = click → select (sel/rotate/delete bar)
     }
 
     function _onKeyDown(event) {
@@ -1715,18 +1940,30 @@ window.THREE = THREE;
             return;
         }
 
-        // Orbit-mode furniture shortcuts (unchanged).
-        if (_selectedFurnId === null) return;
-        if (event.key === 'Escape') { _deselectFurniture(); }
+        // 2D top-down: WASD/arrows steer my avatar (P7). Captured even while seated so the
+        // page doesn't scroll; _updateTopSteer ignores movement keys until you stand up.
+        if (_view === 'top' && _isMoveCode(code, kb)) {
+            event.preventDefault(); event.stopImmediatePropagation();
+            _keys[code] = true;
+            return;
+        }
+
+        // Orbit-mode selection shortcuts — apply to whatever is selected (P8: furniture,
+        // chairs, props, or the table; Delete only applies to furniture).
+        if (!_sel) return;
+        if (event.key === 'Escape') { _deselectAll(); }
         else if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); _deleteSelected(); }
         else if (event.code === 'KeyR') { event.preventDefault(); _rotateSelected(event.shiftKey ? -1 : 1); }
     }
 
     function _onKeyUp(event) {
-        if (!_walk) return;
         var kb = _keyBinds();
-        if (_isMoveCode(event.code, kb)) { _keys[event.code] = false; }
-        if (event.code === kb.crouch)    { _walk.crouch = false; }
+        if (_walk) {
+            if (_isMoveCode(event.code, kb)) { _keys[event.code] = false; }
+            if (event.code === kb.crouch)    { _walk.crouch = false; }
+            return;
+        }
+        if (_view === 'top' && _isMoveCode(event.code, kb)) { _keys[event.code] = false; }
     }
 
     // True if this key.code is any movement key (configured binding).
@@ -1757,6 +1994,7 @@ window.THREE = THREE;
         b.title = 'Walk around in first/third person (' + _keyHint(kb.walk) + ')';
         b.textContent = '🚶';
         b.onclick = _toggleWalk;
+        if (_view === 'top') b.style.display = 'none';   // first-person walk is 3D-only (P6)
         toolbar.appendChild(b);
         _walkBtn = b;
 
@@ -1784,7 +2022,6 @@ window.THREE = THREE;
         toolbar.appendChild(fhb);
         _furnHudBtn = fhb;
 
-        if (_view === 'top') toolbar.style.display = 'none';
         _container.appendChild(toolbar);
         _toolbar = toolbar;
 
@@ -2129,11 +2366,13 @@ window.THREE = THREE;
         if (nx <= -ROOM_W/2 + m || nx >= ROOM_W/2 - m) return true;
         if (nz <= -ROOM_D/2 + m || nz >= ROOM_D/2 - m) return true;
         var t = _tbl();
+        var off = _tableOffset();
+        var tx = nx - off.x, tz = nz - off.z;
         if (_cfg.tableShape === 'round') {
-            if (Math.hypot(nx, nz) < t.RR + 0.45) return true;
+            if (Math.hypot(tx, tz) < t.RR + 0.45) return true;
         } else {
             var tw = t.RW / 2 + 0.38, td = t.RD / 2 + 0.38;
-            if (nx > -tw && nx < tw && nz > -td && nz < td) return true;
+            if (tx > -tw && tx < tw && tz > -td && tz < td) return true;
         }
         return false;
     }
@@ -2415,19 +2654,85 @@ window.THREE = THREE;
         _interactCheckT = 0;
     }
 
-    // ── Selection highlight + control bar ─────────────────────
+    // ── Selection highlight + control bar (P8: furniture, chairs, props, table) ──
     function _selectedFurn() {
+        if (!_sel || _sel.kind !== 'furniture') return null;
         for (var i = 0; i < _furnitureObjs.length; i++) {
-            if (_furnitureObjs[i].id === _selectedFurnId) return _furnitureObjs[i];
+            if (_furnitureObjs[i].id === _sel.id) return _furnitureObjs[i];
+        }
+        return null;
+    }
+    function _propGroupForKey(key) {
+        for (var i = 0; i < _props.length; i++) if (_props[i].key === key) return _props[i].group;
+        return null;
+    }
+    // Resolve the current selection to a uniform { group, pos, getRot, setRot, label,
+    // canRotate } interface, or null if nothing is selected / it no longer exists
+    // (e.g. furniture removed, chair count shrank).
+    function _selRefs() {
+        if (!_sel) return null;
+        if (_sel.kind === 'furniture') {
+            var f = _selectedFurn();
+            if (!f) return null;
+            var icons = { plant:'🌿', coffee_table:'☕', projector:'📽️', whiteboard:'📋' };
+            return {
+                group: f.group, pos: { x: f.x, z: f.z },
+                getRot: function () { return f.rot || 0; },
+                setRot: function (rot) { f.rot = rot; if (f.group) f.group.rotation.y = rot; _saveFurniture(); },
+                label: (icons[f.type] || '📦') + ' ' + String(f.type).replace('_', ' '),
+                canRotate: true
+            };
+        }
+        if (_sel.kind === 'chair') {
+            var idx = _sel.id, co = null;
+            for (var i = 0; i < _chairObjects.length; i++) if (_chairObjects[i].idx === idx) { co = _chairObjects[i]; break; }
+            if (!co) return null;
+            return {
+                group: co.group, pos: { x: co.group.position.x, z: co.group.position.z },
+                getRot: function () { return co.group.rotation.y; },
+                setRot: function (rot) {
+                    _chairPos[idx] = Object.assign({ x: co.group.position.x, z: co.group.position.z }, _chairPos[idx], { rot: rot });
+                    _saveChairPositions(true);
+                    _rebuildSeating();
+                },
+                label: '🪑 chair',
+                canRotate: true
+            };
+        }
+        if (_sel.kind === 'decor') {
+            var key = _sel.id;
+            var group = (key === 'table') ? _tableGroup : _propGroupForKey(key);
+            if (!group) return null;
+            var dlabels = { confetti: '🎉 confetti', music: '🎵 jukebox', table: '🪑 table' };
+            return {
+                group: group, pos: { x: group.position.x, z: group.position.z },
+                getRot: function () { return group.rotation.y; },
+                setRot: function (rot) {
+                    group.rotation.y = rot;
+                    _decorPos[key] = Object.assign({ x: group.position.x, z: group.position.z }, _decorPos[key], { rot: rot });
+                    _saveDecorPositions(true);
+                },
+                label: dlabels[key] || ('📦 ' + key),
+                canRotate: true
+            };
         }
         return null;
     }
     function _updateSelRing() {
-        var f = _selectedFurn();
-        if (f && _selRing) _selRing.position.set(f.x, 0.02, f.z);
+        var ref = _selRefs();
+        if (!ref) { _deselectAll(); return; }
+        if (_selRing) _selRing.position.set(ref.pos.x, 0.02, ref.pos.z);
+        if (_selHandle) {
+            var visible = ref.canRotate && _rotStep() === 'free';
+            _selHandle.visible = visible;
+            if (visible) {
+                var rot = ref.getRot(), R = 0.6;
+                _selHandle.position.set(ref.pos.x + R * Math.sin(rot), 0.12, ref.pos.z + R * Math.cos(rot));
+            }
+        }
     }
-    function _selectFurniture(id) {
-        _selectedFurnId = id;
+    function _selectItem(kind, id) {
+        _sel = { kind: kind, id: id };
         if (!_selRing && _scene) {
             _selRing = new THREE.Mesh(
                 new THREE.TorusGeometry(0.45, 0.03, 8, 32),
@@ -2437,36 +2742,66 @@ window.THREE = THREE;
             _selRing.userData.selRing = true;
             _scene.add(_selRing);
         }
+        if (!_selHandle && _scene) {
+            _selHandle = new THREE.Mesh(
+                new THREE.SphereGeometry(0.07, 16, 12),
+                new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 1.2 })
+            );
+            _selHandle.userData.selHandle = true;
+            _scene.add(_selHandle);
+        }
         if (_selRing) _selRing.visible = true;
         _updateSelRing();
         _showSelBar();
     }
-    function _deselectFurniture() {
-        _selectedFurnId = null;
+    function _deselectAll() {
+        _sel = null;
         if (_selRing) _selRing.visible = false;
+        if (_selHandle) _selHandle.visible = false;
         if (_selBar) _selBar.style.display = 'none';
         _hoverCursor = ''; if (_renderer) _renderer.domElement.style.cursor = '';
     }
     function _deleteSelected() {
-        if (_selectedFurnId === null) return;
-        removeFurniture(_selectedFurnId);
-        _deselectFurniture();
+        if (!_sel || _sel.kind !== 'furniture') return;
+        removeFurniture(_sel.id);
+        _deselectAll();
     }
-    // Rotate the selected item by dir * 45° (dir: +1 = clockwise, -1 = counter-clockwise).
+    // Rotate the selected item by the chosen step (dir: +1 = clockwise, -1 = counter-clockwise).
     function _rotateSelected(dir) {
-        var f = _selectedFurn();
-        if (!f) return;
+        var ref = _selRefs();
+        if (!ref || !ref.canRotate) return;
         var TWO_PI = Math.PI * 2;
-        f.rot = ((f.rot || 0) + dir * (Math.PI / 4)) % TWO_PI;
-        if (f.rot < 0) f.rot += TWO_PI;
-        if (f.group) f.group.rotation.y = f.rot;
-        _saveFurniture();
+        var rot = (ref.getRot() + dir * _rotStepRadians()) % TWO_PI;
+        if (rot < 0) rot += TWO_PI;
+        ref.setRot(rot);
+        _updateSelRing();
     }
     function _resetSelection() {
         if (_selRing && _scene) { try { _scene.remove(_selRing); } catch (e) {} }
-        _selRing = null;
-        _selectedFurnId = null;
+        if (_selHandle && _scene) { try { _scene.remove(_selHandle); } catch (e) {} }
+        _selRing = null; _selHandle = null;
+        _sel = null;
         if (_selBar) _selBar.style.display = 'none';
+    }
+    // Personal preference (not synced): rotation step used by ↺/↻ and R/Shift+R.
+    function _rotStepKey() { return 'es_rs3d_rotstep'; }
+    var _rotStepVal = null;
+    function _rotStep() {
+        if (_rotStepVal === null) {
+            try { _rotStepVal = localStorage.getItem(_rotStepKey()) || '45'; } catch (e) { _rotStepVal = '45'; }
+        }
+        return _rotStepVal;
+    }
+    function _setRotStep(v) {
+        _rotStepVal = v;
+        try { localStorage.setItem(_rotStepKey(), v); } catch (e) {}
+        _updateSelRing();
+    }
+    function _rotStepRadians() {
+        var v = _rotStep();
+        if (v === '15') return Math.PI / 12;
+        if (v === '30') return Math.PI / 6;
+        return Math.PI / 4;   // '45' (default) and 'free' (R/Shift+R fallback)
     }
     function _createSelBar() {
         var bar = document.createElement('div');
@@ -2477,26 +2812,33 @@ window.THREE = THREE;
             'border:1px solid rgba(34,197,94,0.4);backdrop-filter:blur(6px);white-space:nowrap;';
         bar.innerHTML =
             '<span id="rs3d-sel-name">Item selected</span>' +
-            '<button id="rs3d-sel-rot" title="Rotate 45° (R / Shift+R)" style="background:transparent;color:#e8eaf6;' +
+            '<button id="rs3d-sel-rot" title="Rotate (R / Shift+R)" style="background:transparent;color:#e8eaf6;' +
             'border:1px solid #555;border-radius:5px;padding:3px 8px;cursor:pointer;">↻</button>' +
+            '<select id="rs3d-sel-step" title="Rotation step" style="background:#1c2030;color:#e8eaf6;' +
+            'border:1px solid #555;border-radius:5px;padding:3px 4px;cursor:pointer;">' +
+            '<option value="45">45°</option><option value="30">30°</option>' +
+            '<option value="15">15°</option><option value="free">Free</option></select>' +
             '<button id="rs3d-sel-del" style="background:#dc3545;color:#fff;border:none;' +
             'border-radius:5px;padding:3px 10px;cursor:pointer;font-weight:700;">✕ Delete</button>' +
             '<button id="rs3d-sel-done" style="background:transparent;color:#aaa;' +
             'border:1px solid #555;border-radius:5px;padding:3px 8px;cursor:pointer;">Done</button>';
         _container.appendChild(bar);
         bar.querySelector('#rs3d-sel-rot').onclick  = function(){ _rotateSelected(1); };
+        bar.querySelector('#rs3d-sel-step').onchange = function(){ _setRotStep(this.value); };
         bar.querySelector('#rs3d-sel-del').onclick  = _deleteSelected;
-        bar.querySelector('#rs3d-sel-done').onclick = _deselectFurniture;
+        bar.querySelector('#rs3d-sel-done').onclick = _deselectAll;
         _selBar = bar;
     }
     function _showSelBar() {
         if (!_selBar) return;
-        var f = _selectedFurn();
+        var ref = _selRefs();
+        if (!ref) { _deselectAll(); return; }
         var nameEl = _selBar.querySelector('#rs3d-sel-name');
-        if (nameEl && f) {
-            var icons = { plant:'🌿', coffee_table:'☕', projector:'📽️', whiteboard:'📋' };
-            nameEl.textContent = (icons[f.type] || '📦') + ' ' + String(f.type).replace('_',' ') + ' — drag to move';
-        }
+        if (nameEl) nameEl.textContent = ref.label + ' — drag to move';
+        var stepEl = _selBar.querySelector('#rs3d-sel-step');
+        if (stepEl) stepEl.value = _rotStep();
+        var delBtn = _selBar.querySelector('#rs3d-sel-del');
+        if (delBtn) delBtn.style.display = (_sel.kind === 'furniture') ? '' : 'none';
         _selBar.style.display = 'flex';
     }
 
@@ -2939,7 +3281,7 @@ window.THREE = THREE;
 
     // ── Seat / standing positions ─────────────────────────────
     function _seatPositions(count) {
-        var t = _tbl(), positions = [];
+        var t = _tbl(), positions = [], off = _tableOffset();
         if (_cfg.tableShape === 'rect') {
             var h1=Math.ceil(count/2), h2=count-h1;
             for(var i=0;i<h1;i++){
@@ -2956,6 +3298,9 @@ window.THREE = THREE;
                 positions.push({x:Math.cos(a)*(t.RR+0.72),z:Math.sin(a)*(t.RR+0.72)});
             }
         }
+        // Default ring slots are relative to the table — shift by its current offset.
+        // Hand-dragged chairs (_chairPos) are absolute and unaffected.
+        positions.forEach(function(p){ p.x += off.x; p.z += off.z; });
         return positions;
     }
 
@@ -3137,7 +3482,8 @@ window.THREE = THREE;
         }
         for (var j = 0; j < _props.length; j++) {
             var p = _props[j]; if (!p.mesh) continue;
-            if (Math.hypot(p.mesh.position.x - x, p.mesh.position.z - z) < 0.5) return true;
+            var pw = new THREE.Vector3(); p.mesh.getWorldPosition(pw);
+            if (Math.hypot(pw.x - x, pw.z - z) < 0.5) return true;
         }
         return false;
     }
@@ -3324,6 +3670,73 @@ window.THREE = THREE;
         }
     }
 
+    // Kumospace-style WASD/arrow steering in the 2D top-down view (P7). Mirrors
+    // _updateWalk's movement/collision/broadcast pattern, but moves a roamer entry
+    // (no first-person camera) using screen-relative axes (ortho up = world -z).
+    function _updateTopSteer(dt) {
+        var my = _myCid();
+        if (_myChairIdx !== null) {   // seated: must stand up before steering
+            if (_topSteerActive) {
+                _topSteerActive = false;
+                var seated = _roamers[my];
+                if (seated && window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(seated.tx, seated.tz, seated.tyaw, 'idle');
+            }
+            return;
+        }
+        var kb = _keyBinds();
+        var fwd = 0, strafe = 0;
+        if (_keys[kb.forward]) fwd    += 1;
+        if (_keys[kb.back])    fwd    -= 1;
+        if (_keys[kb.right])   strafe += 1;
+        if (_keys[kb.left])    strafe -= 1;
+
+        if (fwd === 0 && strafe === 0) {
+            if (_topSteerActive) {
+                _topSteerActive = false;
+                var r0 = _roamers[my];
+                if (r0 && window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(r0.tx, r0.tz, r0.tyaw, 'idle');
+            }
+            return;
+        }
+
+        // Steering takes over from any active click-to-walk path.
+        _walkToActive = false;
+        if (!_roamers[my]) {
+            var start = _myStartPos();
+            applyAvatarMove(my, start.x, start.z, start.yaw, 'walk');
+        }
+        var r = _roamers[my];
+        if (!r || !r.robot) return;
+        r.path = null;
+
+        var dx = strafe, dz = -fwd;   // screen-relative: right = +x, up = -z
+        var len = Math.hypot(dx, dz);
+        if (len > 1) { dx /= len; dz /= len; }
+        var speed = _walkSpeed() * dt;
+        dx *= speed; dz *= speed;
+
+        // Sliding collision: try full move, then each axis separately.
+        var nx = r.x + dx, nz = r.z + dz;
+        if (!_routeBlockedAt(nx, nz))        { r.x = nx; r.z = nz; }
+        else if (!_routeBlockedAt(nx, r.z))  { r.x = nx; }
+        else if (!_routeBlockedAt(r.x, nz))  { r.z = nz; }
+        var c = _clampRoom(r.x, r.z, 0.30);
+        r.x = c.x; r.z = c.z;
+        r.yaw = Math.atan2(dx, dz);   // robot facing convention (matches _startWalkTo)
+        // Keep targets in lockstep so _updateRoamers' lerp doesn't fight our direct move.
+        r.tx = r.x; r.tz = r.z; r.tyaw = r.yaw;
+
+        _iAmRoaming = true; _topSteerActive = true;
+
+        // Broadcast my position so everyone sees me roam (throttled, ~10Hz).
+        _roamSend += dt;
+        if (_roamSend >= 0.1) {
+            _roamSend = 0;
+            if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(r.x, r.z, r.yaw, 'walk');
+            r.lastMove = _clock;
+        }
+    }
+
     // ── Spatial emotes (floating reactions over avatars) ──────
     function _avatarHeadPos(cid) {
         var r = _roamers[cid]; if (r && r.robot) return { x: r.x, y: r.headY + 0.25, z: r.z };
@@ -3352,7 +3765,7 @@ window.THREE = THREE;
         var moving = _walk
             ? (_keys[_keyBinds().forward] || _keys[_keyBinds().back] || _keys[_keyBinds().left] || _keys[_keyBinds().right] ||
                _keys['ArrowUp'] || _keys['ArrowDown'] || _keys['ArrowLeft'] || _keys['ArrowRight'])
-            : _walkToActive;
+            : (_walkToActive || _topSteerActive);
         if (moving) { _stillTime = 0; return; }
         _stillTime += dt;
         if (_stillTime < 0.35) return;        // brief dwell so we don't sit while passing through
@@ -3477,10 +3890,12 @@ window.THREE = THREE;
         });
 
         // Place chairs + seated robots. A chair the user has dragged uses its custom
-        // position from _chairPos; otherwise the default ring slot.
+        // position from _chairPos; otherwise the default ring slot. Either way, the
+        // chair faces the table's current location (P5: the table is draggable too).
+        var tableOff = _tableOffset();
         for (var i = 0; i < chairs; i++) {
             var pos    = _chairPos[i] || seats[i];
-            var angle  = Math.atan2(-pos.x, -pos.z);
+            var angle  = Math.atan2(-(pos.x - tableOff.x), -(pos.z - tableOff.z));
             var claim  = _claimedChairs[i];
             var isMyPending = (_pendingChairIdx === i);
             var unclaimed   = !claim && !isMyPending;
@@ -3777,6 +4192,10 @@ window.THREE = THREE;
                 if (pr) { if (_armDoubleClick('prop_' + pr.action)) _runProp(pr.action); return; }
             }
         }
+        // Project screen / main table have no click action of their own (drag-only) —
+        // absorb the click so it doesn't fall through to floor click-to-walk.
+        if (_screenMesh && _raycaster.intersectObject(_screenMesh, false).length) return;
+        if (_tableGroup && _raycaster.intersectObject(_tableGroup, true).length) return;
         if (!_chairObjects.length) return;
 
         // Double-click your own claimed chair to stand up (release seat).
@@ -4126,6 +4545,7 @@ window.THREE = THREE;
                 if (_flyTarget.t >= 1.0) _flyTarget = null;
             }
             if (_controls) _controls.update();
+            if (_view === 'top') _updateTopSteer(dt);
         }
         _updateRoamers(dt);
         _tryAutoSit(dt);
@@ -4212,7 +4632,7 @@ window.THREE = THREE;
             var r = _roamers[cid];
             if (r.label && r.label.parentNode) r.label.parentNode.removeChild(r.label);
         });
-        _roamers = {}; _iAmRoaming = false; _walkToActive = false;
+        _roamers = {}; _iAmRoaming = false; _walkToActive = false; _topSteerActive = false;
         _emotes.forEach(function (e) { if (e.div && e.div.parentNode) e.div.parentNode.removeChild(e.div); });
         _emotes = [];
         _disposeInteractLabel();
@@ -4350,6 +4770,7 @@ window.THREE = THREE;
         applyClaim: applyClaim, applyRelease: applyRelease,
         releaseByConnection: releaseByConnection, claimFailed: claimFailed,
         applyChairPositions: applyChairPositions,
+        applyDecorPositions: applyDecorPositions,
         applyAvatarMove: applyAvatarMove, applyAvatarStop: applyAvatarStop, clearRoamer: clearRoamer,
         showEmote: showEmote,
         addFurniture: addFurniture, removeFurniture: removeFurniture,
@@ -4397,6 +4818,7 @@ window.THREE = THREE;
         setClaimsFromServer(pend.chairClaims || []);
         if (pend.roomLayout) applyRemoteLayout(pend.roomLayout);
         if (pend.chairPositions) applyChairPositions(pend.chairPositions);
+        if (pend.decorPositions) applyDecorPositions(pend.decorPositions);
     }());
 
     // Auto-activate only when RoomScene isn't present to orchestrate (defensive). On the

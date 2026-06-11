@@ -64,6 +64,9 @@ window.RoomSceneNet = {
     setChairPositions: function (json) {
         if (connection) connection.invoke('SetChairPositions', json).catch(function(e){ console.error('SetChairPositions failed', e); });
     },
+    setDecorPositions: function (json) {
+        if (connection) connection.invoke('SetDecorPositions', json).catch(function(e){ console.error('SetDecorPositions failed', e); });
+    },
     avatarMove: function (x, z, yaw, pose) {
         if (connection) connection.invoke('AvatarMove', x, z, yaw, pose).catch(function(){});
     },
@@ -234,6 +237,7 @@ function registerHandlers() {
             RS3D.setClaimsFromServer(state.chairClaims || []);
             if (state.roomLayout) RS3D.applyRemoteLayout(state.roomLayout);
             if (state.chairPositions) RS3D.applyChairPositions(state.chairPositions);
+            if (state.decorPositions) RS3D.applyDecorPositions(state.decorPositions);
         } else {
             window._rs3dPendingState = state;
         }
@@ -583,6 +587,9 @@ function registerHandlers() {
     });
     connection.on('ChairPositionsChanged', (json) => {
         if (window.RS3D && RS3D.applyChairPositions) RS3D.applyChairPositions(json);
+    });
+    connection.on('DecorPositionsChanged', (json) => {
+        if (window.RS3D && RS3D.applyDecorPositions) RS3D.applyDecorPositions(json);
     });
     // Spatial presence: peers roaming the room
     connection.on('AvatarMoved', (cid, x, z, yaw, pose) => {

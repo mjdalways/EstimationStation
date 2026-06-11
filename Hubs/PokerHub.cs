@@ -375,6 +375,21 @@ public class PokerHub : Hub
         await Clients.OthersInGroup(roomName).SendAsync("ChairPositionsChanged", json);
     }
 
+    // Room Scene: décor (props/whiteboard/project screen) dragged from their default spots.
+    // Whole-map sync (key -> {x,z[,rot]}), mirrors SetChairPositions.
+    public async Task SetDecorPositions(string json)
+    {
+        if (string.IsNullOrEmpty(json) || json.Length > 6000) return;
+        if (RateLimited("decorPos", TimeSpan.FromMilliseconds(120))) return;
+        var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
+        if (roomName == null) return;
+        var room = _roomService.GetRoom(roomName);
+        if (room == null) return;
+        lock (room) { room.DecorPositionsJson = json; }
+        _roomService.SaveRoom(room);
+        await Clients.OthersInGroup(roomName).SendAsync("DecorPositionsChanged", json);
+    }
+
     /// <summary>Broadcasts room-scene visual config (chair count, table shape, window view, etc.)
     /// so all participants render the same room. The patch is merged into the room's persisted
     /// SceneConfigJson (server-authoritative) so late joiners get the current state via
@@ -1445,6 +1460,7 @@ public class PokerHub : Hub
             whiteboardStrokes = room.WhiteboardStrokes,
             roomIcon = room.RoomIcon,
             chairPositions = room.ChairPositionsJson,
+            decorPositions = room.DecorPositionsJson,
             sceneConfig = room.SceneConfigJson
         };
     }
