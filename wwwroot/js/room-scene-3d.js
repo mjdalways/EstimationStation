@@ -1308,6 +1308,52 @@ window.THREE = THREE;
         return null;
     }
 
+    // ── P1: avatar picking ─────────────────────────────────────
+    // Robots (seated/standing/ghost + roamers) must own the raycast where they stand,
+    // otherwise clicks pass through a person's body to the chair behind them.
+    function _avatarPickList() {
+        var list = [], my = _myCid();
+        Object.keys(_robotMap).forEach(function (k) {
+            var r = _robotMap[k];
+            if (!r || !r.robot) return;                    // glow rings etc.
+            var cid = null, name = null;
+            if (k.indexOf('ghost_') === 0) {
+                var gc = _claimedChairs[parseInt(k.slice(6), 10)];
+                name = (gc && gc.name) || null;
+            } else {
+                cid = (k.indexOf('stand_') === 0) ? k.slice(6) : k;
+                var p = _participantByCid(cid);
+                name = p ? p.name : null;
+            }
+            list.push({ group: r.robot, cid: cid, name: name, mine: !!(cid && my && cid === my), seated: !!r.seated });
+        });
+        Object.keys(_roamers).forEach(function (cid) {
+            var r = _roamers[cid];
+            if (!r || !r.robot) return;
+            var p = _participantByCid(cid);
+            list.push({ group: r.robot, cid: cid, name: p ? p.name : null, mine: !!(my && cid === my), seated: false });
+        });
+        return list;
+    }
+
+    // Raycast the avatar list (recursive into robot groups). Assumes _raycaster is
+    // already set from the camera. Returns the pick entry or null.
+    function _raycastAvatarAt() {
+        var list = _avatarPickList();
+        if (!list.length) return null;
+        var groups = list.map(function (a) { return a.group; });
+        var hits = _raycaster.intersectObjects(groups, true);
+        if (!hits.length) return null;
+        var o = hits[0].object;
+        while (o) {
+            for (var i = 0; i < list.length; i++) if (list[i].group === o) return list[i];
+            o = o.parent;
+        }
+        return null;
+    }
+
+    function _avatarTipY(av) { return (av.seated ? SEAT_H + 0.95 : ROBOT_HEAD_Y) + 0.30; }
+
     // ── P9.2: orbit-mode hover highlight + tooltip ─────────────
     // One hovered target at a time. Highlight = per-mesh material swap to a cached clone
     // with a soft blue emissive (clones cached on the mesh so shared GLB materials never
@@ -1383,11 +1429,30 @@ window.THREE = THREE;
 
         var key = null, root = null, tip = null, pos = null, cursor = '';
 
+        // P1: avatars first — hovering a person shows who they are instead of the
+        // sit/free tips for the chair hidden behind their body. Own seated robot =
+        // stand-up affordance; own standing/roaming body is transparent to hover
+        // (matches the click pass-through).
+        var av = _raycastAvatarAt();
+        if (av && !(av.mine && !av.seated)) {
+            key = 'avatar_' + (av.cid || av.name || 'ghost');
+            var apv = new THREE.Vector3(); av.group.getWorldPosition(apv);
+            if (av.mine) {
+                tip = 'Click to stand up'; cursor = 'pointer';
+                pos = { x: apv.x, y: _avatarTipY(av), z: apv.z };
+            } else if (av.name) {
+                var rsv = _roomState || {};
+                var pv = av.cid ? _participantByCid(av.cid) : null;
+                tip = '🤖 ' + av.name + (rsv.votesRevealed && pv && pv.vote ? ' · ' + pv.vote : '');
+                pos = { x: apv.x, y: _avatarTipY(av), z: apv.z };
+            }
+        }
+
         // Furniture (existing affordance, now with tooltip)
-        var f = _raycastFurnitureAt(event);
+        var f = key ? null : _raycastFurnitureAt(event);
         if (f) {
             key = 'furn_' + f.id; root = f.group; cursor = 'move';
-            tip = 'Drag to move'; pos = { x: f.group.position.x, y: 1.05, z: f.group.position.z };
+            tip = 'Drag to move • Click for options'; pos = { x: f.group.position.x, y: 1.05, z: f.group.position.z };
         }
 
         // Chairs (empty → sit; own → stand; other's → host can free)
@@ -1507,14 +1572,17 @@ window.THREE = THREE;
     function _beginDrag(found, event) {
         var floorPt = _floorIntersect(event);
         if (!floorPt) return false;
+        // NOTE: don't suppress the click yet — a no-move press should still select the
+        // item (showing its rotate/delete bar). The furnDrag move handler sets
+        // Input.suppressClick once the drag actually activates (past the jitter threshold).
         Input.to('furnDrag', {
             item: found,
             offsetX: found.x - floorPt.x,
             offsetZ: found.z - floorPt.z,
             pointerId: event.pointerId,
-            moved: false
+            moved: false,
+            startX: event.clientX, startY: event.clientY
         }, event);
-        Input.suppressClick = true;
         // Stop OrbitControls (canvas listener) from ever seeing this pointerdown.
         event.stopPropagation();
         if (event.preventDefault) event.preventDefault();
@@ -1539,15 +1607,8 @@ window.THREE = THREE;
         if (!_furnitureObjs.length) return;
         var found = _raycastFurnitureAt(event);
 
-        if (found && found.id === _selectedFurnId) {
-            _beginDrag(found, event);               // drag the already-selected item
-            return;
-        }
         if (found) {
-            _selectFurniture(found.id);             // first click selects (no move, no orbit)
-            Input.suppressClick = true;
-            event.stopPropagation();
-            if (event.preventDefault) event.preventDefault();
+            _beginDrag(found, event);               // drag immediately; a no-move release selects
             return;
         }
         // empty space → deselect (if needed) and orbit
@@ -1586,16 +1647,21 @@ window.THREE = THREE;
         }
         var fd = Input.data;
         if (fd.pointerId !== undefined && event.pointerId !== fd.pointerId) return;
+        // Ignore sub-threshold jitter so a normal click still selects the item instead
+        // of committing a 1-pixel "reposition" and eating the click.
+        if (!fd.moved &&
+            Math.abs(event.clientX - fd.startX) < 5 &&
+            Math.abs(event.clientY - fd.startY) < 5) return;
         var floorPt = _floorIntersect(event);
         if (!floorPt) return;
         var clamped = _clampRoom(floorPt.x + fd.offsetX, floorPt.z + fd.offsetZ);
         var nx = _snapGrid(clamped.x);
         var nz = _snapGrid(clamped.z);
-        if (nx !== fd.item.x || nz !== fd.item.z) fd.moved = true;
         fd.item.x = nx;
         fd.item.z = nz;
         fd.item.group.position.set(nx, 0, nz);
         _updateSelRing();
+        fd.moved = true; Input.suppressClick = true;
         event.stopPropagation();
     }
 
@@ -1614,8 +1680,9 @@ window.THREE = THREE;
         if (!Input.is('furnDrag')) return;
         var fd = Input.data;
         if (event && fd.pointerId !== undefined && event.pointerId !== fd.pointerId) return;
-        if (fd.moved) _saveFurniture();
         Input.to('idle', null, event);
+        if (fd.moved) _saveFurniture();
+        else { _selectFurniture(fd.item.id); Input.suppressClick = true; }   // no-move press = click → select (sel/rotate/delete bar)
     }
 
     function _onKeyDown(event) {
@@ -3660,6 +3727,25 @@ window.THREE = THREE;
         var mx = ((event.clientX - rect.left) / rect.width)  * 2 - 1;
         var my = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
         _raycaster.setFromCamera(new THREE.Vector2(mx, my), _camera);
+
+        // P1: a click on someone ELSE's robot body must not fall through to the chair
+        // or floor behind it. Clicking your own seated robot acts like clicking your
+        // own chair (stand up). Your own standing/roaming body never blocks your
+        // clicks — the click passes through to whatever is behind it.
+        var av = _raycastAvatarAt();
+        if (av) {
+            if (av.mine) {
+                if (av.seated) { releaseMySeat(); return; }
+                // own roamer/standing robot: fall through
+            } else {
+                if (av.name) {
+                    var ap = new THREE.Vector3();
+                    av.group.getWorldPosition(ap);
+                    _showHoverTip('🤖 ' + av.name, ap.x, _avatarTipY(av), ap.z);
+                }
+                return;
+            }
+        }
 
         // Click the in-room whiteboard → open it to draw.
         if (_wbBoard && _raycaster.intersectObject(_wbBoard, false).length) {
