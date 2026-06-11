@@ -2774,10 +2774,13 @@ window.THREE = THREE;
     // Seated: thighs horizontal forward, shins hanging down, arms resting forward.
     function _poseRobotSeated(root) {
         var j = root.userData.joints; if (!j) return;
-        j.lHip.rotation.x   =  Math.PI / 2;   // thigh forward
-        j.rHip.rotation.x   =  Math.PI / 2;
-        j.lKnee.rotation.x  = -Math.PI / 2;   // shin straight down
-        j.rKnee.rotation.x  = -Math.PI / 2;
+        // Robot front is +Z (eyes/badge at +z) and rotating −π/2 about X swings the
+        // down-pointing thigh to +Z — negative = forward. The old +π/2 here folded the
+        // legs out through the chair's backrest.
+        j.lHip.rotation.x   = -Math.PI / 2;   // thigh forward over the seat
+        j.rHip.rotation.x   = -Math.PI / 2;
+        j.lKnee.rotation.x  =  Math.PI / 2;   // shin straight down (cancels hip)
+        j.rKnee.rotation.x  =  Math.PI / 2;
         j.lShoulder.rotation.x = -0.9;         // arms resting forward
         j.rShoulder.rotation.x = -0.9;
         j.lElbow.rotation.x    =  0.35;
@@ -2810,10 +2813,12 @@ window.THREE = THREE;
     function _poseRobotCrouch(root) {
         var j = root.userData.joints; if (!j) return;
         j.hips.position.y  = (j.hipY !== undefined ? j.hipY : ROBOT_HIP_Y) - 0.20;
-        j.lHip.rotation.x  =  0.65;
-        j.rHip.rotation.x  =  0.65;
-        j.lKnee.rotation.x = -1.10;
-        j.rKnee.rotation.x = -1.10;
+        // Same forward = negative-X convention as the seated pose: thighs flex forward
+        // into the squat, knees bend the shins back under the body.
+        j.lHip.rotation.x  = -0.65;
+        j.rHip.rotation.x  = -0.65;
+        j.lKnee.rotation.x =  1.10;
+        j.rKnee.rotation.x =  1.10;
         j.lShoulder.rotation.x = -0.30;
         j.rShoulder.rotation.x = -0.30;
         j.lElbow.rotation.x    =  0.20;

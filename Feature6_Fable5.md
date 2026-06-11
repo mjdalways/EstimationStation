@@ -492,6 +492,10 @@ All previously deferred items except Phase C2 implemented and live-tested (two b
 
 Still deferred: **Phase C2 only** (Appendix C — humanoid glTF avatars, on explicit request).
 
+**Follow-up fix (2026-06-11): seated robots sat backwards.** `_poseRobotSeated` rotated hips +π/2 about X, which swings the down-pointing thighs to −Z — out through the chair's backrest (robot front is +Z; rotating −π/2 about X is what brings a −Y limb to +Z). User screenshots confirmed knees poking out the chair back on both throne and office-GLB chairs. Fixed: seated hips −π/2 / knees +π/2; `_poseRobotCrouch` had the same mirror (now hips −0.65 / knees +1.10). Walk (±sym) and jump (already −hip/+knee) untouched. Verified with a canvas-crop close-up: back against backrest, thighs forward over the seat, shins down at the seat's front edge. This was a long-standing pre-P12 bug, just far more visible with the new chairs.
+
+**Verification-environment note (2026-06-11):** Chrome intensive background-tab throttling pauses SignalR keep-alive pings → the server times connections out ("Server returned an error on close") ~40 s after backgrounding, and rAF/CSS2D/timers stop entirely. When automating: keep the tab foregrounded, never assert against `getSeatingPlan(...)` for chair indices ≥ its `chairs` count (it spans only `max(participants, chairCount)`), and read `RoomSceneStore.getState().claims` for claim assertions. A clean way to grab close-up visual evidence: rAF-synced `drawImage` crop of the WebGL canvas POSTed to `/api/rooms/<room>/window-media`, then read the file from `_assets/<room>/` (delete it afterwards).
+
 ---
 
 ## Appendix A — Codebase wiring map (read before P2/P3/P6/P13/P14)
