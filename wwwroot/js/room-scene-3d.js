@@ -75,6 +75,7 @@ window.THREE = THREE;
     var _iAmRoaming = false;
     var _walkToActive = false;   // click-to-walk: gliding my avatar to a clicked floor point
     var _topSteerActive = false; // 2D mode: WASD/arrow steering is currently moving my avatar
+    var _seatedArrowToastT = 0;  // throttle for the "press Space to stand" toast (P7 follow-up)
     var _clickWalkEnabled = true; // click-to-walk feature toggle (user can disable via button)
     var _emotes = [];            // floating emoji over avatars (spatial reactions)
     var _stillTime = 0;          // how long my avatar has been stationary (for walk-up-and-sit)
@@ -175,6 +176,7 @@ window.THREE = THREE;
     // Per-chair position overrides (idx -> {x,z}) when a chair has been dragged from its
     // default ring slot. Shared across the room and synced like the furniture layout.
     var _chairPos  = {};
+    var _myChairMoveTime = {}; // P9.6: idx -> performance.now() of my last drag/rotate, for the conflict toast
     // Décor position overrides (key -> {x,z[,rot]}) for the confetti/jukebox props,
     // whiteboard, and project screen when dragged from their default spots. Shared
     // across the room and synced like _chairPos. Keys: 'confetti', 'music', 'wb', 'screen'.
@@ -304,6 +306,7 @@ window.THREE = THREE;
         _loadClaims();
         _loadChairPositions();
         _loadDecorPositions();
+        _loadClickWalkEnabled();
         _buildRoom();
         _buildTable();
         _buildLights();
@@ -906,12 +909,14 @@ window.THREE = THREE;
         var conf = _makeEmojiProp('🎉', 0xff4fa3);
         var confP = _decorPos.confetti;
         conf.group.position.set(confP ? confP.x : (ROOM_W / 2 - 0.9), 0, confP ? confP.z : (-ROOM_D / 2 + 0.9));
+        conf.group.rotation.y = (confP && confP.rot !== undefined) ? confP.rot : 0;
         _scene.add(conf.group);
         _props.push({ mesh: conf.pick, group: conf.group, action: 'confetti', key: 'confetti' });
 
         var juke = _makeEmojiProp('🎵', 0x6b8cff);
         var jukeP = _decorPos.music;
         juke.group.position.set(jukeP ? jukeP.x : (-ROOM_W / 2 + 0.9), 0, jukeP ? jukeP.z : (ROOM_D / 2 - 0.9));
+        juke.group.rotation.y = (jukeP && jukeP.rot !== undefined) ? jukeP.rot : 0;
         _scene.add(juke.group);
         _props.push({ mesh: juke.pick, group: juke.group, action: 'music', key: 'music' });
     }
@@ -974,6 +979,8 @@ window.THREE = THREE;
         var off = _tableOffset();
         var g = new THREE.Group();
         g.position.set(off.x, 0, off.z);
+        var tp = _decorPos.table;
+        g.rotation.y = (tp && tp.rot !== undefined) ? tp.rot : 0;
         _tableGroup = g;
         _buildContactShadow(t, g);
         var mat = _tableTopMat();
@@ -1477,7 +1484,7 @@ window.THREE = THREE;
     // Throttled (~30 Hz) hover probe: furniture → chairs → whiteboard → props.
     function _updateHover(event) {
         if (_walk || !_raycaster || !_camera || !_renderer) return;
-        if (event.shiftKey) { _clearHover(); return; }
+        // P9.7: Shift only forces orbit-drag (see _onPointerDown ~1761) — hover tips stay visible.
         var now = performance.now();
         if (now - _hover.lastCheck < 33) return;
         _hover.lastCheck = now;
@@ -1544,11 +1551,11 @@ window.THREE = THREE;
             tip = '📋 Double-click to open • Drag to move'; pos = { x: wp.x, y: wp.y + 0.75, z: wp.z };
         }
 
-        // Project screen (drag along the walls)
+        // Project screen (drag along the walls; double-click opens the Stories panel)
         if (!key && _screenMesh && _raycaster.intersectObject(_screenMesh, false).length) {
-            key = 'screen'; root = _screenGroup; cursor = 'move';
+            key = 'screen'; root = _screenGroup; cursor = 'pointer';
             var scp = new THREE.Vector3(); _screenMesh.getWorldPosition(scp);
-            tip = '🖥️ Drag to move'; pos = { x: scp.x, y: scp.y + 0.6, z: scp.z };
+            tip = '🖥️ Double-click to open Stories • Drag to move'; pos = { x: scp.x, y: scp.y + 0.6, z: scp.z };
         }
 
         // Interactive props (confetti / jukebox)
@@ -1588,6 +1595,13 @@ window.THREE = THREE;
     }
 
     // ── Chair dragging (own + empty chairs) ──────────────────
+    function _clickWalkKey() { return 'es_rs3d_ctw_' + ((window.ROOM_CONFIG && window.ROOM_CONFIG.roomName) || 'default'); }
+    function _loadClickWalkEnabled() {
+        try { var s = localStorage.getItem(_clickWalkKey()); if (s !== null) _clickWalkEnabled = (s === '1'); } catch (e) {}
+    }
+    function _saveClickWalkEnabled() {
+        try { localStorage.setItem(_clickWalkKey(), _clickWalkEnabled ? '1' : '0'); } catch (e) {}
+    }
     function _chairPosKey() { return 'es_rs3d_chairpos_' + ((window.ROOM_CONFIG && window.ROOM_CONFIG.roomName) || 'default'); }
     function _loadChairPositions() {
         try { var s = JSON.parse(localStorage.getItem(_chairPosKey()) || '{}'); if (s && typeof s === 'object') _chairPos = s; } catch (e) { _chairPos = {}; }
@@ -1601,7 +1615,17 @@ window.THREE = THREE;
     // From the server (peer drag) / RoomState snapshot.
     function applyChairPositions(json) {
         var obj; try { obj = (typeof json === 'string') ? JSON.parse(json) : json; } catch (e) { return; }
-        _chairPos = (obj && typeof obj === 'object') ? obj : {};
+        var incoming = (obj && typeof obj === 'object') ? obj : {};
+        // P9.6: last-writer-wins — if a chair I moved/rotated in the last ~3s is now
+        // different, a peer's update overwrote mine. Not blocked, just surfaced.
+        var now = performance.now(), overwrote = false;
+        Object.keys(_myChairMoveTime).forEach(function (idx) {
+            if (now - _myChairMoveTime[idx] > 3000) { delete _myChairMoveTime[idx]; return; }
+            var mine = _chairPos[idx], theirs = incoming[idx];
+            if (JSON.stringify(mine) !== JSON.stringify(theirs)) overwrote = true;
+        });
+        if (overwrote && window._showToastAD) window._showToastAD('🪑 Someone else just moved a chair you positioned.', 'warning');
+        _chairPos = incoming;
         try { localStorage.setItem(_chairPosKey(), JSON.stringify(_chairPos)); } catch (e) {}
         if (window.RoomSceneStore) RoomSceneStore.set({ chairPos: _chairPos }, { source: 'remote', slice: 'chairPos', fields: ['chairPos'] });
         if (_scene) _rebuildSeating();
@@ -1724,6 +1748,26 @@ window.THREE = THREE;
         // NOTE: don't suppress the click yet — a no-move press should still let the
         // double-click arbiter (whiteboard open / prop trigger) fire normally.
         Input.to('decorDrag', data, event);
+        event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+        return true;
+    }
+
+    // ── Free-rotate handle (P8): drag the green ring's edge handle to rotate the
+    // selected item continuously around its center. Only shown when the rotation
+    // step picker is set to "Free".
+    function _raycastSelHandleAt(event) {
+        if (!_selHandle || !_selHandle.visible || !_raycaster || !_camera) return false;
+        var rect = _renderer.domElement.getBoundingClientRect();
+        var mx = ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+        var my = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+        _raycaster.setFromCamera(new THREE.Vector2(mx, my), _camera);
+        return _raycaster.intersectObject(_selHandle, false).length > 0;
+    }
+    function _beginRotateDrag(event) {
+        var ref = _selRefs();
+        if (!ref) return false;
+        Input.to('rotateDrag', { pos: ref.pos, pointerId: event.pointerId }, event);
         event.stopPropagation();
         if (event.preventDefault) event.preventDefault();
         return true;
@@ -1869,6 +1913,7 @@ window.THREE = THREE;
             Input.to('idle', null, event);   // releases capture + re-enables orbit
             if (cd.moved) {
                 _chairPos[cd.idx] = Object.assign({}, _chairPos[cd.idx], { x: cd.group.position.x, z: cd.group.position.z });
+                _myChairMoveTime[cd.idx] = performance.now();
                 _saveChairPositions(true);
                 _rebuildSeating();
             } else {
@@ -1940,10 +1985,25 @@ window.THREE = THREE;
             return;
         }
 
+        // 2D top-down: Space stands you up so you can steer (follow-up to P7).
+        if (_view === 'top' && code === 'Space' && _myChairIdx !== null) {
+            event.preventDefault(); event.stopImmediatePropagation();
+            releaseMySeat();
+            return;
+        }
+
         // 2D top-down: WASD/arrows steer my avatar (P7). Captured even while seated so the
-        // page doesn't scroll; _updateTopSteer ignores movement keys until you stand up.
+        // page doesn't scroll; while seated, show a toast pointing at Space instead of moving.
         if (_view === 'top' && _isMoveCode(code, kb)) {
             event.preventDefault(); event.stopImmediatePropagation();
+            if (_myChairIdx !== null) {
+                var now = performance.now();
+                if (now - _seatedArrowToastT > 2000) {
+                    _seatedArrowToastT = now;
+                    if (window._showToastAD) window._showToastAD('⌨️ Press Space to stand up first', 'info');
+                }
+                return;
+            }
             _keys[code] = true;
             return;
         }
@@ -2008,6 +2068,7 @@ window.THREE = THREE;
             _clickWalkEnabled = !_clickWalkEnabled;
             ctw.classList.toggle('off', !_clickWalkEnabled);
             ctw.title = _clickWalkEnabled ? 'Click-to-walk ON — click floor to move avatar' : 'Click-to-walk OFF — click won\'t move avatar';
+            _saveClickWalkEnabled();
         };
         toolbar.appendChild(ctw);
         _clickWalkBtn = ctw;
@@ -2073,7 +2134,9 @@ window.THREE = THREE;
 
     // P15: one-time onboarding callouts (3D view only). Dismissed on first interaction
     // with the canvas, or via each chip's ✕. Persists via localStorage so it shows once.
-    var ONBOARD_KEY = 'es_rs3d_onboarded';
+    // P9.8: bumped to v2 so existing users see the updated onboarding once after the
+    // P1-P8 interaction-model changes (single click selects, double-click interacts, drag).
+    var ONBOARD_KEY = 'es_rs3d_onboarded_v2';
     function _showOnboarding() {
         if (!_container || _view === 'top') return;
         try { if (localStorage.getItem(ONBOARD_KEY)) return; } catch (e) { return; }
@@ -2242,7 +2305,22 @@ window.THREE = THREE;
         setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 2000);
     }
 
-    function _toggleWalk() { if (_walk) _exitWalk(); else _enterWalk(); }
+    // P9.4: pressing the walk key in 2D does nothing visible by itself — explain why.
+    function _showWalk3DOnlyToast() {
+        if (!_container) return;
+        var toast = document.createElement('div');
+        toast.className = 'rs3d-walk-toast';
+        toast.textContent = '🚶 Walk mode is 3D-only — switch to 3D view first';
+        _container.appendChild(toast);
+        setTimeout(function () { toast.style.opacity = '0'; }, 1400);
+        setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 2000);
+    }
+
+    function _toggleWalk() {
+        if (_walk) { _exitWalk(); return; }
+        if (_view === 'top') { _showWalk3DOnlyToast(); return; }
+        _enterWalk();
+    }
 
     function _enterWalk() {
         if (!_camera || _view === 'top') return;   // walk mode is 3D-only
@@ -2544,7 +2622,7 @@ window.THREE = THREE;
         var fr = pickMeshes.length ? _raycaster.intersectObjects(pickMeshes, true) : [];
         if (fr.length) {
             var id = fr[0].object.userData.furnitureId;
-            if (id != null) { _walk.held = id; _deselectFurniture(); }
+            if (id != null) { _walk.held = id; _deselectAll(); }
         }
         _raycaster.far = Infinity;
     }
@@ -2692,6 +2770,7 @@ window.THREE = THREE;
                 getRot: function () { return co.group.rotation.y; },
                 setRot: function (rot) {
                     _chairPos[idx] = Object.assign({ x: co.group.position.x, z: co.group.position.z }, _chairPos[idx], { rot: rot });
+                    _myChairMoveTime[idx] = performance.now();
                     _saveChairPositions(true);
                     _rebuildSeating();
                 },
@@ -2802,6 +2881,35 @@ window.THREE = THREE;
         if (v === '15') return Math.PI / 12;
         if (v === '30') return Math.PI / 6;
         return Math.PI / 4;   // '45' (default) and 'free' (R/Shift+R fallback)
+    }
+    // Generic in-canvas confirm bar (replaces window.confirm for host actions / destructive
+    // resets). Only one confirm can be pending at a time; showing a new one replaces it.
+    var _confirmBar = null;
+    function _createConfirmBar() {
+        var bar = document.createElement('div');
+        bar.id = 'rs3d-confirm-bar';
+        bar.style.cssText = 'position:absolute;bottom:12px;left:50%;transform:translateX(-50%);' +
+            'background:rgba(20,24,40,0.96);color:#e8eaf6;padding:7px 14px;border-radius:8px;' +
+            'display:none;z-index:14;font-size:0.80rem;gap:9px;align-items:center;' +
+            'border:1px solid rgba(220,53,69,0.5);backdrop-filter:blur(6px);white-space:nowrap;';
+        bar.innerHTML =
+            '<span id="rs3d-confirm-msg"></span>' +
+            '<button id="rs3d-confirm-yes" style="background:#dc3545;color:#fff;border:none;' +
+            'border-radius:5px;padding:3px 10px;cursor:pointer;font-weight:700;">✓</button>' +
+            '<button id="rs3d-confirm-no" style="background:transparent;color:#aaa;' +
+            'border:1px solid #555;border-radius:5px;padding:3px 10px;cursor:pointer;">✕</button>';
+        _container.appendChild(bar);
+        _confirmBar = bar;
+    }
+    function _showConfirmBar(message, onYes) {
+        if (!_confirmBar) _createConfirmBar();
+        _confirmBar.querySelector('#rs3d-confirm-msg').textContent = message;
+        var yes = _confirmBar.querySelector('#rs3d-confirm-yes');
+        var no  = _confirmBar.querySelector('#rs3d-confirm-no');
+        function hide() { _confirmBar.style.display = 'none'; yes.onclick = null; no.onclick = null; }
+        yes.onclick = function () { hide(); onYes(); };
+        no.onclick  = hide;
+        _confirmBar.style.display = 'flex';
     }
     function _createSelBar() {
         var bar = document.createElement('div');
@@ -3467,7 +3575,7 @@ window.THREE = THREE;
             var chairs = Math.min(Math.max(_participants.length, _cfg.chairCount || _participants.length, 1), 16);
             var seats = _seatPositions(chairs);
             var pos = _chairPos[_myChairIdx] || seats[_myChairIdx] || { x: 0, z: ROOM_D / 2 - 1.2 };
-            return { x: pos.x, z: pos.z, yaw: Math.atan2(-pos.x, -pos.z) };
+            return { x: pos.x, z: pos.z, yaw: (pos.rot != null) ? pos.rot : Math.atan2(-pos.x, -pos.z) };
         }
         return { x: 0, z: ROOM_D / 2 - 1.2, yaw: 0 };
     }
@@ -3762,11 +3870,7 @@ window.THREE = THREE;
         if (_walk) { _stillTime = 0; return; }   // walk mode: E key only
         if (!_iAmRoaming) { _stillTime = 0; return; }
         var me = _roamers[_myCid()]; if (!me) { _stillTime = 0; return; }
-        var moving = _walk
-            ? (_keys[_keyBinds().forward] || _keys[_keyBinds().back] || _keys[_keyBinds().left] || _keys[_keyBinds().right] ||
-               _keys['ArrowUp'] || _keys['ArrowDown'] || _keys['ArrowLeft'] || _keys['ArrowRight'])
-            : (_walkToActive || _topSteerActive);
-        if (moving) { _stillTime = 0; return; }
+        if (_walkToActive || _topSteerActive) { _stillTime = 0; return; }
         _stillTime += dt;
         if (_stillTime < 0.35) return;        // brief dwell so we don't sit while passing through
         var best = null, bestD = 0.5;
@@ -3895,7 +3999,7 @@ window.THREE = THREE;
         var tableOff = _tableOffset();
         for (var i = 0; i < chairs; i++) {
             var pos    = _chairPos[i] || seats[i];
-            var angle  = Math.atan2(-(pos.x - tableOff.x), -(pos.z - tableOff.z));
+            var angle  = (pos.rot != null) ? pos.rot : Math.atan2(-(pos.x - tableOff.x), -(pos.z - tableOff.z));
             var claim  = _claimedChairs[i];
             var isMyPending = (_pendingChairIdx === i);
             var unclaimed   = !claim && !isMyPending;
@@ -4146,6 +4250,19 @@ window.THREE = THREE;
         return false;
     }
 
+    // P3 follow-up: double-clicking the project screen opens the Stories panel —
+    // the bottom sheet on mobile, or expands it if collapsed on desktop.
+    function _openStoriesPanel() {
+        var panel = document.getElementById('storiesPanel');
+        if (!panel) return;
+        if (window.innerWidth <= 991) {
+            if (window._openStoriesSheet) window._openStoriesSheet();
+            else panel.classList.add('mobile-visible');
+            return;
+        }
+        if (panel.classList.contains('collapsed') && window.toggleStoriesPanel) window.toggleStoriesPanel();
+    }
+
     function _onCanvasClick(event) {
         if (_walk) return;   // walk mode uses E-to-interact, not click-to-claim
         // If a furniture drag just finished, suppress chair pick
@@ -4192,9 +4309,13 @@ window.THREE = THREE;
                 if (pr) { if (_armDoubleClick('prop_' + pr.action)) _runProp(pr.action); return; }
             }
         }
-        // Project screen / main table have no click action of their own (drag-only) —
-        // absorb the click so it doesn't fall through to floor click-to-walk.
-        if (_screenMesh && _raycaster.intersectObject(_screenMesh, false).length) return;
+        // Project screen: double-click opens the Stories panel; main table has no
+        // click action (drag-only) — absorb single clicks so they don't fall through
+        // to floor click-to-walk.
+        if (_screenMesh && _raycaster.intersectObject(_screenMesh, false).length) {
+            if (_armDoubleClick('screen')) _openStoriesPanel();
+            return;
+        }
         if (_tableGroup && _raycaster.intersectObject(_tableGroup, true).length) return;
         if (!_chairObjects.length) return;
 
@@ -4258,9 +4379,10 @@ window.THREE = THREE;
     function _hostFreeSeat(idx) {
         var claim = _claimedChairs[idx];
         var who = (claim && claim.name) ? claim.name : 'this person';
-        if (!window.confirm('Free ' + who + "'s seat? They'll need to pick a chair again.")) return;
-        if (window.RoomSceneNet && RoomSceneNet.hostFreeChair) RoomSceneNet.hostFreeChair(idx);
-        else { applyRelease(idx); }
+        _showConfirmBar('Free ' + who + "'s seat? They'll need to pick a chair again.", function () {
+            if (window.RoomSceneNet && RoomSceneNet.hostFreeChair) RoomSceneNet.hostFreeChair(idx);
+            else { applyRelease(idx); }
+        });
     }
 
     function _colorToHex(c) {
@@ -4624,7 +4746,7 @@ window.THREE = THREE;
             _labelRenderer = null;
         }
         if (_selBar && _selBar.parentNode) { _selBar.parentNode.removeChild(_selBar); _selBar = null; }
-        _selectedFurnId = null; _selRing = null;
+        _sel = null; _selRing = null; _selHandle = null;
         if (_controls) { _controls.dispose(); _controls = null; }
         if (_wbTex) { _wbTex.dispose(); _wbTex = null; }
         _wbBoard = null; _wbVer = -1;
@@ -4754,10 +4876,11 @@ window.THREE = THREE;
     }
 
     function resetFurniture() {
-        _deselectFurniture();   // selected id may no longer exist after reset
-        _selectedFurnId = null;
-        _buildFurniture(_defaultFurniture());
-        _saveFurniture();
+        _showConfirmBar('Reset furniture layout for everyone?', function () {
+            _deselectAll();   // selected id may no longer exist after reset
+            _buildFurniture(_defaultFurniture());
+            _saveFurniture();
+        });
     }
 
     window.RS3D = {
