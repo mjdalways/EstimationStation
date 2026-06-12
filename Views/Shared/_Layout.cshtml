@@ -1653,6 +1653,58 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>6/12/2026 (192)</strong></p>
+                        <ul class="mb-2">
+                            <li>🖱️ <strong>Hover highlight fix</strong>: hovering near the main table no longer highlights furniture tucked underneath it (e.g. a plant) when the table is actually in front — hover now matches drag/click targeting, so the table highlights when it occludes the item beneath it.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/12/2026 (191)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪟 <strong>3D polish</strong>: an uploaded window image/video now sits flush behind the glass instead of floating 0.7m back, so it fills the window frame from any viewing angle instead of leaving a visible gap around its edges. Also, the room's background/fog colour now tints to match the active room theme (Conference, War Room, Cozy, Skyline, or a custom wall colour) instead of always being a fixed dark navy.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/12/2026 (190)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎥 <strong>2D camera follow (P10)</strong>: in the top-down 2D room view, zooming in now keeps your avatar in frame as you steer or walk — the view gently glides to follow you and stays within the room's walls. Manually dragging the view pauses following until you move again; zooming back out returns to the full-room view with no drift.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/12/2026 (189)</strong></p>
+                        <ul class="mb-2">
+                            <li>📐 <strong>Wide room size (P9)</strong>: the 3D room now defaults to a new "Wide" size that better fills the panel. A "Wide (default)" option has been added to the room size picker alongside Small, Medium, and Large — existing rooms with a saved size are unaffected.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/12/2026 (188)</strong></p>
+                        <ul class="mb-2">
+                            <li>↺ <strong>Reset room to defaults (P8)</strong>: the Room Designer now has a "Reset room to defaults" button that restores the default table, chairs, furniture, and design (wall colour, window view, lighting, etc.) for everyone — undoing any dragged/rearranged layout. Seated participants stay seated.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/12/2026 (187)</strong></p>
+                        <ul class="mb-2">
+                            <li>⚡ <strong>Faster page loads (P7)</strong>: the 3D Room Scene's graphics engine, models, and textures now only load when the Room Scene panel is actually shown — pages with the panel hidden (new users, or anyone who's hidden it) skip that download entirely. Showing the panel loads it on demand, same as before.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/12/2026 (186)</strong></p>
+                        <ul class="mb-2">
+                            <li>🏠 <strong>Room Scene hidden for new users (P6)</strong>: first-time visitors no longer get the 3D Room Scene panel automatically — a one-time "Room Scene is available" hint with a "Show now" button lets you turn it on, and it stays on after that. Existing users who've already used the Room Scene or arranged panels are unaffected.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/11/2026 (185)</strong></p>
+                        <ul class="mb-2">
+                            <li>💍 <strong>Halo cleanup (P5)</strong>: avatars who haven't voted yet no longer show an unexplained gray ring over their head. Casting a vote shows the amber ring, reveal turns it green, and observers keep their ring — unclaimed chairs' blue floor ring is unchanged.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/11/2026 (184)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪴 <strong>Furniture pick-area fixes (P4)</strong>: hovering, dragging, and "E pick up" now respond across the whole visible shape of the plant (leaves included), projector screen, monitor, and jukebox — previously only a small base/box near the bottom registered.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/11/2026 (183)</strong></p>
+                        <ul class="mb-2">
+                            <li>🎯 <strong>E-interact reliability (P3)</strong>: in walk mode, pressing E (sit/stand, open whiteboard, confetti/music props, pick up furniture) now works reliably for whatever you're facing and standing near — including chairs in third-person and while looking up/down in first-person, which previously could miss.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/11/2026 (182)</strong></p>
+                        <ul class="mb-2">
+                            <li>🚶 <strong>Walk-mode facing fixed (P2)</strong>: in third-person walk, your robot avatar now faces the direction you're walking (its back to the camera) instead of facing the camera — strafing and walking backward look correct, and other participants see you walking forward instead of moonwalking.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/11/2026 (181)</strong></p>
+                        <ul class="mb-2">
+                            <li>🤖 <strong>Fixed: gray robot on rejoin (P1)</strong>: if you left and rejoined a room (e.g. closed and reopened the tab) and then clicked Walk before the participant list fully refreshed, your avatar could appear as an anonymous gray robot. It now reliably shows your real colour and name.</li>
+                        </ul>
+                        <p class="mb-2"><strong>6/11/2026 (180)</strong></p>
+                        <ul class="mb-2">
+                            <li>🏷️ <strong>Room scene label cleanup (P0)</strong>: the "Press E to ..." walk-mode prompt no longer sticks around after you exit walk mode or switch to 2D view. Changing room settings (lighting, walls, etc.) while in the 3D room no longer leaves behind duplicate 🎉/🎵 prop icons or story-screen labels.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/11/2026 (179)</strong></p>
                         <ul class="mb-2">
                             <li>🪴 <strong>Fixed: furniture under the table</strong>: a plant (or other furniture) placed under the main table now drags correctly — clicking and dragging it no longer moves the table instead.</li>
@@ -3071,6 +3123,7 @@
                         <select id="rs-room-size" class="form-select form-select-sm" onchange="RoomScene.updateConfig({ roomSize: this.value })">
                             <option value="small">Small</option>
                             <option value="medium">Medium</option>
+                            <option value="wide">Wide (default)</option>
                             <option value="large">Large</option>
                         </select>
                     </div>
@@ -3093,6 +3146,7 @@
                     <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" id="rs-plants" onchange="RoomScene.updateConfig({ plants: this.checked })" /><label class="form-check-label small" for="rs-plants">Plants</label></div>
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.RS3D && RS3D.toggleFurniturePanel()" title="Add furniture or reset its layout (3D GL — drag items to reposition)">🪑 Open furniture panel</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="if(confirm('Reset the room layout and design for everyone?')) window.RS3D && RS3D.resetRoom()" title="Reset table, chairs, decor positions, furniture, and room design to defaults">↺ Reset room to defaults</button>
             </div>
 
             <!-- AP1: Room identity icon -->

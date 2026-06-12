@@ -462,6 +462,20 @@
     "three/addons/loaders/GLTFLoader.js": "/lib/three/GLTFLoader.js"
 } }
 </!script>
-<script type="module" src="~/js/room-scene-3d.js" asp-append-version="true"></script>
+<script>
+    // Lazy 3D (P7): the module graph (three.js + addons + models/textures) only loads
+    // once the Room Scene panel is actually visible — room-scene.js calls _rs3dEnsure()
+    // from _applyMode() when window.RS3D is missing and the panel isn't hidden.
+    // Manual cache-bust constant — bump when room-scene-3d.js (or its module-graph
+    // dependencies under /lib/three/) changes; asp-append-version can't run inside
+    // a dynamic import() specifier.
+    window._RS3D_VERSION = 'p7-1';
+    window._rs3dEnsure = (function () {
+        var p = null;
+        return function () {
+            return p || (p = import('@Url.Content("~/js/room-scene-3d.js")?v=' + window._RS3D_VERSION));
+        };
+    })();
+</script>
 <script src="~/js/whiteboard.js" asp-append-version="true"></script>
 }

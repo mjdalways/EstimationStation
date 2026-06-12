@@ -30,12 +30,13 @@ window.THREE = THREE;
     var ROOM_SIZES = {
         small:  { W: 8,  D: 6.5 },
         medium: { W: 10, D: 8   },
+        wide:   { W: 14, D: 8   },
         large:  { W: 13, D: 10  }
     };
     // Refreshes the module-level ROOM_W/ROOM_D from _cfg.roomSize. Must run before
     // _buildRoom()/_buildTable() etc. so every consumer sees the new dimensions.
     function _applyRoomSize() {
-        var sz = ROOM_SIZES[_cfg.roomSize] || ROOM_SIZES.medium;
+        var sz = ROOM_SIZES[_cfg.roomSize] || ROOM_SIZES.wide;
         ROOM_W = sz.W; ROOM_D = sz.D;
     }
 
@@ -75,6 +76,10 @@ window.THREE = THREE;
     var _iAmRoaming = false;
     var _walkToActive = false;   // click-to-walk: gliding my avatar to a clicked floor point
     var _topSteerActive = false; // 2D mode: WASD/arrow steering is currently moving my avatar
+    // P10: 2D top-down camera auto-follow (Kumospace-style). suspended=true while the user
+    // has manually panned and my avatar hasn't moved since; lastX/lastZ track my avatar's
+    // position between ticks so we can detect "they started moving again".
+    var _topFollow = { suspended: false, lastX: null, lastZ: null };
     var _seatedArrowToastT = 0;  // throttle for the "press Space to stand" toast (P7 follow-up)
     var _clickWalkEnabled = true; // click-to-walk feature toggle (user can disable via button)
     var _emotes = [];            // floating emoji over avatars (spatial reactions)
@@ -129,6 +134,8 @@ window.THREE = THREE;
             _controls.screenSpacePanning = true;
             _controls.minZoom = 0.5; _controls.maxZoom = 4;
             if (THREE.MOUSE) _controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+            // P10: manual pan suspends camera auto-follow until my avatar moves again.
+            _controls.addEventListener('start', function () { _topFollow.suspended = true; });
         } else {
             _controls.target.set(0, TBL_TOP, 0);
             _controls.minDistance = 1.5; _controls.maxDistance = 13;
@@ -151,7 +158,7 @@ window.THREE = THREE;
         else { _perspCam.aspect = W / H; _perspCam.updateProjectionMatrix(); }
         _applyControls();
         // Distance-based fog washes out an overhead view — disable it in top-down.
-        if (_scene) _scene.fog = (v === 'top') ? null : new THREE.FogExp2(0x18202c, 0.042);
+        if (_scene) _scene.fog = (v === 'top') ? null : new THREE.FogExp2(_fogColor(), 0.042);
         // First-person walk + fly-to are 3D-only; hide just the walk button + its key-bind
         // hint, and the minimap (redundant overhead). Click-to-walk + furniture-add stay
         // available in top-down (P6) — the toolbar itself remains visible.
@@ -275,8 +282,8 @@ window.THREE = THREE;
         }
 
         _scene = new THREE.Scene();
-        _scene.background = new THREE.Color(0x18202c);
-        _scene.fog = new THREE.FogExp2(0x18202c, 0.042);
+        _scene.background = new THREE.Color(_fogColor());
+        _scene.fog = new THREE.FogExp2(_fogColor(), 0.042);
 
         // Image-based lighting: gives every MeshStandardMaterial soft ambient/reflection
         // detail from a generic neutral room, instead of flat ambient-only shading.
@@ -383,6 +390,14 @@ window.THREE = THREE;
     function _wallColor(pal) {
         return (_cfg.wallColor && _cfg.wallColor !== 'preset') ? _cfg.wallColor : pal.wall;
     }
+    // Distance-fog/background colour: a darkened tint of the active wall colour, so the
+    // "outside" void matches each preset's hue instead of a fixed dark navy.
+    function _fogColor() {
+        var pal = PAL[_cfg.preset] || PAL.conference;
+        var c = new THREE.Color(_wallColor(pal));
+        c.multiplyScalar(0.16);
+        return c.getHex();
+    }
     function _tableTopMat() {
         var mat;
         switch (_cfg.tableMaterial) {
@@ -431,6 +446,11 @@ window.THREE = THREE;
         _videoTextures = [];
 
         var wallCol = _wallColor(pal);
+
+        // Re-tint the void/fog to match this preset (covers preset/wall-colour changes
+        // applied via refreshScene, not just initial init()).
+        _scene.background = new THREE.Color(_fogColor());
+        if (_scene.fog) _scene.fog = new THREE.FogExp2(_fogColor(), 0.042);
 
         var floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), _floorMat(pal));
         floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; _scene.add(floor);
@@ -499,7 +519,11 @@ window.THREE = THREE;
                 _src = _cfg.windowImage;
                 _mime = null;
             }
-            _buildCustomWindowMedia(_src, _mime, OW, OH, cy, zb);
+            // Custom media sits right behind the glass/mullions (unlike the sky
+            // backdrop's zb, which is set back for depth) — at zb the image/video
+            // plane is much smaller than the frame opening from an angle, so the
+            // void behind the frame was visible around its edges.
+            _buildCustomWindowMedia(_src, _mime, OW, OH, cy, zWall + 0.01);
         } else {
             // Large sky backdrop, wider/taller than the opening so the view reads as open sky.
             var sky = new THREE.Mesh(new THREE.PlaneGeometry(OW * 1.8, OH * 2.4),
@@ -864,14 +888,28 @@ window.THREE = THREE;
         orb.position.y = 0.62; g.add(orb);
         var pick = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 1.0, 8), new THREE.MeshBasicMaterial({ visible: false }));
         pick.position.y = 0.5; g.add(pick);
+        var labelObj = null;
         if (CSS2DObject) {
             var d = document.createElement('div');
             d.textContent = emoji; d.style.cssText = 'font-size:1.3rem;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));';
-            var lo = new CSS2DObject(d); lo.position.set(0, 0.98, 0); g.add(lo);
+            labelObj = new CSS2DObject(d); labelObj.position.set(0, 0.98, 0); g.add(labelObj);
         }
-        return { group: g, pick: pick };
+        return { group: g, pick: pick, labelObj: labelObj };
+    }
+
+    // CSS2DObjects retired from props (re-built every _buildProps call) — the
+    // renderer stops managing an object once it leaves the scene graph, so we
+    // must remove its DOM element ourselves to avoid orphaned 🎉/🎵/screen labels.
+    var _propLabelObjs = [];
+    function _disposePropLabels() {
+        _propLabelObjs.forEach(function (lo) {
+            if (lo.parent) lo.parent.remove(lo);
+            if (lo.element && lo.element.parentNode) lo.element.parentNode.removeChild(lo.element);
+        });
+        _propLabelObjs = [];
     }
     function _buildProps() {
+        _disposePropLabels();
         _props = [];
         _storyScreenLabel = null;
 
@@ -902,6 +940,7 @@ window.THREE = THREE;
             // floats the label just in front of the screen on whichever wall it's on.
             lo.position.set(0, 0, 0.11);
             sg.add(lo);
+            _propLabelObjs.push(lo);
         }
         _updateStoryScreen();
 
@@ -912,6 +951,7 @@ window.THREE = THREE;
         conf.group.rotation.y = (confP && confP.rot !== undefined) ? confP.rot : 0;
         _scene.add(conf.group);
         _props.push({ mesh: conf.pick, group: conf.group, action: 'confetti', key: 'confetti' });
+        if (conf.labelObj) _propLabelObjs.push(conf.labelObj);
 
         var juke = _makeEmojiProp('🎵', 0x6b8cff);
         var jukeP = _decorPos.music;
@@ -919,6 +959,7 @@ window.THREE = THREE;
         juke.group.rotation.y = (jukeP && jukeP.rot !== undefined) ? jukeP.rot : 0;
         _scene.add(juke.group);
         _props.push({ mesh: juke.pick, group: juke.group, action: 'music', key: 'music' });
+        if (juke.labelObj) _propLabelObjs.push(juke.labelObj);
     }
     function _propMeshes() { return _props.filter(function (p) { return p.mesh && p.action; }).map(function (p) { return p.mesh; }); }
     function _propForMesh(m) { for (var i = 0; i < _props.length; i++) if (_props[i].mesh === m) return _props[i]; return null; }
@@ -1122,9 +1163,9 @@ window.THREE = THREE;
             var s=new THREE.Mesh(new THREE.SphereGeometry(0.13+Math.abs(o[0])*0.15,6,6),lm);
             s.position.set(o[0],0.22+o[1],o[2]); g.add(s);
         });
-        var pick = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.28,0.12,8),
+        var pick = new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.30,0.90,8),
             new THREE.MeshBasicMaterial({visible:false}));
-        pick.position.y = 0.06; g.add(pick);
+        pick.position.y = 0.45; g.add(pick);
         return { group: g, pickMesh: pick };
     }
 
@@ -1156,9 +1197,9 @@ window.THREE = THREE;
         var base = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.20,0.04,8),
             new THREE.MeshStandardMaterial({color:0x444444,roughness:0.4,metalness:0.6}));
         base.position.y = 0.02; g.add(base);
-        var pick = new THREE.Mesh(new THREE.BoxGeometry(0.40,1.80,0.40),
+        var pick = new THREE.Mesh(new THREE.BoxGeometry(1.20,1.95,0.40),
             new THREE.MeshBasicMaterial({visible:false}));
-        pick.position.y = 0.90; g.add(pick);
+        pick.position.y = 0.96; g.add(pick);
         return { group: g, pickMesh: pick };
     }
 
@@ -1265,7 +1306,7 @@ window.THREE = THREE;
         var base = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.28), dm);
         base.position.y = 0.70; g.add(base);
         var pick = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.00, 0.30), new THREE.MeshBasicMaterial({ visible: false }));
-        pick.position.y = 0.95; g.add(pick);
+        pick.position.y = 1.17; g.add(pick);
         return { group: g, pickMesh: pick };
     }
 
@@ -1290,8 +1331,8 @@ window.THREE = THREE;
         var face = new THREE.Mesh(new THREE.PlaneGeometry(0.40, 0.55),
             new THREE.MeshStandardMaterial({ color: 0xff6040, emissive: 0xff3010, emissiveIntensity: 0.4, roughness: 0.4 }));
         face.position.set(0, 0.70, 0.20); g.add(face);
-        var pick = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.30, 0.42), new THREE.MeshBasicMaterial({ visible: false }));
-        pick.position.y = 0.65; g.add(pick);
+        var pick = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.44, 0.42), new THREE.MeshBasicMaterial({ visible: false }));
+        pick.position.y = 0.72; g.add(pick);
         return { group: g, pickMesh: pick };
     }
 
@@ -1368,6 +1409,13 @@ window.THREE = THREE;
         var pickMeshes = _furnitureObjs.map(function(f){ return f.pickMesh; });
         var hits = _raycaster.intersectObjects(pickMeshes, false);
         if (!hits.length) return null;
+        // The table can sit over furniture (e.g. a plant tucked underneath) — if the
+        // table is the nearer hit, it occludes the furniture here. Matches
+        // _raycastDecorAt's tie-break so hover and click/drag target the same object.
+        if (_tableGroup) {
+            var tHits = _raycaster.intersectObject(_tableGroup, true);
+            if (tHits.length && tHits[0].distance <= hits[0].distance) return null;
+        }
         var fid = hits[0].object.userData.furnitureId;
         for (var i = 0; i < _furnitureObjs.length; i++) {
             if (_furnitureObjs[i].id === fid) return _furnitureObjs[i];
@@ -1430,6 +1478,11 @@ window.THREE = THREE;
 
     function _setGroupHighlight(root, on) {
         if (!root) return;
+        
+        var cssVal = typeof getComputedStyle !== 'undefined' ? getComputedStyle(document.documentElement).getPropertyValue('--card-selected').trim() : '';
+        var match = cssVal.match(/#([0-9a-fA-F]{3,6})/);
+        var hex = match ? match[0] : '#0d6efd';
+
         root.traverse(function (o) {
             if (!o.isMesh || !o.material || o.userData.glowRing) return;
             if (on) {
@@ -1443,17 +1496,28 @@ window.THREE = THREE;
                         hm.color.multiplyScalar(0.45); // Keep the dimming effect
                     }
 
-                    var cssVal = typeof getComputedStyle !== 'undefined' ? getComputedStyle(document.documentElement).getPropertyValue('--card-selected').trim() : '';
-                    var match = cssVal.match(/#([0-9a-fA-F]{3,6})/);
-                    var hex = match ? match[0] : '#0d6efd';
-
-                    hm.emissive = new THREE.Color(hex);
-                    hm.emissiveIntensity = 0.7;
+                    hm.emissive = new THREE.Color(0x000000); // Remove the shine
                     o.userData._hiMat = hm;
                 }
                 o.material = o.userData._hiMat;
-            } else if (o.userData._baseMat) {
-                o.material = o.userData._baseMat;
+
+                if (!o.userData._outlineMesh) {
+                    var edges = new THREE.EdgesGeometry(o.geometry, 15);
+                    var line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: hex, depthTest: false, transparent: true }));
+                    line.renderOrder = 999;
+                    o.userData._outlineMesh = line;
+                    o.add(line);
+                } else {
+                    o.userData._outlineMesh.material.color.set(hex);
+                    o.userData._outlineMesh.visible = true;
+                }
+            } else {
+                if (o.userData._baseMat) {
+                    o.material = o.userData._baseMat;
+                }
+                if (o.userData._outlineMesh) {
+                    o.userData._outlineMesh.visible = false;
+                }
             }
         });
     }
@@ -2378,8 +2442,9 @@ window.THREE = THREE;
         _walkToActive = false;
         var _mr = _roamers[_myCid()]; if (_mr) _mr.path = null;
         _iAmRoaming = true; _roamSend = 1;
-        if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, yaw, 'walk');
-        applyAvatarMove(_myCid(), px, pz, yaw, 'walk');
+        var ryaw = _walkYawToRoamer(yaw);
+        if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, ryaw, 'walk');
+        applyAvatarMove(_myCid(), px, pz, ryaw, 'walk');
         // P7: canvas-scoped keyboard focus (blur exits walk) + first-person mouse-look via Pointer Lock.
         if (_renderer) {
             _renderer.domElement.focus();
@@ -2414,8 +2479,9 @@ window.THREE = THREE;
         _hideWalkHud();
         // Stay where I stopped, now idle (still a roamer so my avatar stays visible to all).
         if (_iAmRoaming) {
-            if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, yaw, 'idle');
-            applyAvatarMove(_myCid(), px, pz, yaw, 'idle');
+            var ryaw = _walkYawToRoamer(yaw);
+            if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, ryaw, 'idle');
+            applyAvatarMove(_myCid(), px, pz, ryaw, 'idle');
         }
     }
 
@@ -2475,6 +2541,12 @@ window.THREE = THREE;
         }
         return false;
     }
+
+    // _walk.yaw is camera convention (forward = (sin yaw, -cos yaw)); roamer/wire
+    // yaw is front-follows-travel (atan2(dx,dz), robot front = local +Z). Both
+    // conventions share sin and differ only by a pi rotation, so the same
+    // function converts in either direction.
+    function _walkYawToRoamer(yaw) { return Math.PI - yaw; }
 
     function _updateWalk(dt) {
         var kb = _keyBinds();
@@ -2565,9 +2637,10 @@ window.THREE = THREE;
         _roamSend += dt;
         if (_roamSend >= 0.1) {
             _roamSend = 0;
+            var ryaw = _walkYawToRoamer(_walk.yaw);
             if (window.RoomSceneNet && RoomSceneNet.avatarMove)
-                RoomSceneNet.avatarMove(_walk.wx, _walk.wz, _walk.yaw, 'walk');
-            applyAvatarMove(_myCid(), _walk.wx, _walk.wz, _walk.yaw, 'walk');
+                RoomSceneNet.avatarMove(_walk.wx, _walk.wz, ryaw, 'walk');
+            applyAvatarMove(_myCid(), _walk.wx, _walk.wz, ryaw, 'walk');
         }
 
         // Refresh the "Press E to ..." prompt a few times a second (P9).
@@ -2578,150 +2651,95 @@ window.THREE = THREE;
         }
     }
 
-    // E key: drop a carried item, or sit/stand at the chair ahead, or pick up furniture.
-    // Each interaction type uses its own proximity-limited ray to avoid cross-room false triggers.
-    function _walkInteract() {
-        if (_walk.held != null) { _saveFurniture(); _walk.held = null; return; }
-        if (!_raycaster || !_camera) return;
-        // In third-person mode use avatar position + yaw for the ray (not camera position behind avatar).
-        var thirdPerson = (_cfg && _cfg.walkCameraMode === 'third');
-        var rayOrigin, dir;
-        if (thirdPerson) {
-            rayOrigin = new THREE.Vector3(_walk.wx, 1.1, _walk.wz);
-            dir = new THREE.Vector3(Math.sin(_walk.yaw), 0, -Math.cos(_walk.yaw)).normalize();
-        } else {
-            rayOrigin = _camera.position.clone();
-            dir = new THREE.Vector3(); _camera.getWorldDirection(dir);
-        }
-        _raycaster.set(rayOrigin, dir);
+    // Shared E-interact resolver (P3): horizontal distance + facing-bearing test,
+    // so chairs/whiteboard/props/furniture respond identically in first- and
+    // third-person — unlike a raycast, this doesn't care that third-person's ray
+    // is horizontal at y=1.1 (chair seats sit at y≈0.47) or that first-person
+    // pitch changes the ray's horizontal reach.
+    // Returns { kind:'drop'|'whiteboard'|'prop'|'chair'|'furniture', ...payload } or null.
+    function _resolveInteractable() {
+        if (!_walk) return null;
+        if (_walk.held != null) return { kind: 'drop' };
 
-        // ── Whiteboard (left wall) — only interact when within 2 m of the board ──
+        var wx = _walk.wx, wz = _walk.wz, yaw = _walk.yaw;
+        var candidates = [];
+
         if (_wbBoard) {
-            var wbPos = new THREE.Vector3();
-            _wbBoard.getWorldPosition(wbPos);
-            var wbDist = Math.hypot(_walk.wx - wbPos.x, _walk.wz - wbPos.z);
-            if (wbDist < 2.2) {
-                _raycaster.far = 2.2;
-                if (_raycaster.intersectObject(_wbBoard, true).length) {
-                    _raycaster.far = Infinity;
-                    if (window.Whiteboard) Whiteboard.open();
-                    return;
-                }
-            }
+            var wbPos = new THREE.Vector3(); _wbBoard.getWorldPosition(wbPos);
+            candidates.push({ kind: 'whiteboard', x: wbPos.x, z: wbPos.z, range: 2.2 });
         }
+        _props.forEach(function (p) {
+            if (!p.group) return;
+            candidates.push({ kind: 'prop', x: p.group.position.x, z: p.group.position.z, range: 2.5, action: p.action });
+        });
+        _chairObjects.forEach(function (c) {
+            candidates.push({ kind: 'chair', x: c.group.position.x, z: c.group.position.z, range: 1.9, idx: c.idx });
+        });
+        _furnitureObjs.forEach(function (f) {
+            candidates.push({ kind: 'furniture', x: f.group.position.x, z: f.group.position.z, range: 2.0, id: f.id });
+        });
 
-        // ── Props (confetti / jukebox) — short range ──
-        var pms = _propMeshes();
-        if (pms.length) {
-            _raycaster.far = 2.5;
-            var phit = _raycaster.intersectObjects(pms, true);
-            if (phit.length) {
-                var hit = phit[0].object, prp = null;
-                while (hit && !prp) { prp = _propForMesh(hit); hit = hit.parent; }
-                if (prp) { _runProp(prp.action); _raycaster.far = Infinity; return; }
-            }
-        }
-
-        // ── Chairs — must be adjacent ──
-        var chairMeshes = _chairObjects.map(function (c) { return c.seatMesh; });
-        _raycaster.far = 1.9;
-        var ch = chairMeshes.length ? _raycaster.intersectObjects(chairMeshes, true) : [];
-        if (ch.length) {
-            var hitMesh = ch[0].object, chairObj = null;
-            for (var i = 0; i < _chairObjects.length; i++) {
-                if (_chairObjects[i].seatMesh === hitMesh) { chairObj = _chairObjects[i]; break; }
-            }
-            if (chairObj) {
-                var idx = chairObj.idx, claim = _claimedChairs[idx];
-                if (claim && claim.cid === _myCid()) { releaseMySeat(); }
-                else if (!claim) { _pendingChairIdx = idx; _confirmClaim(); }   // direct claim, no bar
-                _raycaster.far = Infinity;
-                return;
-            }
-        }
-        var pickMeshes = _furnitureObjs.map(function (f) { return f.pickMesh; });
-        var fr = pickMeshes.length ? _raycaster.intersectObjects(pickMeshes, true) : [];
-        if (fr.length) {
-            var id = fr[0].object.userData.furnitureId;
-            if (id != null) { _walk.held = id; _deselectAll(); }
-        }
-        _raycaster.far = Infinity;
+        var best = null, bestDist = Infinity;
+        candidates.forEach(function (c) {
+            var dist = Math.hypot(c.x - wx, c.z - wz);
+            if (dist > c.range) return;
+            // Bearing uses the camera-yaw convention (forward = (sin yaw, -cos yaw)) —
+            // same convention _walk.yaw uses regardless of the P2 roamer-yaw fix.
+            var brg = Math.atan2(c.x - wx, -(c.z - wz));
+            var d = brg - yaw;
+            while (d > Math.PI) d -= 2 * Math.PI;
+            while (d <= -Math.PI) d += 2 * Math.PI;
+            if (Math.abs(d) >= 0.7) return;   // ~40° facing cone
+            if (dist < bestDist) { bestDist = dist; best = c; }
+        });
+        return best;
     }
 
-    // Side-effect-free probe for the "Press E to ..." HUD prompt (P9). Mirrors the
-    // same proximity-limited rays as _walkInteract() but performs no actions or
-    // state changes — safe to call every tick without affecting claims/furniture.
+    // E key: drop a carried item, open the whiteboard, run a prop, sit/stand, or pick up furniture.
+    function _walkInteract() {
+        var r = _resolveInteractable();
+        if (!r) return;
+        switch (r.kind) {
+            case 'drop':
+                _saveFurniture(); _walk.held = null; return;
+            case 'whiteboard':
+                if (window.Whiteboard) Whiteboard.open(); return;
+            case 'prop':
+                _runProp(r.action); return;
+            case 'chair':
+                var claim = _claimedChairs[r.idx];
+                if (claim && claim.cid === _myCid()) releaseMySeat();
+                else if (!claim) { _pendingChairIdx = r.idx; _confirmClaim(); }   // direct claim, no bar
+                return;
+            case 'furniture':
+                _walk.held = r.id; _deselectAll(); return;
+        }
+    }
+
+    // Side-effect-free probe for the "Press E to ..." HUD prompt (P9) — mirrors
+    // _walkInteract()'s resolution but performs no actions or state changes.
     function _findInteractTarget() {
-        if (!_walk) return null;
-        if (_walk.held != null) return { label: 'drop' };
-        if (!_raycaster || !_camera) return null;
-        var thirdPerson = (_cfg && _cfg.walkCameraMode === 'third');
-        var rayOrigin, dir;
-        if (thirdPerson) {
-            rayOrigin = new THREE.Vector3(_walk.wx, 1.1, _walk.wz);
-            dir = new THREE.Vector3(Math.sin(_walk.yaw), 0, -Math.cos(_walk.yaw)).normalize();
-        } else {
-            rayOrigin = _camera.position.clone();
-            dir = new THREE.Vector3(); _camera.getWorldDirection(dir);
+        var r = _resolveInteractable();
+        if (!r) return null;
+        switch (r.kind) {
+            case 'drop':       return { label: 'drop' };
+            case 'whiteboard': return { label: 'open whiteboard' };
+            case 'prop':       return { label: _propLabel(r.action) };
+            case 'chair':
+                var claim = _claimedChairs[r.idx];
+                if (claim && claim.cid === _myCid()) return { label: 'stand up' };
+                if (!claim) return { label: 'sit' };
+                return null;
+            case 'furniture':  return { label: 'pick up' };
         }
-        _raycaster.set(rayOrigin, dir);
-        var result = null;
-
-        if (_wbBoard) {
-            var wbPos = new THREE.Vector3();
-            _wbBoard.getWorldPosition(wbPos);
-            var wbDist = Math.hypot(_walk.wx - wbPos.x, _walk.wz - wbPos.z);
-            if (wbDist < 2.2) {
-                _raycaster.far = 2.2;
-                if (_raycaster.intersectObject(_wbBoard, true).length) result = { label: 'open whiteboard' };
-            }
-        }
-
-        if (!result) {
-            var pms = _propMeshes();
-            if (pms.length) {
-                _raycaster.far = 2.5;
-                var phit = _raycaster.intersectObjects(pms, true);
-                if (phit.length) {
-                    var hit = phit[0].object, prp = null;
-                    while (hit && !prp) { prp = _propForMesh(hit); hit = hit.parent; }
-                    if (prp) result = { label: _propLabel(prp.action) };
-                }
-            }
-        }
-
-        if (!result) {
-            var chairMeshes = _chairObjects.map(function (c) { return c.seatMesh; });
-            _raycaster.far = 1.9;
-            var ch = chairMeshes.length ? _raycaster.intersectObjects(chairMeshes, true) : [];
-            if (ch.length) {
-                var hitMesh = ch[0].object, chairObj = null;
-                for (var i = 0; i < _chairObjects.length; i++) {
-                    if (_chairObjects[i].seatMesh === hitMesh) { chairObj = _chairObjects[i]; break; }
-                }
-                if (chairObj) {
-                    var idx = chairObj.idx, claim = _claimedChairs[idx];
-                    if (claim && claim.cid === _myCid()) result = { label: 'stand up' };
-                    else if (!claim) result = { label: 'sit' };
-                }
-            }
-        }
-
-        if (!result) {
-            var pickMeshes = _furnitureObjs.map(function (f) { return f.pickMesh; });
-            var fr = pickMeshes.length ? _raycaster.intersectObjects(pickMeshes, true) : [];
-            if (fr.length && fr[0].object.userData.furnitureId != null) result = { label: 'pick up' };
-        }
-
-        _raycaster.far = Infinity;
-        return result;
+        return null;
     }
 
     // Show/hide/update the floating "Press E to ..." prompt near the avatar (P9).
     function _updateInteractLabel(target) {
         if (!_scene || !CSS2DObject) return;
         if (!target) {
-            if (_interactLabel) _interactLabel.element.style.display = 'none';
+            if (_interactLabel) _interactLabel.visible = false;
             return;
         }
         if (!_interactLabel) {
@@ -2734,7 +2752,7 @@ window.THREE = THREE;
         }
         var kb = _keyBinds();
         _interactLabel.element.textContent = _keyHint(kb.interact) + ' ' + target.label;
-        _interactLabel.element.style.display = '';
+        _interactLabel.visible = true;
         var fx = _walk.wx + Math.sin(_walk.yaw) * 1.2;
         var fz = _walk.wz - Math.cos(_walk.yaw) * 1.2;
         _interactLabel.position.set(fx, 1.7, fz);
@@ -3542,13 +3560,20 @@ window.THREE = THREE;
         for (var i = 0; i < _participants.length; i++) if (_participants[i].connectionId === cid) return _participants[i];
         return null;
     }
-    function _makeRoamer(cid) {
+    // CID-first participant lookup with a self-by-name fallback: after a rejoin the
+    // list can briefly hold only the stale same-name entry (old CID) — colour/name
+    // are still correct on it, so prefer it to rendering an anonymous gray robot.
+    function _participantForCid(cid) {
         var p = _participantByCid(cid);
-        // Fallback: local user before CID is in participant list → match by player name so we get their real colour.
-        if (!p && cid && cid === _myCid()) {
+        if (p) return p;
+        if (cid && cid === _myCid()) {
             var myName = window.ROOM_CONFIG && window.ROOM_CONFIG.playerName;
-            if (myName) { for (var _i = 0; _i < _participants.length; _i++) { if (_participants[_i].name === myName) { p = _participants[_i]; break; } } }
+            if (myName) { for (var i = 0; i < _participants.length; i++) if (_participants[i].name === myName) return _participants[i]; }
         }
+        return null;
+    }
+    function _makeRoamer(cid) {
+        var p = _participantForCid(cid);
         var rs = _roomState || {};
         var vs = _voteState(p, rs);
         var robot = _makeRobot(p ? _parseColor(p) : 0x888888, vs, false, _parseScene3d(p));
@@ -3557,11 +3582,11 @@ window.THREE = THREE;
         var rc = VOTE_EMI[vs] || VOTE_EMI.none;
         var ring = new THREE.Mesh(new THREE.TorusGeometry(0.175, 0.020, 8, 28),
             new THREE.MeshStandardMaterial({ color: rc, emissive: rc, emissiveIntensity: 0.9 }));
-        ring.rotation.x = Math.PI / 2; _scene.add(ring);
+        ring.rotation.x = Math.PI / 2; ring.visible = (vs !== 'none'); _scene.add(ring);
         var label = null, labelObj = null;
         if (p && CSS2DObject) { label = _makeLabel(p, rs, true); labelObj = new CSS2DObject(label); _scene.add(labelObj); }
         // wasGray: robot was created with no participant data → needs body rebuild in _refreshRoamers.
-        return { robot: robot, ring: ring, label: label, labelObj: labelObj, headY: headY, wasGray: !p };
+        return { robot: robot, ring: ring, label: label, labelObj: labelObj, headY: headY, wasGray: !p, ringStateVisible: (vs !== 'none') };
     }
     // Live position update for a roaming participant (local or remote).
     function applyAvatarMove(cid, x, z, yaw, pose) {
@@ -3725,7 +3750,7 @@ window.THREE = THREE;
     function _refreshRoamers() {
         var rs = _roomState || {};
         Object.keys(_roamers).forEach(function (cid) {
-            var r = _roamers[cid], p = _participantByCid(cid);
+            var r = _roamers[cid], p = _participantForCid(cid);
             if (!r) return;
 
             // Roamer was created before the participant was in the list (wasGray = true).
@@ -3750,6 +3775,7 @@ window.THREE = THREE;
             if (!p) return;
             var vs = _voteState(p, rs), rc = VOTE_EMI[vs] || VOTE_EMI.none;
             if (r.ring && r.ring.material) { r.ring.material.color.setHex(rc); r.ring.material.emissive.setHex(rc); }
+            r.ringStateVisible = (vs !== 'none');
             if (r.label) r.label.textContent = (p.name || 'Guest') + (rs.votesRevealed && p.vote ? ' · ' + p.vote : '');
         });
     }
@@ -3776,7 +3802,7 @@ window.THREE = THREE;
             // Hide self-avatar in first-person (camera = avatar); show it in third-person.
             var inFirstPerson = _walk && (!_cfg || _cfg.walkCameraMode !== 'third');
             var vis = !(cid === my && inFirstPerson);
-            r.robot.visible = vis; if (r.ring) r.ring.visible = vis; if (r.labelObj) r.labelObj.visible = vis;
+            r.robot.visible = vis; if (r.ring) r.ring.visible = vis && r.ringStateVisible; if (r.labelObj) r.labelObj.visible = vis;
             // Away-dim: fade the name tag of avatars idle for a while.
             if (r.label) r.label.style.opacity = ((_clock - (r.lastMove || 0)) > 45) ? '0.5' : '1';
         });
@@ -3864,6 +3890,39 @@ window.THREE = THREE;
             if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(r.x, r.z, r.yaw, 'walk');
             r.lastMove = _clock;
         }
+    }
+
+    // P10: 2D top-down camera auto-follow (Kumospace-style). When zoomed in, gently keep my
+    // avatar in frame; a manual pan suspends following until my avatar moves again.
+    function _updateTopFollow(dt) {
+        if (!_orthoCam || !_controls) return;
+        if (_orthoCam.zoom <= 1.15) {
+            _topFollow.suspended = false;
+            _topFollow.lastX = null; _topFollow.lastZ = null;
+            return;
+        }
+        var pos = _myStartPos();
+        if (_topFollow.lastX !== null) {
+            var moved = Math.hypot(pos.x - _topFollow.lastX, pos.z - _topFollow.lastZ);
+            if (moved > 0.05) _topFollow.suspended = false;
+        }
+        _topFollow.lastX = pos.x; _topFollow.lastZ = pos.z;
+        if (_topFollow.suspended) return;
+
+        // Visible half-extent at the current zoom (frustum half-size / zoom).
+        var visHalfW = _orthoCam.right / _orthoCam.zoom;
+        var visHalfH = _orthoCam.top / _orthoCam.zoom;
+        var maxX = Math.max(0, ROOM_W / 2 - visHalfW);
+        var maxZ = Math.max(0, ROOM_D / 2 - visHalfH);
+        var tx = Math.max(-maxX, Math.min(maxX, pos.x));
+        var tz = Math.max(-maxZ, Math.min(maxZ, pos.z));
+
+        var k = Math.min(1, dt * 4);
+        _controls.target.x += (tx - _controls.target.x) * k;
+        _controls.target.z += (tz - _controls.target.z) * k;
+        _camera.position.x += (tx - _camera.position.x) * k;
+        _camera.position.z += (tz - _camera.position.z) * k;
+        _controls.update();
     }
 
     // ── Spatial emotes (floating reactions over avatars) ──────
@@ -4092,6 +4151,7 @@ window.THREE = THREE;
             );
             ring.position.set(pos.x, headY, pos.z);
             ring.rotation.x = Math.PI / 2;
+            ring.visible = (vs !== 'none');
             _scene.add(ring);
 
             var label = _makeLabel(p, rs);
@@ -4141,6 +4201,7 @@ window.THREE = THREE;
             );
             ring.position.set(pos.x, headY, pos.z);
             ring.rotation.x = Math.PI / 2;
+            ring.visible = (vs !== 'none');
             _scene.add(ring);
 
             var label = _makeLabel(p, rs, true);
@@ -4688,7 +4749,7 @@ window.THREE = THREE;
                 if (_flyTarget.t >= 1.0) _flyTarget = null;
             }
             if (_controls) _controls.update();
-            if (_view === 'top') _updateTopSteer(dt);
+            if (_view === 'top') { _updateTopSteer(dt); _updateTopFollow(dt); }
         }
         _updateRoamers(dt);
         _tryAutoSit(dt);
@@ -4798,6 +4859,7 @@ window.THREE = THREE;
         // Clean up label DOM nodes attached to CSS2DObjects
         _clearRobots();
         _disposeInteractLabel();
+        _disposePropLabels();
         _disposeHoverTip();
         // Remove everything from scene (lights, room geo, table, furniture)
         while (_scene.children.length > 0) { _scene.remove(_scene.children[0]); }
@@ -4841,7 +4903,7 @@ window.THREE = THREE;
         _evictStaleClaims();
         // Drop roamers for participants who have left.
         Object.keys(_roamers).forEach(function (cid) {
-            if (!_participantByCid(cid)) clearRoamer(cid);
+            if (!_participantForCid(cid)) clearRoamer(cid);
         });
         if (_scene) _seedRoamersFromParticipants();
         _refreshRoamers();
@@ -4904,6 +4966,37 @@ window.THREE = THREE;
         });
     }
 
+    // P8: full room reset — furniture, chair/decor position overrides, and shared design
+    // config back to defaults, for everyone. Confirmation is the caller's job (the Room
+    // Designer button guards with a plain confirm()). Personal fields (keyBindings,
+    // walkSpeed, walkCameraMode, lookSensitivity, invertY, mode) are untouched — the config
+    // patch below only sets RoomSceneStore.SHARED_FIELDS.
+    function resetRoom() {
+        _deselectAll();   // selected id may no longer exist after reset
+        _buildFurniture(_defaultFurniture());
+        _saveFurniture();
+
+        _chairPos = {};
+        _saveChairPositions(true);
+
+        _decorPos = {};
+        _saveDecorPositions(true);
+
+        if (window.RoomScene && RoomScene.updateConfig) {
+            RoomScene.updateConfig({
+                preset: 'skyline', tableShape: 'round', tableSize: 'medium',
+                chairType: 'office', chairCount: 0,
+                floorMaterial: 'preset', wallColor: 'preset', floorColor: 'preset',
+                tableMaterial: 'wood', lighting: 'normal',
+                windowView: 'skyline', windowAnimated: true, windowTimeOfDay: 'day',
+                windowMediaId: null, windowMediaMime: null,
+                whiteboard: true, plants: true, roomSize: 'wide'
+            });
+        } else {
+            refreshScene();
+        }
+    }
+
     window.RS3D = {
         init: init, dispose: dispose, resize: resize,
         refreshScene: refreshScene,
@@ -4919,6 +5012,7 @@ window.THREE = THREE;
         showEmote: showEmote,
         addFurniture: addFurniture, removeFurniture: removeFurniture,
         getFurnitureLayout: getFurnitureLayout, resetFurniture: resetFurniture,
+        resetRoom: resetRoom,
         toggleFurniturePanel: toggleFurniturePanel,
         applyRemoteLayout: applyRemoteLayout,
         setView: setView,
@@ -4949,6 +5043,19 @@ window.THREE = THREE;
             probePress: function (x, y) {
                 var hit = _raycastDraggableChairAt({ clientX: x, clientY: y });
                 return { chairIdx: hit ? hit.idx : null, cam: _camera === _perspCam ? 'persp' : 'ortho', view: _view };
+            },
+            stepTopFollow: function (dt) {
+                _updateTopFollow(dt || 0.1);
+                return RS3D.__debug.topFollow();
+            },
+            topFollow: function () {
+                return {
+                    suspended: _topFollow.suspended,
+                    zoom: _orthoCam ? _orthoCam.zoom : null,
+                    target: _controls ? { x: _controls.target.x, z: _controls.target.z } : null,
+                    cam: _camera ? { x: _camera.position.x, z: _camera.position.z } : null,
+                    me: _myStartPos()
+                };
             }
         }
     };

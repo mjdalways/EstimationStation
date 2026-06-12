@@ -27,7 +27,7 @@
         floorColor: 'preset', // 'preset' or a #hex (tints the floor material)
         tableMaterial: 'wood',// wood | glass | marble
         lighting: 'normal',   // normal | warm | cool | neon
-        roomSize: 'medium',   // small | medium | large — overall room footprint
+        roomSize: 'wide',     // small | medium | wide | large — overall room footprint
         walkCameraMode: 'first', // first = first-person | third = third-person follow camera
         // Walk feel (personal — not shared with the room)
         walkSpeed: 2.7,       // m/s, 1.5–4.5
@@ -47,6 +47,7 @@
         roomState: null
     };
     var _glActive = false;   // true while the WebGL renderer (RS3D) owns the stage
+    var _rs3dLoading = false; // true while the lazy 3D module graph is being fetched (P7)
 
     function loadConfig() {
         try {
@@ -152,7 +153,7 @@
         if (wallColor)  wallColor.value        = (state.config.wallColor && state.config.wallColor !== 'preset') ? state.config.wallColor : '#cfd3da';
         if (floorColor) floorColor.value       = (state.config.floorColor && state.config.floorColor !== 'preset') ? state.config.floorColor : '#cfd3da';
         if (lighting)   lighting.value         = state.config.lighting || 'normal';
-        if (roomSize)   roomSize.value         = state.config.roomSize || 'medium';
+        if (roomSize)   roomSize.value         = state.config.roomSize || 'wide';
         if (walkSpeed)  walkSpeed.value        = state.config.walkSpeed != null ? state.config.walkSpeed : 2.7;
         if (lookSens)   lookSens.value         = state.config.lookSensitivity != null ? state.config.lookSensitivity : 0.005;
         if (invertY)    invertY.checked        = !!state.config.invertY;
@@ -226,6 +227,25 @@
                 RS3D.syncParticipants(state.participants, state.roomState);
             }
             if (RS3D.setView) RS3D.setView(view);
+            syncControls();
+        } else if (_wantGl()) {
+            // RS3D module graph not loaded yet (P7 lazy-load). Fetch it only once the panel
+            // is actually visible — a hidden panel (P6 default, or user-hidden) stays on the
+            // CSS placeholder and costs nothing.
+            var panelEl = state.root || document.getElementById('roomScenePanel');
+            var panelHidden = panelEl && panelEl.style.display === 'none';
+            if (!panelHidden && !_rs3dLoading && window._rs3dEnsure) {
+                _rs3dLoading = true;
+                window._rs3dEnsure().then(function () {
+                    _rs3dLoading = false;
+                    _applyMode();
+                }, function (e) {
+                    _rs3dLoading = false;
+                    console.error('[RS3D] lazy load failed:', e);
+                    _showGlError('Failed to load 3D module');
+                });
+            }
+            _renderCss();
             syncControls();
         } else {
             if (_glActive && window.RS3D) { RS3D.dispose(); _glActive = false; }
@@ -306,6 +326,7 @@
         syncRoom: syncRoom,
         render: render,
         syncControls: syncControls,
+        ensureStarted: _applyMode, // re-run mode selection (used when a hidden panel is shown — P7)
         getConfig: function() { return Object.assign({}, state.config); }
     };
 

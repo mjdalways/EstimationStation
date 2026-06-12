@@ -68,7 +68,11 @@
       "Bash(curl -s \"http://localhost:5288/js/room.js\")",
       "Bash(node --check \"C:/Users/mjdal/source/repos/mjdalways/EstimationStation/wwwroot/js/room-scene.js\")",
       "PowerShell($pids = Get-NetTCPConnection -LocalPort 5288 -State Listen | Select-Object -ExpandProperty OwningProcess -Unique; \"Distinct PIDs: $\\($pids -join ','\\)\"; try { $r = Invoke-WebRequest -Uri \"http://localhost:5288/\" -UseBasicParsing -TimeoutSec 10; \"HTTP $\\($r.StatusCode\\)\" } catch { \"ERR $\\($_.Exception.Message\\)\" })",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(find /mnt/c/Users/mjdal/source/repos/mjdalways/EstimationStation -maxdepth 2 -type d | head -30)",
+      "Bash(Get-Process -Name dotnet -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Id,ProcessName,StartTime)",
+      "PowerShell(Get-Process -Name dotnet -ErrorAction SilentlyContinue)"
     ]
   }
 }

@@ -3788,6 +3788,23 @@ function _widgetClose(srcId) {
     _wgtRenderSettingsPanel();
 }
 
+// One-time hint shown to first-run users when the Room Scene panel is auto-hidden (P6).
+function _wgtShowRoomSceneHint() {
+    var anchor = document.getElementById('votingSection');
+    if (!anchor || !anchor.parentNode) return;
+    var chip = document.createElement('div');
+    chip.id = 'roomSceneHintChip';
+    chip.className = 'alert alert-info d-flex align-items-center justify-content-between gap-2 py-2 px-3 mb-2';
+    chip.style.fontSize = '0.8rem';
+    chip.innerHTML =
+        '<span>🏠 Room Scene is available — enable it in ⚙ Settings → panels</span>' +
+        '<span class="d-flex gap-2 align-items-center">' +
+            '<button type="button" class="btn btn-sm btn-primary py-0 px-2" onclick="_widgetShow(\'roomScenePanel\');document.getElementById(\'roomSceneHintChip\').remove();">Show now</button>' +
+            '<button type="button" class="btn-close" aria-label="Dismiss" onclick="document.getElementById(\'roomSceneHintChip\').remove();"></button>' +
+        '</span>';
+    anchor.parentNode.insertBefore(chip, anchor);
+}
+
 // Restore a hidden panel (show, at home position)
 function _widgetShow(srcId) {
     var src = document.getElementById(srcId);
@@ -3796,6 +3813,9 @@ function _widgetShow(srcId) {
     _wgtSyncAllGrids();
     _wgtRefreshZoneClasses();
     _wgtRenderSettingsPanel();
+    // P7: the Room Scene's 3D module graph is lazy-loaded — kick off init now that the
+    // panel is no longer display:none (it was a no-op CSS placeholder while hidden).
+    if (srcId === 'roomScenePanel' && window.RoomScene) RoomScene.ensureStarted();
 }
 
 // ── Within-zone ordering ──────────────────────────────────────────────────────────────
@@ -4395,6 +4415,15 @@ window.addEventListener('resize', function() {
     });
 
     var all = _wgtGetLayout();
+    // First-run seed: a user who has never opened the Room Scene (no 3D config saved) and
+    // has no saved layout entry for it yet gets the panel hidden by default, with a one-time
+    // hint chip. Writing the seed here means `all['roomScenePanel']` is defined on every
+    // later load, so this block — and the hint — only ever fires once.
+    if (all['roomScenePanel'] === undefined && localStorage.getItem('es_roomSceneConfig') === null) {
+        _wgtSaveState('roomScenePanel', { hidden: true });
+        all = _wgtGetLayout();
+        _wgtShowRoomSceneHint();
+    }
     // On mobile (<768px) skip all dock-zone and hidden restore — the stacked home layout
     // is the only sensible layout on a small screen.  Desktop state is preserved in storage
     // and resumes when the user next visits on a desktop browser (Finding 1).
