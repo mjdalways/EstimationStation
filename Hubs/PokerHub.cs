@@ -1242,9 +1242,7 @@ public class PokerHub : Hub
         if (string.IsNullOrWhiteSpace(domain) || string.IsNullOrWhiteSpace(email) ||
             string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(jql)) return;
 
-        // Strip protocol if user pasted a full URL
-        domain = domain.Replace("https://", "").Replace("http://", "").TrimEnd('/');
-        if (!domain.Contains(".atlassian.net"))
+        if (!TryValidateJiraDomain(domain, out var validatedDomain))
         {
             await Clients.Caller.SendAsync("Error", "Jira domain must end in .atlassian.net");
             return;
@@ -1253,7 +1251,7 @@ public class PokerHub : Hub
         List<JiraIssue> issues;
         try
         {
-            issues = await _jiraService.FetchIssuesAsync(domain, email, token, jql);
+            issues = await _jiraService.FetchIssuesAsync(validatedDomain, email, token, jql);
         }
         catch (Exception ex)
         {
@@ -1330,8 +1328,7 @@ public class PokerHub : Hub
             return;
         }
 
-        domain = domain.Replace("https://", "").Replace("http://", "").TrimEnd('/');
-        if (!domain.EndsWith(".atlassian.net", StringComparison.OrdinalIgnoreCase))
+        if (!TryValidateJiraDomain(domain, out var validatedDomain))
         {
             await Clients.Caller.SendAsync("JiraWriteResult", jiraKey, false, "Invalid domain");
             return;
@@ -1339,7 +1336,7 @@ public class PokerHub : Hub
 
         try
         {
-            await _jiraService.WriteEstimateAsync(domain, email, token, jiraKey, numericEstimate, fieldId);
+            await _jiraService.WriteEstimateAsync(validatedDomain, email, token, jiraKey, numericEstimate, fieldId);
             await Clients.Caller.SendAsync("JiraWriteResult", jiraKey, true, null);
         }
         catch (Exception ex)
@@ -1356,6 +1353,26 @@ public class PokerHub : Hub
         room.SettingsLockMode == "none"
         || string.IsNullOrEmpty(room.HostConnectionId)
         || room.HostConnectionId == connectionId;
+
+    // Validates a user-supplied Jira domain by parsing it as a URI and checking the
+    // *parsed host* (not the raw string) ends with .atlassian.net. This blocks SSRF
+    // tricks like embedded credentials (x.atlassian.net@10.0.0.1) or path/query
+    // suffixes (10.0.0.1/x?.atlassian.net) that a plain Contains/EndsWith on the raw
+    // string would miss. Returns the clean host to use for outbound requests.
+    private static bool TryValidateJiraDomain(string raw, out string host)
+    {
+        host = "";
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+
+        var trimmed = raw.Replace("https://", "").Replace("http://", "").TrimEnd('/');
+        if (!Uri.TryCreate($"https://{trimmed}", UriKind.Absolute, out var uri)) return false;
+        if (uri.Scheme != "https") return false;
+        if (!string.IsNullOrEmpty(uri.UserInfo)) return false;
+        if (!uri.Host.EndsWith(".atlassian.net", StringComparison.OrdinalIgnoreCase)) return false;
+
+        host = uri.Host;
+        return true;
+    }
 
     private static string? FindShameParticipantId(Room room)
     {

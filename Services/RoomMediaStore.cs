@@ -167,7 +167,18 @@ public class RoomMediaStore
     private void SaveMeta(string room, List<MediaEntry> entries)
     {
         var json = JsonSerializer.Serialize(entries, _jsonOpts);
-        File.WriteAllText(MetaPath(room), json);
+        var path = MetaPath(room);
+        var tmpPath = path + ".tmp";
+        try
+        {
+            File.WriteAllText(tmpPath, json);
+            File.Move(tmpPath, path, overwrite: true);
+        }
+        catch
+        {
+            try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* best effort */ }
+            throw;
+        }
     }
 
     // Whitelist by claimed content-type, then verify magic bytes so a renamed/forged

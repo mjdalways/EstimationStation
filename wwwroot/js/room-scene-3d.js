@@ -1437,8 +1437,18 @@ window.THREE = THREE;
                     if (o.material.emissive === undefined) return;   // not emissive-capable
                     o.userData._baseMat = o.material;
                     var hm = o.material.clone();
-                    hm.emissive = new THREE.Color(0x335577);
-                    hm.emissiveIntensity = 0.6;
+                    
+                    if (hm.color) {
+                        hm.color = hm.color.clone();
+                        hm.color.multiplyScalar(0.45); // Keep the dimming effect
+                    }
+
+                    var cssVal = typeof getComputedStyle !== 'undefined' ? getComputedStyle(document.documentElement).getPropertyValue('--card-selected').trim() : '';
+                    var match = cssVal.match(/#([0-9a-fA-F]{3,6})/);
+                    var hex = match ? match[0] : '#0d6efd';
+
+                    hm.emissive = new THREE.Color(hex);
+                    hm.emissiveIntensity = 0.7;
                     o.userData._hiMat = hm;
                 }
                 o.material = o.userData._hiMat;

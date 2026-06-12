@@ -47,7 +47,19 @@ public class FileRoomRepository : IRoomRepository
             {
                 json = JsonSerializer.Serialize(room, _jsonOpts);
             }
-            File.WriteAllText(path, json);
+            // Write to a temp file then atomically rename, so concurrent readers
+            // (GetRoom/GetAllRooms) never observe a partially written file.
+            var tmpPath = path + ".tmp";
+            try
+            {
+                File.WriteAllText(tmpPath, json);
+                File.Move(tmpPath, path, overwrite: true);
+            }
+            catch
+            {
+                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* best effort */ }
+                throw;
+            }
         }
         catch { /* log in production */ }
     }
