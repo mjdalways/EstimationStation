@@ -1726,8 +1726,19 @@ window.THREE = THREE;
                 if (pr && pr.group) return { kind: 'prop', key: pr.key, group: pr.group };
             }
         }
-        if (_tableGroup && _raycaster.intersectObject(_tableGroup, true).length) {
-            return { kind: 'table', key: 'table', group: _tableGroup, margin: _tableDragMargin() };
+        if (_tableGroup) {
+            var tHits = _raycaster.intersectObject(_tableGroup, true);
+            if (tHits.length) {
+                // The table is large and can sit over furniture (e.g. a plant tucked
+                // underneath) — only claim the table if it's the nearer hit, so the
+                // furniture underneath remains draggable.
+                var fMeshes = _furnitureObjs.map(function (f) { return f.pickMesh; });
+                var fHits = fMeshes.length ? _raycaster.intersectObjects(fMeshes, false) : [];
+                if (!fHits.length || tHits[0].distance <= fHits[0].distance) {
+                    return { kind: 'table', key: 'table', group: _tableGroup, margin: _tableDragMargin() };
+                }
+                return null;
+            }
         }
         return null;
     }
