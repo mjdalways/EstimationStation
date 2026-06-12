@@ -77,6 +77,7 @@ public class RoomService
             persisted.HostConnectionId = null;  // stale connection ID
             persisted.VotesRevealed = false;    // no participants left to have voted
             persisted.Vibes.Clear();            // per-round data tied to participants
+            persisted.ChairClaims.Clear();      // claims also hold stale connection IDs
             _rooms[roomName] = persisted;
             return persisted;
         }

@@ -1607,7 +1607,7 @@ window.THREE = THREE;
                 }
                 if (cObj) {
                     var claim = _claimedChairs[cObj.idx];
-                    if (!claim)                                tip = '🪑 Double-click to sit • Drag to move';
+                    if (!claim || _claimIsStale(claim))        tip = '🪑 Double-click to sit • Drag to move';
                     else if (claim.cid === _myCid())           tip = 'Double-click to stand up';
                     else if (_isHost())                        tip = '👑 Double-click to free this seat';
                     if (tip) {
@@ -3560,6 +3560,18 @@ window.THREE = THREE;
         for (var i = 0; i < _participants.length; i++) if (_participants[i].connectionId === cid) return _participants[i];
         return null;
     }
+    // A chair claim is stale when its connection is gone (e.g. a server restart wiped
+    // persisted claims, or a rejoin window left an old session's claim behind) and either
+    // nobody by that name is present, or it's actually our own old session. Treat it like
+    // an empty chair so it can be reclaimed instead of showing a non-interactive ghost.
+    function _claimIsStale(claim) {
+        if (!claim) return false;
+        if (_participantByCid(claim.cid)) return false;
+        var myName = window.ROOM_CONFIG && window.ROOM_CONFIG.playerName;
+        if (claim.name === myName) return true;
+        for (var i = 0; i < _participants.length; i++) if (_participants[i].name === claim.name) return false;
+        return true;
+    }
     // CID-first participant lookup with a self-by-name fallback: after a rejoin the
     // list can briefly hold only the stale same-name entry (old CID) — colour/name
     // are still correct on it, so prefer it to rendering an anonymous gray robot.
@@ -4417,7 +4429,7 @@ window.THREE = THREE;
         }
 
         var testMeshes = _chairObjects
-            .filter(function(c){ return !_claimedChairs[c.idx]; })
+            .filter(function(c){ var cl = _claimedChairs[c.idx]; return !cl || _claimIsStale(cl); })
             .map(function(c){ return c.seatMesh; });
 
         var hits = _raycaster.intersectObjects(testMeshes, false);

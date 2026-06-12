@@ -85,10 +85,42 @@ public class PokerHub : Hub
         };
 
         bool hostReclaimed = false;
+        var staleConnectionIds = new List<string>();
+        var reKeyedChairs = new List<(int Idx, string? Color)>();
         lock (room)
         {
             bool midVote = !room.VotesRevealed && room.Participants.Any(p => !p.IsObserver && p.Vote != null);
             participant.IsGhost = room.GhostModeEnabled && midVote;
+
+            // Reconcile a previous session for the same display name (e.g. closing and
+            // reopening a tab): carry the old session's avatar over to the new connection,
+            // re-key its chair claim and host status, and drop the stale entry — otherwise
+            // a doppelganger lingers (with a non-interactive chair claim) until SignalR's
+            // disconnect detection eventually catches up.
+            foreach (var stale in room.Participants.Where(p => p.Name == userName && p.ConnectionId != Context.ConnectionId).ToList())
+            {
+                room.Participants.Remove(stale);
+                staleConnectionIds.Add(stale.ConnectionId);
+                if (!string.IsNullOrEmpty(stale.AvatarData)) participant.AvatarData = stale.AvatarData;
+
+                foreach (var kv in room.ChairClaims.Where(kv => kv.Value.ConnectionId == stale.ConnectionId).ToList())
+                {
+                    room.ChairClaims[kv.Key] = new ChairClaim
+                    {
+                        ConnectionId = Context.ConnectionId,
+                        Name = userName,
+                        Color = kv.Value.Color
+                    };
+                    reKeyedChairs.Add((kv.Key, kv.Value.Color));
+                }
+
+                if (room.HostConnectionId == stale.ConnectionId)
+                {
+                    room.HostConnectionId = Context.ConnectionId;
+                    hostReclaimed = true;
+                }
+            }
+
             room.Participants.RemoveAll(p => p.ConnectionId == Context.ConnectionId);
             room.Participants.Add(participant);
             room.LastActivity = DateTime.UtcNow;
@@ -102,6 +134,8 @@ public class PokerHub : Hub
                 hostReclaimed = true;
             }
         }
+
+        foreach (var oldCid in staleConnectionIds) _roomService.RemoveConnection(oldCid);
 
         await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
 
@@ -129,6 +163,14 @@ public class PokerHub : Hub
         // AD1 — if this joiner reclaimed an absent host, keep everyone's crown in sync
         if (hostReclaimed)
             await Clients.OthersInGroup(roomName).SendAsync("HostChanged", Context.ConnectionId);
+
+        // Clean up the stale previous-session entries this join reconciled: tell everyone
+        // the old connection left, and re-announce its re-keyed chair claims under the new
+        // connection so the client's seating/avatar state lines up immediately.
+        foreach (var oldCid in staleConnectionIds)
+            await Clients.OthersInGroup(roomName).SendAsync("ParticipantLeft", oldCid, userName);
+        foreach (var (idx, color) in reKeyedChairs)
+            await Clients.OthersInGroup(roomName).SendAsync("ChairClaimed", idx, userName, color, Context.ConnectionId);
     }
 
     public async Task LeaveRoom()
