@@ -1653,6 +1653,54 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>7/8/2026 (202)</strong></p>
+                        <ul class="mb-2">
+                            <li>🍞 <strong>Non-blocking "removed from room" notice (review C6)</strong>: getting kicked, timed out, or idle-removed now shows a toast instead of a blocking alert(), then returns you to the lobby a moment later.</li>
+                            <li>🔗 <strong>Jira API migration (review B9)</strong>: switched story import from the deprecated <code>/rest/api/3/search</code> endpoint to <code>/rest/api/3/search/jql</code> ahead of Atlassian's sunset. Not yet verified against a live Jira instance — flag it if imports start failing.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/8/2026 (201)</strong></p>
+                        <ul class="mb-2">
+                            <li>🔒 <strong>Room state hardening (review B3/B9)</strong>: fixed several rare race conditions where reading the participant list without the room lock could throw or produce inconsistent data (private messages/reactions/sounds, avatar movement, host transfer, the "are you there?" timeout sweep). Reveal/Reset/Hide Votes, story switching, story completion, and starting the timer now honor the room's settings lock the same way other room settings already did.</li>
+                            <li>⚖️ <strong>Round-reset consistency (review B4)</strong>: switching the current story now fully clears confidence/ghost/vibe state to match a real vote reset, instead of leaving stale values that could show up on the next reveal.</li>
+                            <li>💾 <strong>Whiteboard persistence fix (review B5)</strong>: strokes drawn on the whiteboard are now saved with the room, so a restart shortly after drawing no longer loses the board.</li>
+                            <li>🛡️ <strong>Input validation (review B6/B7)</strong>: capped vote and custom-estimate-set input server-side, and fixed a crash-on-malformed-request path in the estimate-set change handler.</li>
+                            <li>🧺 <strong>Room memory cleanup (review B8)</strong>: rooms deleted by the 30-day stale-room sweep are now also dropped from the in-memory cache, so they can no longer resurrect their file via a lingering connection.</li>
+                            <li>🔑 <strong>Lobby PIN fix (review C3)</strong>: a PIN entered at the lobby is now saved under the same normalized room key the room page reads it back from, so typing a room name with spaces/punctuation + a PIN no longer loses the PIN and re-prompts.</li>
+                            <li>💌 <strong>Private reactions now show the sender (review C4)</strong>: AD6 private emoji reactions float above the sender's badge instead of appearing anonymously mid-screen.</li>
+                            <li>🃏 <strong>Stale card selection fix (review C5)</strong>: after a reconnect, your card highlight now syncs with the server's authoritative vote state instead of showing a selection the server doesn't have.</li>
+                            <li>👥 <strong>Join/leave reconciliation cleanup (review A2/A3/A4)</strong>: fixed a brief window where rejoining under the same name could show two entries for one person; if a different person joins using your display name, your session is now told explicitly and returns to the lobby instead of silently going stale.</li>
+                            <li>🧹 <strong>Misc cleanup (review B9/C6)</strong>: server-side PIN format validation, CSV export now properly quotes commas/quotes in story titles, "Reset Votes" always confirms (not just before a reveal), removed a duplicate script load, escaped the recent-rooms list against a stored-XSS edge case, factory reset now preserves Jira credentials and recent rooms, and excluded a dev-only test script from production builds.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/8/2026 (200)</strong></p>
+                        <ul class="mb-2">
+                            <li>🐛 <strong>Server bug fixes (review B1/B2)</strong>: vote stats and the "shame" outlier no longer silently drop votes on comma-decimal locales (fixed culture-invariant number parsing). Fixed a rare race where a fast join right after another join/leave could throw and leave the joiner seeing an empty room (room state is now built and materialized entirely under lock).</li>
+                            <li>🔊 <strong>Unified sound-mute/receive settings (review C1)</strong>: the "🔇 No sounds", "🎵 My sounds only", and "📻 Received only" choices in the sound preference prompt now actually take effect — they were writing to storage keys nothing else read. Everything now routes through the one real mute flag and one real sound-receive setting.</li>
+                            <li>🧹 <strong>3D scene cache-bust bump (review C2)</strong>: bumped the room-scene-3d.js version tag so the ghost-avatar fix and other pending 3D changes actually reach browsers instead of being served from cache.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/8/2026 (199)</strong></p>
+                        <ul class="mb-2">
+                            <li>👻 <strong>Fixed ghost avatars after kick/timeout/idle removal (review A1)</strong>: kicking a participant, letting an "are you there?" prompt time out, or the 2-hour idle sweep removing someone now also frees their chair claim server-side — so later joiners and reloading clients no longer see a non-interactive gray robot sitting in an empty chair. Added a client-side fallback too, so any already-stale claim renders as an open seat instead of a ghost.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/8/2026 (198)</strong></p>
+                        <ul class="mb-2">
+                            <li>🛋️ <strong>Solid furniture in walk mode (P5)</strong>: in first/third-person walk mode you now bump into sofas, bookshelves, plants, and the confetti/jukebox props instead of walking straight through them — the same collision the 2D view and click-to-walk routing always had, so movement feels identical everywhere. Furniture you're carrying never blocks you, and if someone drops a sofa right on top of your avatar you can simply walk back out.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/8/2026 (197)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>Walk to your seat (P4)</strong>: double-clicking an empty chair now walks your avatar over to it (routing around the table and furniture) and sits you down on arrival, instead of teleporting you into the seat — the target chair glows green while you're on your way. If someone grabs the chair first, your avatar simply finishes the stroll and stays standing. Clicking the floor, steering, or entering walk mode cancels the trip; if you're already next to the chair (or have click-to-walk turned off) you sit instantly, and switching seats now walks you from one chair to the other.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/8/2026 (196)</strong></p>
+                        <ul class="mb-2">
+                            <li>🚶 <strong>Walk mode starts at your avatar (P3)</strong>: pressing <kbd>T</kbd> (or the Walk button) in the 3D room now drops you into first/third-person right where your avatar is standing — your roaming spot, beside your chair if seated, or your standing spot along the wall — facing the way it was facing. Previously walk mode spawned you wherever the orbit camera happened to hover, visibly teleporting your robot for everyone else in the room.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/8/2026 (195)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>Stand up naturally (P2)</strong>: moving now means standing — walking off in first/third-person, clicking the floor, or steering with the arrow keys while seated all stand you up automatically and free your chair for others (no more "Press Space first" toast; Space still works as an explicit stand-up). And standing up — however you do it — now places your avatar right beside your chair facing the table, instead of teleporting it to the far wall. Everyone in the room sees you stand in place.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/8/2026 (194)</strong></p>
+                        <ul class="mb-2">
+                            <li>🚶 <strong>Movement fixes (P1)</strong>: your avatar no longer keeps walking in place after arriving at a click-to-walk destination or releasing the arrow keys in the 2D view. Also, pressing E to sit on a chair while in first/third-person walk mode now properly exits walk mode and seats you — previously you'd claim the chair but keep walking, and everyone else (including late joiners) saw your robot stuck walking on the spot.</li>
+                        </ul>
                         <p class="mb-2"><strong>6/12/2026 (193)</strong></p>
                         <ul class="mb-2">
                             <li>🪑 <strong>Rejoin/seat fix</strong>: closing and reopening the room tab now instantly reclaims your name, avatar, host crown, and chair — no more doppelganger or non-interactive "ghost" avatar sitting in your seat. Stale chair claims left over from a server restart are also cleared, and any remaining stale claim can be double-clicked to sit, just like an empty chair.</li>

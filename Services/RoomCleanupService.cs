@@ -23,11 +23,16 @@ public class RoomCleanupService : BackgroundService
                 using var scope = _services.CreateScope();
                 var repo = scope.ServiceProvider.GetRequiredService<IRoomRepository>();
                 var mediaStore = scope.ServiceProvider.GetRequiredService<RoomMediaStore>();
+                var rooms = scope.ServiceProvider.GetRequiredService<RoomService>();
                 var cutoff = DateTime.UtcNow - _ttl;
                 foreach (var room in repo.GetAllRooms())
                 {
                     if (room.LastActivity < cutoff)
                     {
+                        // B8: also drop the in-memory entry, or a later SaveRoom on it (e.g. a
+                        // stray connection) would mark it dirty and resurrect the file we're
+                        // about to delete. No-ops if the room is back in active use.
+                        if (!rooms.TryEvictRoom(room.Name)) continue;
                         repo.DeleteRoom(room.Name);
                         mediaStore.DeleteRoom(room.Name);
                         _logger.LogInformation("Deleted stale room: {Room}", room.Name);

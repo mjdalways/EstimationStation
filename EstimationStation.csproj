@@ -11,5 +11,11 @@
     <None Include=".github\copilot-instructions.md" />
   </ItemGroup>
 
+  <!-- C6: wgt-test.js is a console debugging harness, not app code — keep it out of publish
+       output so it doesn't ship to production wwwroot. -->
+  <ItemGroup>
+    <Content Remove="wwwroot\js\wgt-test.js" />
+  </ItemGroup>
+
 
 </Project>

@@ -307,7 +307,7 @@ function tabResetDefaults(tabId) {
     if (!confirm('Reset this tab to defaults?')) return;
     var keysToRemove = {
         'tab-visual':      ['es_cardFontSize','es_compactMode','es_showConfidence'],
-        'tab-audio':       ['es_audioAllOff','es_timerAudio','es_ambientAudio','es_soundReceive','es_voiceSettings'],
+        'tab-audio':       ['es_allSoundsOff','es_timerAudio','es_ambientAudio','es_soundReceiveSettings','es_voiceSettings'],
         'tab-seasons':     Object.keys(localStorage).filter(function(k) { return k.startsWith('sea_') || k.startsWith('cel-seasonal') || k === 'es_seaFreq'; }),
         'tab-celebration': Object.keys(localStorage).filter(function(k) { return k.startsWith('es_celebration') || k.startsWith('cel-') && !k.startsWith('cel-seasonal'); }),
     };
@@ -335,7 +335,9 @@ function settingsAllOn() {
 }
 function settingsResetAll() {
     if (!confirm('Reset ALL settings to factory defaults? This cannot be undone.')) return;
-    var keepKeys = ['es_playerName','es_playerEmoji','es_playerAvatar','es_soundAsked'];
+    // C6: also preserve Jira credentials and the recent-rooms list — a factory reset
+    // shouldn't force re-entering Jira auth or lose quick-access to recent rooms.
+    var keepKeys = ['es_playerName','es_playerEmoji','es_playerAvatar','es_soundAsked','es_jiraSettings','es_recentRooms'];
     var toRemove = [];
     for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
@@ -384,13 +386,12 @@ function importAllSettings() {
 // ── N5: Sound confirmation choice handler ───────────────────
 function _applySoundChoice(choice) {
     if (choice === 'none') {
-        localStorage.setItem('audio-all-off', 'true');
-        var el = document.getElementById('audio-all-off'); if (el) el.checked = true;
+        saveAllSoundsOff(true);
     } else if (choice === 'local') {
-        localStorage.setItem('es_soundReceive', JSON.stringify({ receiveEnabled: false, showSubtitle: false }));
+        localStorage.setItem(_SOUND_RECEIVE_KEY, JSON.stringify({ receive: false, subtitle: false }));
     } else if (choice === 'broadcast') {
-        localStorage.setItem('es_soundReceive', JSON.stringify({ receiveEnabled: true, showSubtitle: true }));
-        localStorage.setItem('audio-all-off', 'false');
+        localStorage.setItem(_SOUND_RECEIVE_KEY, JSON.stringify({ receive: true, subtitle: true }));
+        saveAllSoundsOff(false);
     }
     // 'all' = keep current settings unchanged
 }
@@ -1079,7 +1080,7 @@ function _syncCardAnimSoundSelect() {
 window._syncCardAnimSoundSelect = _syncCardAnimSoundSelect;
 
 // ── AJ: Web Audio synth sounds ──────────────────────────────
-function _synthPlayCheck() { return localStorage.getItem('es_soundAllOff') !== '1'; }
+function _synthPlayCheck() { return !getAllSoundsOff(); }
 function _synthTardisSound(dur) {
     if (!_synthPlayCheck()) return;
     try { var ctx=new(window.AudioContext||window.webkitAudioContext)(),t=ctx.currentTime,end=t+dur/1000;

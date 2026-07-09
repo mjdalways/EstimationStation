@@ -75,12 +75,12 @@ window.THREE = THREE;
     var _roamSend = 0;      // throttle accumulator for broadcasting my own position
     var _iAmRoaming = false;
     var _walkToActive = false;   // click-to-walk: gliding my avatar to a clicked floor point
+    var _walkToSitIdx = null;    // P4: chair idx to claim when the current click-to-walk arrives
     var _topSteerActive = false; // 2D mode: WASD/arrow steering is currently moving my avatar
     // P10: 2D top-down camera auto-follow (Kumospace-style). suspended=true while the user
     // has manually panned and my avatar hasn't moved since; lastX/lastZ track my avatar's
     // position between ticks so we can detect "they started moving again".
     var _topFollow = { suspended: false, lastX: null, lastZ: null };
-    var _seatedArrowToastT = 0;  // throttle for the "press Space to stand" toast (P7 follow-up)
     var _clickWalkEnabled = true; // click-to-walk feature toggle (user can disable via button)
     var _emotes = [];            // floating emoji over avatars (spatial reactions)
     var _stillTime = 0;          // how long my avatar has been stationary (for walk-up-and-sit)
@@ -2070,25 +2070,20 @@ window.THREE = THREE;
             return;
         }
 
-        // 2D top-down: Space stands you up so you can steer (follow-up to P7).
+        // 2D top-down: Space stands you up (explicit stand — movement keys also auto-stand).
         if (_view === 'top' && code === 'Space' && _myChairIdx !== null) {
             event.preventDefault(); event.stopImmediatePropagation();
-            releaseMySeat();
+            _standUpFromChair();
             return;
         }
 
-        // 2D top-down: WASD/arrows steer my avatar (P7). Captured even while seated so the
-        // page doesn't scroll; while seated, show a toast pointing at Space instead of moving.
+        // 2D top-down: WASD/arrows steer my avatar (P7). If seated, _updateTopSteer
+        // auto-stands on the first tick (P2) — no "press Space first" gate.
+        // C6 (documented, intentional Kumospace-style tradeoff): capturing arrows here means
+        // the vote-card arrow navigation (room.js) stops working whenever the 2D scene is
+        // mounted. ','/'.' still navigate cards as an alternative.
         if (_view === 'top' && _isMoveCode(code, kb)) {
             event.preventDefault(); event.stopImmediatePropagation();
-            if (_myChairIdx !== null) {
-                var now = performance.now();
-                if (now - _seatedArrowToastT > 2000) {
-                    _seatedArrowToastT = now;
-                    if (window._showToastAD) window._showToastAD('⌨️ Press Space to stand up first', 'info');
-                }
-                return;
-            }
             _keys[code] = true;
             return;
         }
@@ -2416,6 +2411,21 @@ window.THREE = THREE;
         var m = 0.30;
         var px = Math.max(-ROOM_W/2+m, Math.min(ROOM_W/2-m, _camera.position.x));
         var pz = Math.max(-ROOM_D/2+m, Math.min(ROOM_D/2-m, _camera.position.z));
+        // P3 (Feature8): walk starts where my avatar IS — the stand-up spot beside my
+        // chair if seated (P2, frees the chair), else my roamer, else my standing-row
+        // robot. The camera position is only the fallback when I have no avatar at all,
+        // so entering walk never teleports my avatar for the rest of the room.
+        var stood = _standUpFromChair();   // no-op unless seated
+        var meR = _roamers[_myCid()];
+        if (stood)       { px = stood.x; pz = stood.z; yaw = _walkYawToRoamer(stood.yaw); }
+        else if (meR)    { px = meR.x;   pz = meR.z;   yaw = _walkYawToRoamer(meR.yaw); }
+        else {
+            var st = _robotMap['stand_' + _myCid()];
+            if (st && st.standingRobotPos) {
+                px = st.standingRobotPos.x; pz = st.standingRobotPos.z;
+                yaw = _walkYawToRoamer(st.robot ? st.robot.rotation.y : 0);
+            }
+        }
         // Push the start position out of the table if we're inside it.
         if (_walkCollidesAt(px, pz)) { pz = ROOM_D / 2 - 1.5; px = 0; }
         _walk = { yaw: yaw, pitch: -0.05, vy: 0, grounded: true, crouch: false, held: null,
@@ -2439,6 +2449,7 @@ window.THREE = THREE;
         if (_isTouchDevice()) _showTouchControls();
         // Become a roamer: tell everyone where I am, and spawn my own avatar locally.
         // Entering walk mode cancels any routed click-to-walk path — WASD owns movement now.
+        _cancelWalkToSit();
         _walkToActive = false;
         var _mr = _roamers[_myCid()]; if (_mr) _mr.path = null;
         _iAmRoaming = true; _roamSend = 1;
@@ -2525,7 +2536,12 @@ window.THREE = THREE;
         return null;
     }
 
-    // Returns true if placing the avatar at (nx, nz) would overlap a wall or the table.
+    // Returns true if placing the avatar at (nx, nz) would overlap a wall, the table,
+    // furniture, or an interactive prop. P5 (Feature8): furniture/props use the same
+    // circle tests A* routing always used, so 3D walk mode can no longer stroll through
+    // a sofa that 2D steering routes around. The item being carried in walk mode is
+    // exempt — it moves with the avatar and would otherwise jam movement.
+    var _propPosScratch = null;
     function _walkCollidesAt(nx, nz) {
         var m = 0.30;   // avatar body radius
         if (nx <= -ROOM_W/2 + m || nx >= ROOM_W/2 - m) return true;
@@ -2538,6 +2554,18 @@ window.THREE = THREE;
         } else {
             var tw = t.RW / 2 + 0.38, td = t.RD / 2 + 0.38;
             if (tx > -tw && tx < tw && tz > -td && tz < td) return true;
+        }
+        var held = _walk ? _walk.held : null;
+        for (var i = 0; i < _furnitureObjs.length; i++) {
+            var f = _furnitureObjs[i];
+            if (f.id === held) continue;
+            if (Math.hypot(f.group.position.x - nx, f.group.position.z - nz) < 0.55) return true;
+        }
+        if (!_propPosScratch) _propPosScratch = new THREE.Vector3();
+        for (var j = 0; j < _props.length; j++) {
+            var p = _props[j]; if (!p.mesh) continue;
+            p.mesh.getWorldPosition(_propPosScratch);
+            if (Math.hypot(_propPosScratch.x - nx, _propPosScratch.z - nz) < 0.5) return true;
         }
         return false;
     }
@@ -2569,9 +2597,15 @@ window.THREE = THREE;
         if (len > 1) { dx /= len; dz /= len; }
         dx *= speed; dz *= speed;
 
-        // Sliding collision: try full move, then each axis separately.
+        // Sliding collision: try full move, then each axis separately. If my CURRENT
+        // spot already overlaps an obstacle (e.g. furniture dragged onto me), movement
+        // is allowed (room bounds only) so I can walk back out instead of being stuck.
         var nx = _walk.wx + dx, nz = _walk.wz + dz;
         if (!_walkCollidesAt(nx, nz))          { _walk.wx = nx; _walk.wz = nz; }
+        else if (_walkCollidesAt(_walk.wx, _walk.wz)) {
+            var esc = _clampRoom(nx, nz, 0.30);
+            _walk.wx = esc.x; _walk.wz = esc.z;
+        }
         else if (!_walkCollidesAt(nx, _walk.wz)) { _walk.wx = nx; }
         else if (!_walkCollidesAt(_walk.wx, nz)) { _walk.wz = nz; }
         // else: fully blocked (corner) — don't move
@@ -2709,7 +2743,13 @@ window.THREE = THREE;
             case 'chair':
                 var claim = _claimedChairs[r.idx];
                 if (claim && claim.cid === _myCid()) releaseMySeat();
-                else if (!claim) { _pendingChairIdx = r.idx; _confirmClaim(); }   // direct claim, no bar
+                else if (!claim) {
+                    // Exit walk BEFORE claiming: _updateWalk's 100ms 'walk' broadcasts would
+                    // otherwise recreate my roamer and overwrite the AvatarStop that
+                    // applyClaim sends, leaving me claimed-but-roaming for everyone.
+                    _exitWalk();
+                    _pendingChairIdx = r.idx; _confirmClaim();
+                }
                 return;
             case 'furniture':
                 _walk.held = r.id; _deselectAll(); return;
@@ -3625,34 +3665,74 @@ window.THREE = THREE;
     }
     function applyAvatarStop(cid) { clearRoamer(cid); }
 
+    // World position of chair idx (drag override, else default ring slot, else room default).
+    function _chairWorldPos(idx) {
+        var chairs = Math.min(Math.max(_participants.length, _cfg.chairCount || _participants.length, 1), 16);
+        var seats = _seatPositions(chairs);
+        return _chairPos[idx] || seats[idx] || { x: 0, z: ROOM_D / 2 - 1.2 };
+    }
+
     // Where is my avatar right now? (roaming pos, else my claimed seat, else a default spot.)
     function _myStartPos() {
         var r = _roamers[_myCid()];
         if (r) return { x: r.x, z: r.z, yaw: r.yaw };
         if (_myChairIdx != null) {
-            var chairs = Math.min(Math.max(_participants.length, _cfg.chairCount || _participants.length, 1), 16);
-            var seats = _seatPositions(chairs);
-            var pos = _chairPos[_myChairIdx] || seats[_myChairIdx] || { x: 0, z: ROOM_D / 2 - 1.2 };
+            var pos = _chairWorldPos(_myChairIdx);
             return { x: pos.x, z: pos.z, yaw: (pos.rot != null) ? pos.rot : Math.atan2(-pos.x, -pos.z) };
         }
         return { x: 0, z: ROOM_D / 2 - 1.2, yaw: 0 };
     }
-    // ── Click-to-walk A* routing over the snap grid ───────────
-    // Obstacles: walls + table (same test walk mode uses) plus furniture and interactive
-    // props, so the routed glide no longer passes through the table or a sofa.
-    function _routeBlockedAt(x, z) {
-        if (_walkCollidesAt(x, z)) return true;
-        for (var i = 0; i < _furnitureObjs.length; i++) {
-            var f = _furnitureObjs[i];
-            if (Math.hypot(f.group.position.x - x, f.group.position.z - z) < 0.55) return true;
-        }
-        for (var j = 0; j < _props.length; j++) {
-            var p = _props[j]; if (!p.mesh) continue;
-            var pw = new THREE.Vector3(); p.mesh.getWorldPosition(pw);
-            if (Math.hypot(pw.x - x, pw.z - z) < 0.5) return true;
+
+    // True if (x, z) is within auto-sit range (~0.5) of any chair the auto-sit could
+    // claim (unclaimed, or my own — it is about to be released when this is used).
+    function _nearSittableChair(x, z) {
+        for (var i = 0; i < _chairObjects.length; i++) {
+            var c = _chairObjects[i], cl = _claimedChairs[c.idx];
+            if (cl && c.idx !== _myChairIdx) continue;   // someone else's chair — auto-sit ignores it
+            if (Math.hypot(c.group.position.x - x, c.group.position.z - z) < 0.6) return true;
         }
         return false;
     }
+
+    // P2 (Feature8): stand up out of my claimed chair. Spawns my roamer on a free spot
+    // beside the chair (facing the table), broadcasts it, then releases the claim — so
+    // standing up never teleports the avatar to the standing row, in any view or client.
+    // Returns the stand spot { x, z, yaw } (roamer yaw convention), or null if not seated.
+    function _standUpFromChair() {
+        if (_myChairIdx === null || !_scene) return null;
+        var pos = _chairWorldPos(_myChairIdx);
+        var off = _tableOffset();
+        var away = Math.atan2(pos.x - off.x, pos.z - off.z);   // table → chair direction
+        var tries = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI * 0.75, -Math.PI * 0.75, Math.PI];
+        var spot = null;
+        for (var d = 0; d < 2 && !spot; d++) {
+            var D = (d === 0) ? 0.85 : 1.25;
+            for (var i = 0; i < tries.length; i++) {
+                var a = away + tries[i];
+                var c = _clampRoom(pos.x + Math.sin(a) * D, pos.z + Math.cos(a) * D, 0.30);
+                if (_nearSittableChair(c.x, c.z)) continue;   // F8: outside auto-sit range, or we'd instantly re-sit
+                if (_routeBlockedAt(c.x, c.z)) continue;
+                spot = c; break;
+            }
+        }
+        if (!spot) spot = { x: 0, z: ROOM_D / 2 - 1.2 };   // chair fully boxed in (rare): room default spot
+        var yaw = Math.atan2(off.x - spot.x, off.z - spot.z);   // face the table
+        var my = _myCid();
+        if (my) {
+            _iAmRoaming = true;
+            applyAvatarMove(my, spot.x, spot.z, yaw, 'idle');
+            if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(spot.x, spot.z, yaw, 'idle');
+        }
+        releaseMySeat();
+        // Optimistic: don't wait for the ChairReleased echo — callers run per-tick
+        // (_updateTopSteer) and must not re-trigger stand-up/release until it lands.
+        _myChairIdx = null;
+        return { x: spot.x, z: spot.z, yaw: yaw };
+    }
+    // ── Click-to-walk A* routing over the snap grid ───────────
+    // P5 (Feature8): walk mode and routing now share the exact same obstacle set —
+    // walls + table + furniture + props all live in _walkCollidesAt.
+    function _routeBlockedAt(x, z) { return _walkCollidesAt(x, z); }
     function _segmentClear(ax, az, bx, bz) {
         var d = Math.hypot(bx - ax, bz - az), steps = Math.max(1, Math.ceil(d / 0.15));
         for (var i = 1; i <= steps; i++) {
@@ -3722,13 +3802,42 @@ window.THREE = THREE;
         return path;
     }
 
+    // P4 (Feature8): cancel a pending walk-then-sit — another movement input took over,
+    // or the target chair was claimed by someone else mid-walk.
+    function _cancelWalkToSit() {
+        if (_walkToSitIdx === null) return;
+        var idx = _walkToSitIdx; _walkToSitIdx = null;
+        if (_pendingChairIdx === idx) { _pendingChairIdx = null; if (_scene) _rebuildSeating(); }
+    }
+
+    // P4 (Feature8): double-click on an empty (or stale-claimed) chair — walk over and sit
+    // on arrival, Kumospace-style. Instant sit when click-to-walk is disabled or I'm
+    // already beside the chair. If I'm seated elsewhere, _startWalkTo stands me up (P2).
+    function _sitOrWalkToChair(idx) {
+        if (_clickWalkEnabled) {
+            var pos = _chairWorldPos(idx);
+            var me = _myStartPos();
+            if (Math.hypot(pos.x - me.x, pos.z - me.z) >= 0.9) {
+                _startWalkTo(pos.x, pos.z);   // also cancels any previous walk-to-sit
+                _walkToSitIdx = idx;
+                _pendingChairIdx = idx;
+                _rebuildSeating();            // show the pending glow during the walk
+                return;
+            }
+        }
+        _pendingChairIdx = idx;
+        _confirmClaim();
+    }
+
     // Click-to-walk: route my avatar to a floor point along the A* path; each waypoint is
     // broadcast as it becomes the active target so peers walk the same route.
     function _startWalkTo(x, z) {
         if (!_scene) return;
+        _cancelWalkToSit();   // a plain floor click supersedes a pending walk-then-sit
         var m = 0.30;
         x = Math.max(-ROOM_W/2+m, Math.min(ROOM_W/2-m, x));
         z = Math.max(-ROOM_D/2+m, Math.min(ROOM_D/2-m, z));
+        _standUpFromChair();   // P2: click-to-walk while seated stands you up (frees the chair)
         var start = _myStartPos();
         if (!_roamers[_myCid()]) applyAvatarMove(_myCid(), start.x, start.z, start.yaw, 'walk');
         var r = _roamers[_myCid()];
@@ -3739,6 +3848,7 @@ window.THREE = THREE;
         if (!_routeBlockedAt(x, z) && _segmentClear(last.x, last.z, x, z)) path.push({ x: x, z: z });
         var first = path.shift() || { x: x, z: z };
         r.path = path;
+        r.pose = 'walk';   // roamer may already exist as 'idle' — restart the local walk animation
         r.tx = first.x; r.tz = first.z;
         r.tyaw = Math.atan2(first.x - r.x, first.z - r.z);
         _iAmRoaming = true; _walkToActive = true;
@@ -3832,6 +3942,15 @@ window.THREE = THREE;
                     _walkToActive = false;
                     me.path = null;
                     if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(me.tx, me.tz, me.tyaw, 'idle');
+                    // Flip the LOCAL pose to idle too, or my own robot marches in place forever.
+                    applyAvatarMove(my, me.tx, me.tz, me.tyaw, 'idle');
+                    // P4: this walk came from double-clicking a chair — sit if it's still free.
+                    if (_walkToSitIdx !== null) {
+                        var sitIdx = _walkToSitIdx; _walkToSitIdx = null;
+                        var scl = _claimedChairs[sitIdx];
+                        if (!scl || _claimIsStale(scl)) { _pendingChairIdx = sitIdx; _confirmClaim(); }
+                        else if (_pendingChairIdx === sitIdx) { _pendingChairIdx = null; _rebuildSeating(); }
+                    }
                 }
             }
         }
@@ -3842,14 +3961,6 @@ window.THREE = THREE;
     // (no first-person camera) using screen-relative axes (ortho up = world -z).
     function _updateTopSteer(dt) {
         var my = _myCid();
-        if (_myChairIdx !== null) {   // seated: must stand up before steering
-            if (_topSteerActive) {
-                _topSteerActive = false;
-                var seated = _roamers[my];
-                if (seated && window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(seated.tx, seated.tz, seated.tyaw, 'idle');
-            }
-            return;
-        }
         var kb = _keyBinds();
         var fwd = 0, strafe = 0;
         if (_keys[kb.forward]) fwd    += 1;
@@ -3861,12 +3972,20 @@ window.THREE = THREE;
             if (_topSteerActive) {
                 _topSteerActive = false;
                 var r0 = _roamers[my];
-                if (r0 && window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(r0.tx, r0.tz, r0.tyaw, 'idle');
+                if (r0) {
+                    if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(r0.tx, r0.tz, r0.tyaw, 'idle');
+                    applyAvatarMove(my, r0.tx, r0.tz, r0.tyaw, 'idle');
+                }
             }
             return;
         }
 
+        // P2 (Feature8): movement keys while seated auto-stand (Kumospace-style) — the
+        // roamer spawns beside my chair and steering continues from there this tick.
+        if (_myChairIdx !== null) _standUpFromChair();
+
         // Steering takes over from any active click-to-walk path.
+        _cancelWalkToSit();
         _walkToActive = false;
         if (!_roamers[my]) {
             var start = _myStartPos();
@@ -3875,6 +3994,7 @@ window.THREE = THREE;
         var r = _roamers[my];
         if (!r || !r.robot) return;
         r.path = null;
+        r.pose = 'walk';   // local walk animation (remote sees 'walk' via the broadcast below)
 
         var dx = strafe, dz = -fwd;   // screen-relative: right = +x, up = -z
         var len = Math.hypot(dx, dz);
@@ -3882,9 +4002,11 @@ window.THREE = THREE;
         var speed = _walkSpeed() * dt;
         dx *= speed; dz *= speed;
 
-        // Sliding collision: try full move, then each axis separately.
+        // Sliding collision: try full move, then each axis separately. Same escape rule
+        // as _updateWalk: if already overlapping an obstacle, move freely (clamp below).
         var nx = r.x + dx, nz = r.z + dz;
         if (!_routeBlockedAt(nx, nz))        { r.x = nx; r.z = nz; }
+        else if (_routeBlockedAt(r.x, r.z))  { r.x = nx; r.z = nz; }
         else if (!_routeBlockedAt(nx, r.z))  { r.x = nx; }
         else if (!_routeBlockedAt(r.x, nz))  { r.z = nz; }
         var c = _clampRoom(r.x, r.z, 0.30);
@@ -4137,6 +4259,10 @@ window.THREE = THREE;
             if (p && p.connectionId && seatedIds.hasOwnProperty(p.connectionId) && seatedIds[p.connectionId] !== i) continue;
             if (p && p.name        && seatedIds.hasOwnProperty(p.name)         && seatedIds[p.name]         !== i) continue;
             if (!p) {
+                // Stale claim (participant no longer present, e.g. kick/timeout/idle-removal
+                // that predates the server freeing chairs on removal) — render as unclaimed
+                // instead of drawing a non-interactive ghost.
+                if (_claimIsStale(claim)) continue;
                 var ghost = _makeRobot(claim.color || 0x444444, 'none', true);
                 ghost.position.set(pos.x, 0, pos.z);
                 ghost.rotation.y = angle;
@@ -4375,7 +4501,7 @@ window.THREE = THREE;
         if (av) {
             if (av.mine) {
                 if (av.seated) {
-                    if (_armDoubleClick('avatar_mine')) releaseMySeat();
+                    if (_armDoubleClick('avatar_mine')) _standUpFromChair();
                     return;
                 }
                 // own roamer/standing robot: fall through
@@ -4422,7 +4548,7 @@ window.THREE = THREE;
             if (myMesh) {
                 var myHit = _raycaster.intersectObject(myMesh, false);
                 if (myHit.length) {
-                    if (_armDoubleClick('chair_mine')) releaseMySeat();
+                    if (_armDoubleClick('chair_mine')) _standUpFromChair();
                     return;
                 }
             }
@@ -4440,8 +4566,9 @@ window.THREE = THREE;
                 if (_chairObjects[i].seatMesh === hitMesh) { chairObj = _chairObjects[i]; break; }
             }
             if (chairObj) {
-                // Double-click an empty chair → sit directly (no confirm bar).
-                if (_armDoubleClick('chair_' + chairObj.idx)) { _pendingChairIdx = chairObj.idx; _confirmClaim(); }
+                // Double-click an empty chair → walk over and sit (P4); instant when close
+                // or when click-to-walk is disabled.
+                if (_armDoubleClick('chair_' + chairObj.idx)) _sitOrWalkToChair(chairObj.idx);
                 return;
             }
         }
@@ -4529,6 +4656,12 @@ window.THREE = THREE;
 
     // A peer (or me) successfully claimed a chair.
     function applyClaim(idx, name, color, cid) {
+        // P4: someone else took the chair I'm walking to (or had pending) — stop
+        // intending to sit there; the walk just finishes as a plain stroll.
+        if (cid !== _myCid()) {
+            if (_walkToSitIdx === idx) _cancelWalkToSit();
+            if (_pendingChairIdx === idx) _pendingChairIdx = null;
+        }
         // A connection holds at most one chair. Evict any stale claim by the same CID *or*
         // the same name — this covers localStorage entries from a previous session where the
         // CID has changed, which would otherwise leave the person seated in two chairs.
@@ -4586,6 +4719,7 @@ window.THREE = THREE;
     // I lost a race for a chair.
     function claimFailed(idx, winnerName) {
         if (_pendingChairIdx === idx) _pendingChairIdx = null;
+        if (_walkToSitIdx === idx) _walkToSitIdx = null;   // P4: don't re-claim on arrival
         if (_scene) _rebuildSeating();
         var msg = '😅 ' + (winnerName || 'Someone') + ' grabbed that chair first! Pick another.';
         if (window._showToastAD) window._showToastAD(msg, 'warning');
@@ -4848,7 +4982,7 @@ window.THREE = THREE;
             var r = _roamers[cid];
             if (r.label && r.label.parentNode) r.label.parentNode.removeChild(r.label);
         });
-        _roamers = {}; _iAmRoaming = false; _walkToActive = false; _topSteerActive = false;
+        _roamers = {}; _iAmRoaming = false; _walkToActive = false; _walkToSitIdx = null; _topSteerActive = false;
         _emotes.forEach(function (e) { if (e.div && e.div.parentNode) e.div.parentNode.removeChild(e.div); });
         _emotes = [];
         _disposeInteractLabel();
@@ -5050,8 +5184,9 @@ window.THREE = THREE;
             },
             roamer: function (cid) {
                 var r = _roamers[cid || _myCid()];
-                return r ? { x: r.x, z: r.z, tx: r.tx, tz: r.tz, path: (r.path || []).length } : null;
+                return r ? { x: r.x, z: r.z, tx: r.tx, tz: r.tz, yaw: r.yaw, path: (r.path || []).length, pose: r.pose } : null;
             },
+            seat: function () { return { mine: _myChairIdx, pending: _pendingChairIdx, roaming: _iAmRoaming, walkToSit: _walkToSitIdx }; },
             probePress: function (x, y) {
                 var hit = _raycastDraggableChairAt({ clientX: x, clientY: y });
                 return { chairIdx: hit ? hit.idx : null, cam: _camera === _perspCam ? 'persp' : 'ortho', view: _view };

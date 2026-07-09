@@ -118,22 +118,29 @@ public class RoomService
     }
 
     /// <summary>Result of removing a participant from a room.</summary>
-    public record RemovalResult(bool Removed, string Name, bool WasHost, string? NewHostId);
+    public record RemovalResult(bool Removed, string Name, bool WasHost, string? NewHostId, List<int> ReleasedChairs);
 
     /// <summary>
-    /// Removes a participant from a room's state under lock and transfers host to the next
-    /// remaining participant if the one removed was the host. Pure state mutation — the caller
-    /// is responsible for connection cleanup, persistence, and broadcasting.
+    /// Removes a participant from a room's state under lock, frees any chair claim they held,
+    /// and transfers host to the next remaining participant if the one removed was the host.
+    /// Pure state mutation — the caller is responsible for connection cleanup, persistence,
+    /// and broadcasting.
     /// </summary>
     public RemovalResult RemoveParticipant(Room room, string connectionId)
     {
         string name = string.Empty;
         bool removed = false, wasHost = false;
         string? newHostId = null;
+        var releasedChairs = new List<int>();
         lock (room)
         {
             var p = room.Participants.FirstOrDefault(x => x.ConnectionId == connectionId);
             if (p != null) { name = p.Name; room.Participants.Remove(p); removed = true; }
+            foreach (var kv in room.ChairClaims.Where(kv => kv.Value.ConnectionId == connectionId).ToList())
+            {
+                room.ChairClaims.Remove(kv.Key);
+                releasedChairs.Add(kv.Key);
+            }
             if (room.HostConnectionId == connectionId)
             {
                 wasHost = true;
@@ -144,11 +151,31 @@ public class RoomService
                 }
             }
         }
-        return new RemovalResult(removed, name, wasHost, newHostId);
+        return new RemovalResult(removed, name, wasHost, newHostId, releasedChairs);
     }
 
     /// <summary>Returns the in-memory rooms (used by the idle sweep).</summary>
     public IEnumerable<Room> ActiveRooms => _rooms.Values;
+
+    /// <summary>
+    /// Drops a room from the in-memory cache (used by <see cref="RoomCleanupService"/> after it
+    /// deletes the on-disk file). Without this the in-memory entry lives forever — any later
+    /// SaveRoom on it (e.g. from a lingering connection) would mark it dirty and
+    /// FlushDirty/RoomPersistenceService would resurrect the file the cleanup just deleted.
+    /// No-ops if the room has participants (still in active use) or is dirty (unsaved changes
+    /// would be lost) — evict on the next sweep instead of racing a live room.
+    /// </summary>
+    public bool TryEvictRoom(string roomName)
+    {
+        var key = NormalizeName(roomName);
+        if (!_rooms.TryGetValue(key, out var room)) return true;
+        lock (room)
+        {
+            if (room.Participants.Count > 0) return false;
+        }
+        if (_dirty.ContainsKey(key)) return false;
+        return _rooms.TryRemove(key, out _);
+    }
 
     public void MapConnection(string connectionId, string roomName)
     {
@@ -165,8 +192,10 @@ public class RoomService
     {
         if (_connectionToRoom.TryRemove(connectionId, out var roomName))
         {
+            // B9: coalesce like every other mutation (SaveRoom marks dirty; RoomPersistenceService
+            // flushes) instead of a synchronous disk write on the hub thread.
             if (_rooms.TryGetValue(roomName, out var room))
-                _repo.SaveRoom(room);
+                SaveRoom(room);
         }
     }
 }

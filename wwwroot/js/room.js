@@ -198,6 +198,13 @@ function registerHandlers() {
         const _pinBtn = document.getElementById('pinBtn');
         if (_pinBtn) _pinBtn.classList.toggle('btn-warning', !!state.hasPin);
 
+        // C5: after a reconnect, the server's authoritative state may show I haven't voted
+        // (round was reset, or the vote never made it through before the drop) even though
+        // my local selectedVote still highlights a card. Sync before rendering so the card
+        // selection never lies about what the server actually has.
+        const _me = roomState.participants.find(p => p.connectionId === myConnectionId);
+        if (_me && !_me.hasVoted) selectedVote = null;
+
         // UI repaint is best-effort: RoomState can arrive before DOMContentLoaded, and a
         // missing element must not abort the state application below (claims, layout, …).
         try {
@@ -246,6 +253,10 @@ function registerHandlers() {
     });
 
     connection.on('ParticipantJoined', (p) => {
+        // Belt-and-suspenders dedupe: a same-name reconciliation on the server sends
+        // ParticipantLeft/ParticipantJoined in order now, but this guards against any
+        // stray duplicate (e.g. reordering during a reconnect) leaving two entries.
+        roomState.participants = roomState.participants.filter(x => x.connectionId !== p.connectionId);
         roomState.participants.push(p);
         renderParticipants();
         appendChat('System', `${p.name} joined the room`, null);
@@ -667,9 +678,11 @@ function registerHandlers() {
         _showPrivateMessageToast(senderName, message);
     });
 
-    // AD6 — Private emoji reaction received
-    connection.on('PrivateReactionReceived', (senderName, emoji) => {
-        _reactionFloatFromBadge(null, emoji, senderName);
+    // AD6 — Private emoji reaction received. senderCid lets this float above the sender's
+    // badge like a room-wide reaction, instead of floating anonymously mid-screen (the old
+    // handler only received the name, which _reactionFloatFromBadge doesn't use).
+    connection.on('PrivateReactionReceived', (senderName, emoji, senderCid) => {
+        _reactionFloatFromBadge(senderCid, emoji);
     });
 
     // Remove-user flow
@@ -1374,9 +1387,10 @@ async function hideVotes() {
 }
 
 async function resetVotes() {
-    // Only confirm if votes haven't been revealed yet AND at least one person has voted
+    // C6: always confirm — previously this was skipped once votes were revealed, so a stray
+    // bare-R keypress after a reveal wiped the round for everyone with no warning.
     const anyVoteCast = roomState.participants.some(p => p.hasVoted);
-    if (!roomState.votesRevealed && anyVoteCast) {
+    if (anyVoteCast) {
         if (!confirm('Are you sure? This will reset all votes for everyone.')) return;
     }
     try { await connection.invoke('ResetVotes'); } catch(e) { console.error(e); }
@@ -1544,11 +1558,12 @@ function toggleChat() {
 // Export CSV
 // ============================================================
 function exportCSV() {
+    const csvField = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [['Story', 'Final Estimate', 'Completed']];
     roomState.stories.forEach(s => {
-        rows.push([`"${s.title.replace(/"/g, '""')}"`, s.finalEstimate || '', s.isCompleted ? 'Yes' : 'No']);
+        rows.push([s.title, s.finalEstimate || '', s.isCompleted ? 'Yes' : 'No']);
     });
-    const csv = rows.map(r => r.join(',')).join('\n');
+    const csv = rows.map(r => r.map(csvField).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1722,7 +1737,7 @@ if (typeof startSeasonalAmbience === 'function') startSeasonalAmbience();
 // ============================================================
 function _promptSoundPreferenceOnce() {
     if (sessionStorage.getItem('es_soundAsked')) return;
-    var muted = localStorage.getItem('audio-all-off') === 'true';
+    var muted = getAllSoundsOff();
     if (muted) { sessionStorage.setItem('es_soundAsked','1'); return; }
     var anyOn = false;
     if (typeof getTimerAudioSettings === 'function') {
@@ -3110,16 +3125,20 @@ async function _respondLeave(requestId, willLeave) {
 }
 
 // We were removed (kicked / accepted leave / timed out / idle). Show why, then return to lobby.
+// C6: uses the non-blocking toast instead of alert() — a blocking dialog here can freeze the
+// tab (e.g. if it fires while another modal/prompt already has focus) and is jarring for
+// something as routine as an idle timeout.
 function _handleRemovedFromRoom(reason) {
     var msgMap = {
-        removed: 'You were removed from the room by the host.',
-        left:    'You left the room.',
-        timeout: 'You were removed from the room (no response to the "are you there?" prompt).',
-        idle:    'You were removed from the room after 2 hours of inactivity.'
+        removed:    'You were removed from the room by the host.',
+        left:       'You left the room.',
+        timeout:    'You were removed from the room (no response to the "are you there?" prompt).',
+        idle:       'You were removed from the room after 2 hours of inactivity.',
+        superseded: 'Someone else joined this room using your display name, so this session was disconnected.'
     };
     try { if (connection) connection.stop(); } catch (e) {}
-    alert(msgMap[reason] || 'You have been removed from the room.');
-    window.location.href = '/';
+    _showToastAD(msgMap[reason] || 'You have been removed from the room.', 'warning');
+    setTimeout(function () { window.location.href = '/'; }, 2500);
 }
 
 async function setLeaveTimeout(seconds) {

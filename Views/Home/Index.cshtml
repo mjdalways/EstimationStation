@@ -81,6 +81,13 @@
 <script>
     const inviteRoom = @Json.Serialize(inviteRoom ?? "");
 
+    // C3: mirrors RoomService.NormalizeName (server-side canonical room key) so a PIN saved
+    // here under the raw typed name is found by room.js, which reads it back under
+    // ROOM_CONFIG.roomName — the already-normalized name the server hands the room page.
+    function _normalizeRoomName(r) {
+        return (r || '').replace(/[^a-zA-Z0-9\-_]/g, '').toLowerCase();
+    }
+
     function createRoom() {
         const name = document.getElementById('playerName').value.trim();
         const room = document.getElementById('createRoomName').value.trim();
@@ -97,7 +104,7 @@
         if (!room) { alert('Please enter a room name.'); return; }
         // F: save PIN to sessionStorage so room.js picks it up on JoinRoom
         const pin = (document.getElementById('joinPinInput')?.value || '').trim();
-        if (pin) sessionStorage.setItem('es_roomPin_' + room, pin);
+        if (pin) sessionStorage.setItem('es_roomPin_' + _normalizeRoomName(room), pin);
         saveToLocalStorage(name, room);
         window.location.href = `/room/${encodeURIComponent(room)}?name=${encodeURIComponent(name)}`;
     }
@@ -111,19 +118,33 @@
         localStorage.setItem('es_recentRooms', JSON.stringify(rooms));
     }
 
+    // C6: rooms[] comes from localStorage — normally just names we ourselves saved, but it's
+    // still attacker-controllable (shared machine, browser extension, imported settings), so
+    // build these buttons via DOM APIs (textContent/dataset) instead of innerHTML string
+    // concatenation — no escaping scheme to get wrong.
     function loadRecentRooms() {
         const rooms = JSON.parse(localStorage.getItem('es_recentRooms') || '[]');
         if (rooms.length === 0) return;
         const section = document.getElementById('recentRoomsSection');
         const list = document.getElementById('recentRoomsList');
         section.style.display = 'block';
-        list.innerHTML = rooms.map(r => {
-            const hasCachedPin = !!sessionStorage.getItem('es_roomPin_' + r);
-            const safeR = r.replace(/'/g, "\\'");
-            return `<button class="recent-room-btn" onclick="quickJoin('${safeR}')" title="${hasCachedPin ? 'PIN cached · ' : ''}${r}">
-                🏠 ${r}${hasCachedPin ? ' <span class="badge bg-warning text-dark" style="font-size:0.6rem;">🔒</span>' : ''}
-            </button>`;
-        }).join('');
+        list.innerHTML = '';
+        rooms.forEach(r => {
+            const hasCachedPin = !!sessionStorage.getItem('es_roomPin_' + _normalizeRoomName(r));
+            const btn = document.createElement('button');
+            btn.className = 'recent-room-btn';
+            btn.title = (hasCachedPin ? 'PIN cached · ' : '') + r;
+            btn.addEventListener('click', () => quickJoin(r));
+            btn.append(document.createTextNode('🏠 ' + r));
+            if (hasCachedPin) {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-warning text-dark';
+                badge.style.fontSize = '0.6rem';
+                badge.textContent = '🔒';
+                btn.append(' ', badge);
+            }
+            list.appendChild(btn);
+        });
     }
 
     function quickJoin(room) {

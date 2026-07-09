@@ -447,7 +447,6 @@
         }
     }
 </script>
-<script src="~/js/shame.js" asp-append-version="true"></script>
 <script src="~/js/room-scene-store.js" asp-append-version="true"></script>
 <script src="~/js/room-scene.js" asp-append-version="true"></script>
 <script src="~/js/room.js" asp-append-version="true"></script>
@@ -469,7 +468,7 @@
     // Manual cache-bust constant — bump when room-scene-3d.js (or its module-graph
     // dependencies under /lib/three/) changes; asp-append-version can't run inside
     // a dynamic import() specifier.
-    window._RS3D_VERSION = 'p7-1';
+    window._RS3D_VERSION = 'p7-2';
     window._rs3dEnsure = (function () {
         var p = null;
         return function () {

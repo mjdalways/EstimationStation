@@ -48,10 +48,15 @@ public class ParticipantSweepService : BackgroundService
 
             var room = _rooms.GetRoom(req.RoomName);
             if (room == null) continue;
-            if (!room.Participants.Any(p => p.ConnectionId == req.TargetConnectionId)) continue; // already gone
 
-            bool targetIsHost = room.HostConnectionId == req.TargetConnectionId;
-            bool requesterPresent = room.Participants.Any(p => p.ConnectionId == req.RequesterConnectionId);
+            bool targetGone, targetIsHost, requesterPresent;
+            lock (room)
+            {
+                targetGone = !room.Participants.Any(p => p.ConnectionId == req.TargetConnectionId);
+                targetIsHost = room.HostConnectionId == req.TargetConnectionId;
+                requesterPresent = room.Participants.Any(p => p.ConnectionId == req.RequesterConnectionId);
+            }
+            if (targetGone) continue; // already gone
 
             if (targetIsHost)
             {

@@ -307,6 +307,9 @@
     });
 
     function syncParticipants(participants) {
+        // C6 (documented, not fixed): the scene has 16 chair/standing slots, so beyond that
+        // participants are silently dropped from the 3D/2D view with no "+N more" indicator.
+        // They're still fully present in the participant list panel and can vote normally.
         state.participants = (participants || []).slice(0, 16);
         if (_glActive && window.RS3D) { RS3D.syncParticipants(state.participants, state.roomState); return; }
         _renderCss();

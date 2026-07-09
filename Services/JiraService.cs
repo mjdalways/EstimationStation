@@ -13,7 +13,11 @@ public class JiraService(IHttpClientFactory httpClientFactory)
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-        var url = $"https://{domain}/rest/api/3/search"
+        // B9: Atlassian is deprecating GET /rest/api/3/search in favor of /search/jql (which
+        // drops total-count/startAt-offset pagination for a nextPageToken cursor). We don't
+        // paginate today (hard maxResults cap, single page) and only read the issues[] array,
+        // so this is a same-shape response for our purposes — a straight endpoint swap.
+        var url = $"https://{domain}/rest/api/3/search/jql"
                 + $"?jql={Uri.EscapeDataString(jql)}"
                 + $"&maxResults={maxResults}"
                 + "&fields=summary,description,issuetype";

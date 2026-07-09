@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using EstimationStation.Models;
 using EstimationStation.Services;
 using System.Collections.Concurrent;
+using System.Globalization;
 
 namespace EstimationStation.Hubs;
 
@@ -64,7 +65,11 @@ public class PokerHub : Hub
 
         var room = _roomService.GetOrCreateRoom(roomName);
 
-        // PIN check — skip for the very first joiner (they set the PIN after joining)
+        // PIN check — skip for the very first joiner (they set the PIN after joining).
+        // Known/accepted tradeoff (review B9): once a room empties (last participant leaves)
+        // or the server restarts, the next joiner is treated as "first" and bypasses the PIN,
+        // becoming host. Rooms are ephemeral and PIN is a casual deterrent, not an auth
+        // boundary, so this is intentional rather than enforcing the PIN unconditionally.
         if (room.Participants.Count > 0 && room.Pin != null && room.Pin != pin)
         {
             await Clients.Caller.SendAsync("Error", "PIN_REQUIRED");
@@ -149,6 +154,23 @@ public class PokerHub : Hub
         // Send full state to the joining participant
         await Clients.Caller.SendAsync("RoomState", BuildRoomState(room, Context.ConnectionId, showSetupPrompt));
 
+        // A4 — a stale connection here isn't necessarily our own old tab; it may be a
+        // different person who happens to share this display name. Tell them explicitly
+        // so their tab shows a message and navigates home instead of silently no-oping on
+        // every subsequent hub call. (If it *is* our own old tab, it's already gone and
+        // this is a no-op.)
+        foreach (var oldCid in staleConnectionIds)
+            await Clients.Client(oldCid).SendAsync("RemovedFromRoom", "superseded");
+
+        // Clean up the stale previous-session entries this join reconciled BEFORE announcing
+        // the new join (A2): tell everyone the old connection left, and re-announce its
+        // re-keyed chair claims under the new connection, so other clients never briefly
+        // hold two entries (old + new cid) for the same name.
+        foreach (var oldCid in staleConnectionIds)
+            await Clients.OthersInGroup(roomName).SendAsync("ParticipantLeft", oldCid, userName);
+        foreach (var (idx, color) in reKeyedChairs)
+            await Clients.OthersInGroup(roomName).SendAsync("ChairClaimed", idx, userName, color, Context.ConnectionId);
+
         // Notify others
         await Clients.OthersInGroup(roomName).SendAsync("ParticipantJoined", new
         {
@@ -163,14 +185,6 @@ public class PokerHub : Hub
         // AD1 — if this joiner reclaimed an absent host, keep everyone's crown in sync
         if (hostReclaimed)
             await Clients.OthersInGroup(roomName).SendAsync("HostChanged", Context.ConnectionId);
-
-        // Clean up the stale previous-session entries this join reconciled: tell everyone
-        // the old connection left, and re-announce its re-keyed chair claims under the new
-        // connection so the client's seating/avatar state lines up immediately.
-        foreach (var oldCid in staleConnectionIds)
-            await Clients.OthersInGroup(roomName).SendAsync("ParticipantLeft", oldCid, userName);
-        foreach (var (idx, color) in reKeyedChairs)
-            await Clients.OthersInGroup(roomName).SendAsync("ChairClaimed", idx, userName, color, Context.ConnectionId);
     }
 
     public async Task LeaveRoom()
@@ -322,6 +336,7 @@ public class PokerHub : Hub
             if (room.WhiteboardStrokes.Count > 4000)
                 room.WhiteboardStrokes.RemoveRange(0, room.WhiteboardStrokes.Count - 4000);
         }
+        _roomService.SaveRoom(room);
         await Clients.OthersInGroup(roomName).SendAsync("WhiteboardStroke", strokeJson);
     }
 
@@ -383,10 +398,16 @@ public class PokerHub : Hub
         // Clamp to a sane room-sized range to ignore garbage.
         if (double.IsNaN(x) || double.IsNaN(z) || double.IsNaN(yaw)) return;
         x = Math.Max(-12, Math.Min(12, x)); z = Math.Max(-12, Math.Min(12, z));
-        var p = room.Participants.FirstOrDefault(q => q.ConnectionId == Context.ConnectionId);
-        if (p == null) return;
-        p.PosX = x; p.PosZ = z; p.Yaw = yaw; p.Pose = (pose == "walk" || pose == "idle") ? pose : "idle";
-        await Clients.OthersInGroup(roomName).SendAsync("AvatarMoved", Context.ConnectionId, x, z, yaw, p.Pose);
+        yaw = ((yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        string pose2;
+        lock (room)
+        {
+            var p = room.Participants.FirstOrDefault(q => q.ConnectionId == Context.ConnectionId);
+            if (p == null) return;
+            p.PosX = x; p.PosZ = z; p.Yaw = yaw; p.Pose = (pose == "walk" || pose == "idle") ? pose : "idle";
+            pose2 = p.Pose;
+        }
+        await Clients.OthersInGroup(roomName).SendAsync("AvatarMoved", Context.ConnectionId, x, z, yaw, pose2);
     }
 
     // Stop roaming (e.g. sat down / left the room) — clear pose so the avatar returns to
@@ -397,9 +418,12 @@ public class PokerHub : Hub
         if (roomName == null) return;
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
-        var p = room.Participants.FirstOrDefault(q => q.ConnectionId == Context.ConnectionId);
-        if (p == null) return;
-        p.Pose = null; p.PosX = null; p.PosZ = null; p.Yaw = null;
+        lock (room)
+        {
+            var p = room.Participants.FirstOrDefault(q => q.ConnectionId == Context.ConnectionId);
+            if (p == null) return;
+            p.Pose = null; p.PosX = null; p.PosZ = null; p.Yaw = null;
+        }
         await Clients.OthersInGroup(roomName).SendAsync("AvatarStopped", Context.ConnectionId);
     }
 
@@ -518,6 +542,8 @@ public class PokerHub : Hub
 
     public async Task CastVote(string vote)
     {
+        if (vote != null && vote.Length > 16) return; // B7: reject crafted/oversized vote values
+
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
 
@@ -555,6 +581,7 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         Dictionary<string, string?> votes;
         object stats;
@@ -577,6 +604,7 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         lock (room)
         {
@@ -594,23 +622,29 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
-        lock (room)
-        {
-            foreach (var p in room.Participants)
-            {
-                p.Vote = null;
-                p.IsGhost = false;
-                p.Confidence = null;
-            }
-            room.VotesRevealed = false;
-            room.ShameParticipantId = null;
-            room.Vibes.Clear();
-        }
+        lock (room) { ResetRoundState(room); }
 
         _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("VotesReset");
         await Clients.Group(roomName).SendAsync("VibeUpdated", new Dictionary<string, int>());
+    }
+
+    // Shared by ResetVotes and SetCurrentStory so switching story doesn't leave stale
+    // confidence/ghost/vibes state on the server while clients (which get VotesReset either
+    // way) render as if it were fully cleared. Caller must hold lock(room).
+    private static void ResetRoundState(Room room)
+    {
+        foreach (var p in room.Participants)
+        {
+            p.Vote = null;
+            p.IsGhost = false;
+            p.Confidence = null;
+        }
+        room.VotesRevealed = false;
+        room.ShameParticipantId = null;
+        room.Vibes.Clear();
     }
 
     public async Task ToggleGhostMode(bool enabled)
@@ -638,6 +672,10 @@ public class PokerHub : Hub
         if (room == null) return;
         // Only the host may set or clear the room PIN.
         if (!string.IsNullOrEmpty(room.HostConnectionId) && room.HostConnectionId != Context.ConnectionId) return;
+        // B9: enforce server-side what the lobby UI already promises (4-8 digits) — the
+        // client's maxlength/pattern are advisory only.
+        if (!string.IsNullOrWhiteSpace(pin) && !System.Text.RegularExpressions.Regex.IsMatch(pin.Trim(), @"^\d{4,8}$"))
+            return;
         lock (room)
         {
             room.Pin = string.IsNullOrWhiteSpace(pin) ? null : pin.Trim();
@@ -771,19 +809,18 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         lock (room)
         {
             room.CurrentStoryId = storyId;
-            // Reset votes when switching story
-            foreach (var p in room.Participants)
-                p.Vote = null;
-            room.VotesRevealed = false;
+            ResetRoundState(room);
         }
 
         _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("CurrentStoryChanged", storyId);
         await Clients.Group(roomName).SendAsync("VotesReset");
+        await Clients.Group(roomName).SendAsync("VibeUpdated", new Dictionary<string, int>());
     }
 
     public async Task DeleteStory(string storyId)
@@ -793,6 +830,7 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         lock (room)
         {
@@ -875,8 +913,11 @@ public class PokerHub : Hub
         if (roomName == null) return;
         var room = _roomService.GetRoom(roomName);
         if (room == null || room.HostConnectionId != Context.ConnectionId) return;
-        if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
-        lock (room) { room.HostConnectionId = targetConnectionId; }
+        lock (room)
+        {
+            if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+            room.HostConnectionId = targetConnectionId;
+        }
         _roomService.SaveRoom(room);
         await Clients.Group(roomName).SendAsync("HostChanged", targetConnectionId);
     }
@@ -889,7 +930,8 @@ public class PokerHub : Hub
         var room = _roomService.GetRoom(roomName);
         if (room == null || room.HostConnectionId != Context.ConnectionId) return;
         if (targetConnectionId == Context.ConnectionId) return; // host can't kick themselves
-        if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+        // No unlocked existence check here — RemoveAndBroadcastAsync's RemoveParticipant call
+        // does the lookup under lock(room) and no-ops (res.Removed == false) if already gone.
         await RemoveAndBroadcastAsync(_roomService, Clients, Groups, room, roomName, targetConnectionId, "removed");
     }
 
@@ -971,6 +1013,8 @@ public class PokerHub : Hub
         roomService.SaveRoom(room);
         await clients.Client(targetConnectionId).SendAsync("RemovedFromRoom", reason);
         await clients.Group(roomName).SendAsync("ParticipantLeft", targetConnectionId, res.Name);
+        foreach (var idx in res.ReleasedChairs)
+            await clients.Group(roomName).SendAsync("ChairReleased", idx);
         if (res.NewHostId != null)
             await clients.Group(roomName).SendAsync("HostChanged", res.NewHostId);
     }
@@ -1053,7 +1097,8 @@ public class PokerHub : Hub
                 }
                 break;
             case "estimateSet":
-                var setName = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(valueJson)?["set"] ?? "fibonacci";
+                var setDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(valueJson);
+                var setName = (setDict != null && setDict.TryGetValue("set", out var sn)) ? sn : "fibonacci";
                 if (RoomService.EstimateSets.TryGetValue(setName, out var info)) {
                     lock (room) { room.EstimateSet = setName; room.CustomEstimates = null; }
                     _roomService.SaveRoom(room);
@@ -1070,14 +1115,18 @@ public class PokerHub : Hub
         if (roomName == null) return;
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
-        if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
         if (RateLimited("privateMsg", TimeSpan.FromMilliseconds(750))) return;
-        var sender = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        if (sender == null) return;
         message = (message ?? "").Trim();
         if (message.Length > 500) message = message[..500];
         if (string.IsNullOrEmpty(message)) return;
-        await Clients.Client(targetConnectionId).SendAsync("PrivateMessageReceived", sender.Name, message, DateTime.UtcNow);
+        string? senderName;
+        lock (room)
+        {
+            if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+            senderName = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name;
+        }
+        if (senderName == null) return;
+        await Clients.Client(targetConnectionId).SendAsync("PrivateMessageReceived", senderName, message, DateTime.UtcNow);
     }
 
     // AD6 — Private emoji reaction to a single participant
@@ -1088,10 +1137,18 @@ public class PokerHub : Hub
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
         var room = _roomService.GetRoom(roomName);
-        if (room == null || !room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
-        var sender = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        if (sender == null) return;
-        await Clients.Client(targetConnectionId).SendAsync("PrivateReactionReceived", sender.Name, emoji);
+        if (room == null) return;
+        string? senderName;
+        lock (room)
+        {
+            if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+            senderName = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name;
+        }
+        if (senderName == null) return;
+        // C4: pass the sender's connectionId too so the recipient can attribute the reaction
+        // (the client previously only received the name, which the float-animation helper
+        // ignored, making private reactions appear anonymous).
+        await Clients.Client(targetConnectionId).SendAsync("PrivateReactionReceived", senderName, emoji, Context.ConnectionId);
     }
 
     // AD7 — Private sound to a single participant
@@ -1100,17 +1157,25 @@ public class PokerHub : Hub
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
         var room = _roomService.GetRoom(roomName);
-        if (room == null || !room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
-        var sender = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        if (sender == null) return;
+        if (room == null) return;
         var validSounds = new[] { "fanfare", "drumroll", "bell", "airhorn" };
         if (!validSounds.Contains(soundId)) return;
         if (RateLimited("sound", TimeSpan.FromSeconds(1))) return;
-        await Clients.Client(targetConnectionId).SendAsync("SoundTriggered", soundId, sender.Name);
+        string? senderName;
+        lock (room)
+        {
+            if (!room.Participants.Any(p => p.ConnectionId == targetConnectionId)) return;
+            senderName = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name;
+        }
+        if (senderName == null) return;
+        await Clients.Client(targetConnectionId).SendAsync("SoundTriggered", soundId, senderName);
     }
 
     public async Task SetEstimateSet(string setName, string? customValues)
     {
+        // B7: cap custom estimate set size (every other mutator caps its input).
+        if (customValues != null && customValues.Length > 500) return;
+
         var roomName = _roomService.GetRoomForConnection(Context.ConnectionId);
         if (roomName == null) return;
 
@@ -1125,7 +1190,7 @@ public class PokerHub : Hub
             room.CustomEstimates = customValues;
             if (setName == "custom" && !string.IsNullOrEmpty(customValues))
             {
-                values = customValues.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).ToArray();
+                values = customValues.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).Take(50).ToArray();
             }
             else if (RoomService.EstimateSets.TryGetValue(setName, out var info))
             {
@@ -1141,6 +1206,9 @@ public class PokerHub : Hub
         await Clients.Group(roomName).SendAsync("EstimateSetChanged", setName, values);
     }
 
+    // By design (review B9): chat is relayed live and never persisted to Room, so late
+    // joiners/reloads see no history. Keeps room state small and avoids storing arbitrary
+    // free text long-term.
     public async Task SendChat(string message)
     {
         if (string.IsNullOrWhiteSpace(message)) return;
@@ -1171,6 +1239,7 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         string startedBy;
         lock (room)
@@ -1197,6 +1266,7 @@ public class PokerHub : Hub
 
         var room = _roomService.GetRoom(roomName);
         if (room == null) return;
+        if (!CanChangeRoomSetting(room, Context.ConnectionId)) return;
 
         lock (room)
         {
@@ -1353,7 +1423,9 @@ public class PokerHub : Hub
         if (RateLimited("customSound", TimeSpan.FromSeconds(3))) return;
 
         var room = _roomService.GetRoom(roomName);
-        var senderName = room?.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name ?? "Someone";
+        string senderName = "Someone";
+        if (room != null)
+            lock (room) { senderName = room.Participants.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId)?.Name ?? "Someone"; }
         var safeLabel = string.IsNullOrWhiteSpace(label) ? "Custom" : label[..Math.Min(label.Length, 30)];
 
         await Clients.Group(roomName).SendAsync("CustomSoundTriggered", base64Data, senderName, safeLabel);
@@ -1419,8 +1491,8 @@ public class PokerHub : Hub
     private static string? FindShameParticipantId(Room room)
     {
         var numericVoters = room.Participants
-            .Where(p => !p.IsObserver && p.Vote != null && double.TryParse(p.Vote!.Replace("½", "0.5"), out _))
-            .Select(p => (participant: p, val: double.Parse(p.Vote!.Replace("½", "0.5"))))
+            .Where(p => !p.IsObserver && p.Vote != null && double.TryParse(p.Vote!.Replace("½", "0.5"), NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            .Select(p => (participant: p, val: double.Parse(p.Vote!.Replace("½", "0.5"), NumberStyles.Float, CultureInfo.InvariantCulture)))
             .ToList();
 
         if (numericVoters.Count < 3) return null;
@@ -1433,7 +1505,7 @@ public class PokerHub : Hub
         var topGroup = groups[0];
         if (topGroup.Count() * 2 < numericVoters.Count) return null;
 
-        var majorityNum = double.Parse(topGroup.Key.Replace("½", "0.5"));
+        var majorityNum = double.Parse(topGroup.Key.Replace("½", "0.5"), NumberStyles.Float, CultureInfo.InvariantCulture);
         var outliers = numericVoters
             .Where(x => x.participant.Vote != topGroup.Key)
             .OrderByDescending(x => Math.Abs(x.val - majorityNum))
@@ -1447,88 +1519,95 @@ public class PokerHub : Hub
 
     private static object BuildRoomState(Room room, string requestingConnectionId, bool showSetupPrompt = false)
     {
-        string[] estimateValues;
-        if (room.EstimateSet == "custom" && !string.IsNullOrEmpty(room.CustomEstimates))
+        // Build entirely under the room lock and materialize every collection (.ToList()/
+        // .ToArray()) before returning — SignalR serializes the returned object after this
+        // method returns, so any deferred LINQ over room.Participants/Stories/ChairClaims
+        // left un-materialized could enumerate concurrently with a join/leave mutating them.
+        lock (room)
         {
-            estimateValues = room.CustomEstimates.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).ToArray();
-        }
-        else if (RoomService.EstimateSets.TryGetValue(room.EstimateSet, out var info))
-        {
-            estimateValues = info.Values;
-        }
-        else
-        {
-            estimateValues = RoomService.EstimateSets["fibonacci"].Values;
-        }
+            string[] estimateValues;
+            if (room.EstimateSet == "custom" && !string.IsNullOrEmpty(room.CustomEstimates))
+            {
+                estimateValues = room.CustomEstimates.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).ToArray();
+            }
+            else if (RoomService.EstimateSets.TryGetValue(room.EstimateSet, out var info))
+            {
+                estimateValues = info.Values;
+            }
+            else
+            {
+                estimateValues = RoomService.EstimateSets["fibonacci"].Values;
+            }
 
-        return new
-        {
-            name = room.Name,
-            // True only on the very first join of a freshly created room — gates the
-            // one-shot "you're the host" settings-lock prompt client-side.
-            showSetupPrompt,
-            autoReveal = room.AutoReveal,
-            votesRevealed = room.VotesRevealed,
-            ghostModeEnabled = room.GhostModeEnabled,
-            revealMajorityFirst = room.RevealMajorityFirst,
-            hasPin = room.Pin != null,
-            currentStoryId = room.CurrentStoryId,
-            estimateSet = room.EstimateSet,
-            estimateValues,
-            customEstimates = room.CustomEstimates,
-            // AD1 — host info
-            isHost = room.HostConnectionId == requestingConnectionId,
-            hostConnectionId = room.HostConnectionId,
-            settingsLockMode = room.SettingsLockMode,
-            leaveRequestTimeoutSeconds = room.LeaveRequestTimeoutSeconds,
-            participants = room.Participants.Select(p => new
+            return new
             {
-                connectionId = p.ConnectionId,
-                name = p.Name,
-                isObserver = p.IsObserver,
-                isGhost = p.IsGhost,
-                counterUsed = p.CounterUsed,
-                hasVoted = p.Vote != null,
-                vote = room.VotesRevealed ? p.Vote : null,
-                avatarData = p.AvatarData,
-                confidence = room.VotesRevealed ? p.Confidence : null,
-                posX = p.PosX, posZ = p.PosZ, yaw = p.Yaw, pose = p.Pose
-            }),
-            stories = room.Stories.Select(s => new
-            {
-                id = s.Id,
-                title = s.Title,
-                isCompleted = s.IsCompleted,
-                finalEstimate = s.FinalEstimate,
-                createdAt = s.CreatedAt,
-                jiraKey = s.JiraKey,
-                jiraUrl = s.JiraUrl,
-                description = s.Description,
-                notes = s.Notes,
-                issueType = s.IssueType
-            }),
-            // Room Scene seating so a joiner immediately sees who sits where.
-            chairClaims = room.ChairClaims.Select(kv => new
-            {
-                idx = kv.Key,
-                name = kv.Value.Name,
-                color = kv.Value.Color,
-                connectionId = kv.Value.ConnectionId
-            }),
-            roomLayout = room.RoomLayoutJson,
-            whiteboardStrokes = room.WhiteboardStrokes,
-            roomIcon = room.RoomIcon,
-            chairPositions = room.ChairPositionsJson,
-            decorPositions = room.DecorPositionsJson,
-            sceneConfig = room.SceneConfigJson
-        };
+                name = room.Name,
+                // True only on the very first join of a freshly created room — gates the
+                // one-shot "you're the host" settings-lock prompt client-side.
+                showSetupPrompt,
+                autoReveal = room.AutoReveal,
+                votesRevealed = room.VotesRevealed,
+                ghostModeEnabled = room.GhostModeEnabled,
+                revealMajorityFirst = room.RevealMajorityFirst,
+                hasPin = room.Pin != null,
+                currentStoryId = room.CurrentStoryId,
+                estimateSet = room.EstimateSet,
+                estimateValues,
+                customEstimates = room.CustomEstimates,
+                // AD1 — host info
+                isHost = room.HostConnectionId == requestingConnectionId,
+                hostConnectionId = room.HostConnectionId,
+                settingsLockMode = room.SettingsLockMode,
+                leaveRequestTimeoutSeconds = room.LeaveRequestTimeoutSeconds,
+                participants = room.Participants.Select(p => new
+                {
+                    connectionId = p.ConnectionId,
+                    name = p.Name,
+                    isObserver = p.IsObserver,
+                    isGhost = p.IsGhost,
+                    counterUsed = p.CounterUsed,
+                    hasVoted = p.Vote != null,
+                    vote = room.VotesRevealed ? p.Vote : null,
+                    avatarData = p.AvatarData,
+                    confidence = room.VotesRevealed ? p.Confidence : null,
+                    posX = p.PosX, posZ = p.PosZ, yaw = p.Yaw, pose = p.Pose
+                }).ToList(),
+                stories = room.Stories.Select(s => new
+                {
+                    id = s.Id,
+                    title = s.Title,
+                    isCompleted = s.IsCompleted,
+                    finalEstimate = s.FinalEstimate,
+                    createdAt = s.CreatedAt,
+                    jiraKey = s.JiraKey,
+                    jiraUrl = s.JiraUrl,
+                    description = s.Description,
+                    notes = s.Notes,
+                    issueType = s.IssueType
+                }).ToList(),
+                // Room Scene seating so a joiner immediately sees who sits where.
+                chairClaims = room.ChairClaims.Select(kv => new
+                {
+                    idx = kv.Key,
+                    name = kv.Value.Name,
+                    color = kv.Value.Color,
+                    connectionId = kv.Value.ConnectionId
+                }).ToList(),
+                roomLayout = room.RoomLayoutJson,
+                whiteboardStrokes = room.WhiteboardStrokes.ToList(),
+                roomIcon = room.RoomIcon,
+                chairPositions = room.ChairPositionsJson,
+                decorPositions = room.DecorPositionsJson,
+                sceneConfig = room.SceneConfigJson
+            };
+        }
     }
 
     private static object CalculateStats(Room room)
     {
         var numericVoters = room.Participants
-            .Where(p => !p.IsObserver && p.Vote != null && double.TryParse(p.Vote!.Replace("½", "0.5"), out _))
-            .Select(p => (participant: p, val: double.Parse(p.Vote!.Replace("½", "0.5"))))
+            .Where(p => !p.IsObserver && p.Vote != null && double.TryParse(p.Vote!.Replace("½", "0.5"), NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            .Select(p => (participant: p, val: double.Parse(p.Vote!.Replace("½", "0.5"), NumberStyles.Float, CultureInfo.InvariantCulture)))
             .ToList();
 
         if (numericVoters.Count == 0)
@@ -1555,7 +1634,7 @@ public class PokerHub : Hub
             if (topGroup.Count() * 2 >= numericVoters.Count)
             {
                 majorityValue = topGroup.Key;
-                var majorityNum = double.Parse(majorityValue.Replace("½", "0.5"));
+                var majorityNum = double.Parse(majorityValue.Replace("½", "0.5"), NumberStyles.Float, CultureInfo.InvariantCulture);
 
                 var outliers = numericVoters
                     .Where(x => x.participant.Vote != majorityValue)
