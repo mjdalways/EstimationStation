@@ -89,11 +89,18 @@ window.THREE = THREE;
     var _view    = 'persp'; // 'persp' (3D) | 'top' (2D top-down) — both view the same scene
     var _walk    = null;    // null = orbit mode; else { yaw, pitch, vy, grounded, crouch, held }
     var _keys    = {};      // event.code -> bool (currently-held movement keys)
+    var _preWalkCam = null; // P5 (Feature9): orbit camera pos/target saved on walk entry, restored on exit
     var _toolbar = null;       // P15: vertical icon toolbar (top-right) housing the buttons below
     var _walkBtn = null;       // the on-canvas Orbit/Walk toggle button
     var _clickWalkBtn = null;  // the on-canvas click-to-walk enable/disable toggle
     var _furnHudBtn = null;    // the on-canvas "+" furniture quick-add HUD button
     var _furnHud = null;       // the furniture quick-add panel (shown on button click)
+    // P10 (Feature9): layout editing (drag/select/rotate chairs, furniture, decor, table)
+    // is gated behind this explicit mode — off by default so plain clicks/drags never
+    // rearrange the room. See _setEditMode.
+    var _editMode = false;
+    var _editBtn = null;       // the ✏️ Edit-layout toggle button
+    var _editChip = null;      // the "Editing layout" HUD chip shown while ON
     var EYE_STAND = 1.60, EYE_CROUCH = 1.02, WALK_SPEED = 2.7, CROUCH_SPEED = 1.25;
     // Personal walk-feel overrides (P14) — fall back to the constants above when unset.
     function _walkSpeed()   { return (_cfg && _cfg.walkSpeed) || WALK_SPEED; }
@@ -103,7 +110,7 @@ window.THREE = THREE;
 
     function _defaultKeyBinds() {
         return { forward:'ArrowUp', back:'ArrowDown', left:'ArrowLeft', right:'ArrowRight',
-                 jump:'AltLeft', crouch:'ControlLeft', interact:'KeyE', walk:'KeyT' };
+                 jump:'AltLeft', crouch:'ControlLeft', interact:'KeyE', walk:'KeyT', camToggle:'KeyV' };
     }
     // Merge configured bindings over defaults.
     function _keyBinds() {
@@ -149,7 +156,7 @@ window.THREE = THREE;
     function setView(view) {
         var v = (view === '2d' || view === 'top') ? 'top' : 'persp';
         if (v === _view && _camera) return;
-        if (_walk) _exitWalk();                 // first-person only makes sense in 3D
+        if (_walk) _exitWalk('toggle');          // first-person only makes sense in 3D
         _view = v;
         _camera = (v === 'top') ? _orthoCam : _perspCam;
         var W = (_container && _container.clientWidth)  || 400;
@@ -157,6 +164,7 @@ window.THREE = THREE;
         if (v === 'top') _setOrthoFrustum(W, H);
         else { _perspCam.aspect = W / H; _perspCam.updateProjectionMatrix(); }
         _applyControls();
+        _rescaleAllRobots();   // P6: robots built under the other view need the new view's scale
         // Distance-based fog washes out an overhead view — disable it in top-down.
         if (_scene) _scene.fog = (v === 'top') ? null : new THREE.FogExp2(_fogColor(), 0.042);
         // First-person walk + fly-to are 3D-only; hide just the walk button + its key-bind
@@ -168,6 +176,19 @@ window.THREE = THREE;
         var hint = document.getElementById('rs3d-walk-hint'); if (hint) hint.style.display = topHide;
         if (_miniCanvas) _miniCanvas.style.display = topHide;
         _flyTarget = null;
+        // P6 (Feature9) regression guard: top-down previously showed name chips over
+        // empty floor with no robot bodies. Assert (dev-only signal, no user impact) that
+        // at least one robot is actually visible in-scene whenever participants exist.
+        if (v === 'top' && _participants.length) {
+            setTimeout(function () {
+                if (_view !== 'top') return;
+                var anyVisible = Object.keys(_robotMap).some(function (k) {
+                    var r = _robotMap[k];
+                    return r.robot && r.robot.visible && r.robot.parent === _scene;
+                });
+                console.assert(anyVisible, '[RS3D] P6 regression: no robot mesh visible in top-down view with participants present');
+            }, 50);
+        }
     }
 
     // Chair claiming
@@ -566,10 +587,33 @@ window.THREE = THREE;
     // Renders the 🎨 custom window media (uploaded image or looping video) filling the
     // window opening. `mime` comes from the server media entry when available; falls back
     // to sniffing `src` (data URL or file extension) for legacy windowImage data URLs.
+    // P8 (Feature9): the static-image branch, factored out so the video branch can fall
+    // back to it when the browser can't play the configured media.
+    function _buildStaticWindowImage(src, OW, OH, cy, zb) {
+        var tex = new THREE.TextureLoader().load(src, function () {
+            if (_renderer) _renderer.render(_scene, _camera);   // repaint once decoded
+        });
+        tex.colorSpace = THREE.SRGBColorSpace;
+        var img = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
+            new THREE.MeshBasicMaterial({ map: tex }));
+        img.position.set(0, cy, zb); _scene.add(img);
+    }
+
     function _buildCustomWindowMedia(src, mime, OW, OH, cy, zb) {
         var _isVideo = mime ? /^video\/(mp4|webm)$/.test(mime)
             : (/^data:video\/(mp4|webm)/.test(src) || /\.(mp4|webm)(\?|$)/i.test(src));
         if (_isVideo) {
+            // P8 (Feature9): probe playability before building a real <video> element — a
+            // stale/removed/unsupported media entry used to construct+play unconditionally
+            // and fire a hard error on every passive page load. Warn once and fall back to
+            // the static-image rendering instead.
+            var _probeMime = mime || (/\.webm(\?|$)/i.test(src) ? 'video/webm' : 'video/mp4');
+            var _probe = document.createElement('video');
+            if (_probe.canPlayType && _probe.canPlayType(_probeMime) === '') {
+                console.warn('[RS3D] window media not playable (' + _probeMime + '), falling back to static image:', src);
+                _buildStaticWindowImage(src, OW, OH, cy, zb);
+                return;
+            }
             // 1. Setup the Video Element
             const video = document.createElement('video');
             video.src = src;
@@ -624,19 +668,21 @@ window.THREE = THREE;
             });
 
             video.addEventListener('error', function (err) {
-                console.error("Error loading video:", video.error);
-                if (window._showToastAD) window._showToastAD("This browser can't play this video format.", 'warning');
-                else alert("This browser can't play this video format.");
+                // P8 (Feature9): downgrade to warn (include src) — this can fire on a
+                // passive page load (e.g. the media file was later removed), not just an
+                // active user pick, so a hard console.error + toast on every reload was
+                // overkill. Only toast when the user just configured this media in this
+                // session — see the _rsJustConfiguredWindowMedia flag set by the upload/
+                // select flow in _Layout.cshtml.
+                console.warn('[RS3D] Error loading window video:', src, video.error);
+                if (window._rsJustConfiguredWindowMedia) {
+                    if (window._showToastAD) window._showToastAD("This browser can't play this video format.", 'warning');
+                    else alert("This browser can't play this video format.");
+                }
             });
         } else {
             // 🎨 Static custom image fills the opening.
-            var tex = new THREE.TextureLoader().load(src, function () {
-                if (_renderer) _renderer.render(_scene, _camera);   // repaint once decoded
-            });
-            tex.colorSpace = THREE.SRGBColorSpace;
-            var img = new THREE.Mesh(new THREE.PlaneGeometry(OW, OH),
-                new THREE.MeshBasicMaterial({ map: tex }));
-            img.position.set(0, cy, zb); _scene.add(img);
+            _buildStaticWindowImage(src, OW, OH, cy, zb);
         }
     }
 
@@ -1461,7 +1507,10 @@ window.THREE = THREE;
         if (!hits.length) return null;
         var o = hits[0].object;
         while (o) {
-            for (var i = 0; i < list.length; i++) if (list[i].group === o) return list[i];
+            for (var i = 0; i < list.length; i++) if (list[i].group === o) {
+                list[i].dist = hits[0].distance;
+                return list[i];
+            }
             o = o.parent;
         }
         return null;
@@ -1589,14 +1638,15 @@ window.THREE = THREE;
             }
         }
 
-        // Furniture (existing affordance, now with tooltip)
-        var f = key ? null : _raycastFurnitureAt(event);
+        // Furniture (P10: edit-mode only — pure scenery otherwise)
+        var f = (key || !_editMode) ? null : _raycastFurnitureAt(event);
         if (f) {
             key = 'furn_' + f.id; root = f.group; cursor = 'move';
             tip = 'Drag to move • Click for options'; pos = { x: f.group.position.x, y: 1.05, z: f.group.position.z };
         }
 
-        // Chairs (empty → sit; own → stand; other's → host can free)
+        // Chairs (empty → sit; own → stand; other's → host can free). P10: the drag
+        // affordance only applies in Edit-layout mode; outside it a chair is sit/stand only.
         if (!key && _chairObjects.length) {
             var seatMeshes = _chairObjects.map(function (c) { return c.seatMesh; });
             var ch = _raycaster.intersectObjects(seatMeshes, false);
@@ -1606,33 +1656,40 @@ window.THREE = THREE;
                     if (_chairObjects[i].seatMesh === ch[0].object) { cObj = _chairObjects[i]; break; }
                 }
                 if (cObj) {
-                    var claim = _claimedChairs[cObj.idx];
-                    if (!claim || _claimIsStale(claim))        tip = '🪑 Double-click to sit • Drag to move';
-                    else if (claim.cid === _myCid())           tip = 'Double-click to stand up';
-                    else if (_isHost())                        tip = '👑 Double-click to free this seat';
+                    if (_editMode) {
+                        tip = 'Drag to move • Click for options';
+                    } else {
+                        var claim = _claimedChairs[cObj.idx];
+                        if (!claim || _claimIsStale(claim))        tip = '🪑 Double-click to sit';
+                        else if (claim.cid === _myCid())           tip = 'Double-click to stand up';
+                        else if (_isHost())                        tip = '👑 Double-click to free this seat';
+                    }
                     if (tip) {
-                        key = 'chair_' + cObj.idx; root = cObj.group; cursor = 'pointer';
+                        key = 'chair_' + cObj.idx; root = cObj.group; cursor = _editMode ? 'move' : 'pointer';
                         pos = { x: cObj.group.position.x, y: 1.15, z: cObj.group.position.z };
                     }
                 }
             }
         }
 
-        // Whiteboard
+        // Whiteboard. P10: double-click-to-open still works outside edit mode; the drag
+        // affordance only applies inside it (and double-click is paused there instead).
         if (!key && _wbBoard && _raycaster.intersectObject(_wbBoard, false).length) {
-            key = 'wb'; root = _wbBoard; cursor = 'pointer';
+            key = 'wb'; root = _wbBoard; cursor = _editMode ? 'move' : 'pointer';
             var wp = new THREE.Vector3(); _wbBoard.getWorldPosition(wp);
-            tip = '📋 Double-click to open • Drag to move'; pos = { x: wp.x, y: wp.y + 0.75, z: wp.z };
+            tip = _editMode ? 'Drag to move • Click for options' : '📋 Double-click to open';
+            pos = { x: wp.x, y: wp.y + 0.75, z: wp.z };
         }
 
-        // Project screen (drag along the walls; double-click opens the Stories panel)
+        // Project screen — same OFF/ON split as the whiteboard above.
         if (!key && _screenMesh && _raycaster.intersectObject(_screenMesh, false).length) {
-            key = 'screen'; root = _screenGroup; cursor = 'pointer';
+            key = 'screen'; root = _screenGroup; cursor = _editMode ? 'move' : 'pointer';
             var scp = new THREE.Vector3(); _screenMesh.getWorldPosition(scp);
-            tip = '🖥️ Double-click to open Stories • Drag to move'; pos = { x: scp.x, y: scp.y + 0.6, z: scp.z };
+            tip = _editMode ? 'Drag to move • Click for options' : '🖥️ Double-click to open Stories';
+            pos = { x: scp.x, y: scp.y + 0.6, z: scp.z };
         }
 
-        // Interactive props (confetti / jukebox)
+        // Interactive props (confetti / jukebox) — same OFF/ON split.
         if (!key) {
             var pm = _propMeshes();
             if (pm.length) {
@@ -1640,16 +1697,17 @@ window.THREE = THREE;
                 if (ph.length) {
                     var pr = _propForMesh(ph[0].object);
                     if (pr) {
-                        key = 'prop_' + pr.action; root = pr.mesh; cursor = 'pointer';
+                        key = 'prop_' + pr.action; root = pr.mesh; cursor = _editMode ? 'move' : 'pointer';
                         var pp = new THREE.Vector3(); pr.mesh.getWorldPosition(pp);
-                        tip = '✨ Double-click to use • Drag to move'; pos = { x: pp.x, y: pp.y + 0.55, z: pp.z };
+                        tip = _editMode ? 'Drag to move • Click for options' : '✨ Double-click to use';
+                        pos = { x: pp.x, y: pp.y + 0.55, z: pp.z };
                     }
                 }
             }
         }
 
-        // Main table (drag to move — chairs re-ring around it)
-        if (!key && _tableGroup && _raycaster.intersectObject(_tableGroup, true).length) {
+        // Main table (P10: edit-mode only — drag-to-move has no meaning outside it)
+        if (!key && _editMode && _tableGroup && _raycaster.intersectObject(_tableGroup, true).length) {
             key = 'table'; root = _tableGroup; cursor = 'move';
             var tp = _tableGroup.position;
             tip = '🪑 Drag to move'; pos = { x: tp.x, y: TBL_TOP + 0.15, z: tp.z };
@@ -1862,6 +1920,10 @@ window.THREE = THREE;
     // space deselects. Shift+drag ALWAYS orbits (escape hatch when an item blocks the view).
     function _onPointerDown(event) {
         if (_walk) return;                          // walk mode: drag = look, handled elsewhere
+        // P10 (Feature9): outside Edit-layout mode, nothing here is selectable/draggable —
+        // don't consume the press at all, so OrbitControls (attached to the same canvas)
+        // handles it as a plain orbit. Chair claims live in _onCanvasClick, unaffected.
+        if (!_editMode) { if (_sel) _deselectAll(); return; }
         if (event.button !== undefined && event.button !== 0) return;
         if (event.shiftKey) return;                 // Shift → let OrbitControls orbit
         // Only treat presses on the WebGL canvas as scene interactions. Presses on DOM
@@ -2002,8 +2064,9 @@ window.THREE = THREE;
                 _saveChairPositions(true);
                 _rebuildSeating();
             } else {
-                // P8: a no-move press selects the chair (rotate bar); the double-click
-                // arbiter (in _onCanvasClick) still claims/releases it normally.
+                // P10: this branch is only reachable in Edit-layout mode (chair drag never
+                // starts otherwise), so a no-move press can select immediately — no double-
+                // click-to-sit competes with it here anymore.
                 _selectItem('chair', cd.idx);
             }
             return;
@@ -2051,19 +2114,20 @@ window.THREE = THREE;
         if (_walk) {
             // In walk mode: block ALL other page handlers (prevents Space→reveal, Ctrl shortcuts, etc.)
             if (_isMoveCode(code, kb) || code === kb.jump || code === kb.crouch ||
-                code === kb.interact || code === 'Escape') {
+                code === kb.interact || code === kb.camToggle || code === 'Escape') {
                 event.preventDefault(); event.stopImmediatePropagation();
             }
             if (_isMoveCode(code, kb)) { _keys[code] = true; return; }
             if (code === kb.jump)    { if (_walk.grounded) { _walk.vy = 7.5; _walk.grounded = false; } return; }
             if (code === kb.crouch)  { _walk.crouch = true; return; }
             if (code === kb.interact){ _walkInteract(); return; }
+            if (code === kb.camToggle){ _toggleWalkCamera(); return; }
             if (code === 'Escape')   {
                 // First Esc while pointer-locked: let the browser release the lock and
                 // fall back to drag-look, but stay in walk mode. Second Esc (already
                 // unlocked) exits walk as before.
                 if (_renderer && document.pointerLockElement === _renderer.domElement) return;
-                _toggleWalk(); return;
+                _toggleWalk('esc'); return;
             }
             // Any other key in walk mode: prevent bubbling to page shortcuts
             event.stopImmediatePropagation();
@@ -2090,10 +2154,25 @@ window.THREE = THREE;
 
         // Orbit-mode selection shortcuts — apply to whatever is selected (P8: furniture,
         // chairs, props, or the table; Delete only applies to furniture).
+        // P10 (Feature9): Escape ladder — deselect first if something's selected, else
+        // (with nothing selected) drop out of Edit-layout mode.
+        if (event.key === 'Escape') {
+            if (_sel) _deselectAll();
+            else if (_editMode) _setEditMode(false);
+            return;
+        }
         if (!_sel) return;
-        if (event.key === 'Escape') { _deselectAll(); }
-        else if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); _deleteSelected(); }
+        if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); _deleteSelected(); }
         else if (event.code === 'KeyR') { event.preventDefault(); _rotateSelected(event.shiftKey ? -1 : 1); }
+    }
+
+    // P7 (Feature9): redundant bubble-phase Escape handler — see registration comment.
+    function _onKeyDownEscFallback(event) {
+        if (event.key !== 'Escape' || !_sel) return;
+        if (document.body.classList.contains('modal-open')) return;   // a real modal owns Escape
+        var t = event.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        _deselectAll();
     }
 
     function _onKeyUp(event) {
@@ -2133,7 +2212,7 @@ window.THREE = THREE;
         b.className = 'rs3d-tool-btn';
         b.title = 'Walk around in first/third person (' + _keyHint(kb.walk) + ')';
         b.textContent = '🚶';
-        b.onclick = _toggleWalk;
+        b.onclick = function () { _toggleWalk('toggle'); };
         if (_view === 'top') b.style.display = 'none';   // first-person walk is 3D-only (P6)
         toolbar.appendChild(b);
         _walkBtn = b;
@@ -2162,14 +2241,29 @@ window.THREE = THREE;
         fhb.onclick = function(e) { e.stopPropagation(); _toggleFurnHud(); };
         toolbar.appendChild(fhb);
         _furnHudBtn = fhb;
+        fhb.style.display = 'none';   // P10: quick-add is edit-mode-only (see _updateEditModeUi)
+
+        // P10 (Feature9): Edit-layout toggle — viewing/sitting is the default; editing the
+        // room's furniture/chairs is an explicit opt-in, same as Walk already is.
+        var eb = document.createElement('button');
+        eb.id = 'rs3d-edit-btn'; eb.type = 'button';
+        eb.className = 'rs3d-tool-btn';
+        eb.title = 'Edit room layout — move chairs & furniture';
+        eb.textContent = '✏️';
+        eb.onclick = function () { _setEditMode(!_editMode); };
+        toolbar.appendChild(eb);
+        _editBtn = eb;
 
         _container.appendChild(toolbar);
         _toolbar = toolbar;
 
         // Small hint label under the toolbar so users know T enters walk mode.
+        // P10 (Feature9): anchored below the toolbar — 4 buttons now (walk, click-walk,
+        // furniture-add, edit-layout) at 32px + 4px gap each, from an 8px top offset:
+        // 4*32 + 3*4 + 8 = 148px, so this starts just past that.
         var hint = document.createElement('div');
         hint.id = 'rs3d-walk-hint';
-        hint.style.cssText = 'position:absolute;top:116px;right:8px;z-index:12;font-size:0.60rem;' +
+        hint.style.cssText = 'position:absolute;top:156px;right:8px;z-index:12;font-size:0.60rem;' +
             'color:rgba(200,210,240,0.7);text-align:right;pointer-events:none;white-space:nowrap;';
         hint.textContent = 'Press ' + _keyHint(kb.walk) + ' to walk';
         if (_view === 'top') hint.style.display = 'none';
@@ -2178,7 +2272,7 @@ window.THREE = THREE;
         // Furniture quick-add panel (hidden by default), anchored under the toolbar.
         var fhud = document.createElement('div');
         fhud.id = 'rs3d-furn-hud';
-        fhud.style.cssText = 'position:absolute;top:116px;right:8px;z-index:13;display:none;' +
+        fhud.style.cssText = 'position:absolute;top:156px;right:8px;z-index:13;display:none;' +
             'background:rgba(20,24,40,0.94);color:#e8eaf6;border:1px solid rgba(120,140,210,0.4);' +
             'border-radius:8px;padding:6px 8px;backdrop-filter:blur(6px);';
         var FURN_ITEMS = [
@@ -2258,11 +2352,13 @@ window.THREE = THREE;
         var kb = _keyBinds();
         var thirdPerson = (_cfg && _cfg.walkCameraMode === 'third');
         var locked = !thirdPerson && _renderer && document.pointerLockElement === _renderer.domElement;
-        var lookHint = locked ? 'move mouse to look · Esc unlocks, Esc again exits' : 'drag to look · Esc exit';
+        // P7 (Feature9): the hint now says what actually happens — clicking outside the
+        // canvas (a vote card, chat, etc.) also exits walk mode, not just Esc.
+        var lookHint = locked ? 'move mouse to look · Esc unlocks, Esc again exits · click outside to exit' : 'drag to look · Esc exit · click outside to exit';
         var text = _keyHint(kb.forward) + _keyHint(kb.left) + _keyHint(kb.back) + _keyHint(kb.right) +
             ' move · ' + _keyHint(kb.jump) + ' jump · ' + _keyHint(kb.crouch) + ' crouch · ' +
             _keyHint(kb.interact) + ' interact · ' + lookHint +
-            (thirdPerson ? ' · 3rd person' : ' · 1st person');
+            ' · ' + _keyHint(kb.camToggle) + ' ' + (thirdPerson ? '3rd person' : '1st person');
         var hud = document.getElementById('rs3d-walk-hud');
         if (hud) { hud.textContent = text; return; }
         hud = document.createElement('div');
@@ -2310,7 +2406,7 @@ window.THREE = THREE;
         if (pr(2) && !_padPrev[2]) _walkInteract();                                               // X → interact
         var exitNow = pr(9) && !_padPrev[9];                                                      // Start → exit walk
         _padPrev = { 0: pr(0), 1: pr(1), 2: pr(2), 9: pr(9) };
-        if (exitNow) { _padMove = null; _exitWalk(); }
+        if (exitNow) { _padMove = null; _exitWalk('toggle'); }
     }
 
     function _showTouchControls() {
@@ -2362,7 +2458,7 @@ window.THREE = THREE;
         var kb = _keyBinds();
         mkBtn('⤒', 86, 84, function () { if (_walk && _walk.grounded) { _walk.vy = 7.5; _walk.grounded = false; } });
         mkBtn(_keyHint(kb.interact), 24, 84, function () { if (_walk) _walkInteract(); });
-        mkBtn('✕', 55, 18, function () { _exitWalk(); });
+        mkBtn('✕', 55, 18, function () { _exitWalk('toggle'); });
         _container.appendChild(wrap);
         _touchUi = wrap;
     }
@@ -2396,15 +2492,54 @@ window.THREE = THREE;
         setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 2000);
     }
 
-    function _toggleWalk() {
-        if (_walk) { _exitWalk(); return; }
+    // P7 (Feature9): shown when walk mode ends on an event the user didn't explicitly
+    // trigger (e.g. clicking a vote card blurs the canvas) — the HUD's "Esc to exit" hint
+    // otherwise contradicts what just happened, with zero feedback as to why.
+    function _showLeftWalkToast() {
+        if (!_container) return;
+        var toast = document.createElement('div');
+        toast.className = 'rs3d-walk-toast';
+        toast.textContent = '🚶 Left walk mode';
+        _container.appendChild(toast);
+        setTimeout(function () { toast.style.opacity = '0'; }, 1400);
+        setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 2000);
+    }
+
+    function _toggleWalk(reason) {
+        if (_walk) { _exitWalk(reason || 'toggle'); return; }
         if (_view === 'top') { _showWalk3DOnlyToast(); return; }
         _enterWalk();
     }
 
+    // Quick first/third-person swap while walking — mirrors the Setup Room dropdown but
+    // from the keyboard, without leaving walk mode. Flips _cfg directly first so the
+    // camera changes on the very next frame; RoomScene.updateConfig persists the choice
+    // and keeps the dropdown in sync (walkCameraMode is a personal, non-broadcast field —
+    // this never affects what other participants see).
+    function _toggleWalkCamera() {
+        if (!_walk) return;
+        var next = (_cfg && _cfg.walkCameraMode === 'third') ? 'first' : 'third';
+        if (_cfg) _cfg.walkCameraMode = next;
+        _walk.tpCamX = null; _walk.tpCamZ = null;   // re-seed the third-person follow lerp
+        if (window.RoomScene && RoomScene.updateConfig) RoomScene.updateConfig({ walkCameraMode: next });
+        _showWalkHud();   // refresh the HUD's "1st/3rd person" label
+        if (!_container) return;
+        var toast = document.createElement('div');
+        toast.className = 'rs3d-walk-toast';
+        toast.textContent = (next === 'third') ? '🎥 Third person' : '👁️ First person';
+        _container.appendChild(toast);
+        setTimeout(function () { toast.style.opacity = '0'; }, 900);
+        setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 1300);
+    }
+
     function _enterWalk() {
         if (!_camera || _view === 'top') return;   // walk mode is 3D-only
+        _setEditMode(false);                        // P10: walk and edit-layout are mutually exclusive
         _clearHover();                             // hover affordance is orbit-only
+        // P5 (Feature9): remember the orbit framing so _exitWalk can restore it exactly —
+        // it was valid when saved, so this is always a safe place to end up (unlike
+        // leaving the camera wherever walking last put it, which can be inside a wall).
+        _preWalkCam = { pos: _camera.position.clone(), target: _controls ? _controls.target.clone() : null };
         var dir = new THREE.Vector3();
         _camera.getWorldDirection(dir);
         var yaw = Math.atan2(dir.x, -dir.z);
@@ -2428,8 +2563,12 @@ window.THREE = THREE;
         }
         // Push the start position out of the table if we're inside it.
         if (_walkCollidesAt(px, pz)) { pz = ROOM_D / 2 - 1.5; px = 0; }
+        var _enterRyaw = _walkYawToRoamer(yaw);
         _walk = { yaw: yaw, pitch: -0.05, vy: 0, grounded: true, crouch: false, held: null,
-                  wx: px, wz: pz, camY: EYE_STAND };
+                  wx: px, wz: pz, camY: EYE_STAND,
+                  // P4 (Feature9): last position/pose actually broadcast, so _updateWalk can
+                  // skip sending when nothing meaningfully changed since (see below).
+                  lastSentX: px, lastSentZ: pz, lastSentYaw: _enterRyaw, lastSentPose: 'walk', lastSentT: 0 };
         _keys = {};
         _camera.position.set(px, EYE_STAND, pz);
         if (_controls) _controls.enabled = false;
@@ -2453,9 +2592,8 @@ window.THREE = THREE;
         _walkToActive = false;
         var _mr = _roamers[_myCid()]; if (_mr) _mr.path = null;
         _iAmRoaming = true; _roamSend = 1;
-        var ryaw = _walkYawToRoamer(yaw);
-        if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, ryaw, 'walk');
-        applyAvatarMove(_myCid(), px, pz, ryaw, 'walk');
+        if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, _enterRyaw, 'walk');
+        applyAvatarMove(_myCid(), px, pz, _enterRyaw, 'walk');
         // P7: canvas-scoped keyboard focus (blur exits walk) + first-person mouse-look via Pointer Lock.
         if (_renderer) {
             _renderer.domElement.focus();
@@ -2465,7 +2603,11 @@ window.THREE = THREE;
         }
     }
 
-    function _exitWalk() {
+    // P7 (Feature9): reason is 'esc' | 'blur' | 'toggle' | 'sit' | undefined. Explicit exits
+    // (Esc, the walk toggle, gamepad Start, E-sit) are self-evident and stay silent; a
+    // 'blur' exit (or any unrecognized reason) happens on events the user didn't ask for
+    // (e.g. clicking a vote card), so it gets a toast explaining why walk mode ended.
+    function _exitWalk(reason) {
         if (_walk && _walk.held != null) { _saveFurniture(); }   // drop carried item where it is
         var px = _walk ? _walk.wx : (_camera ? _camera.position.x : 0);
         var pz = _walk ? _walk.wz : (_camera ? _camera.position.z : 0);
@@ -2478,7 +2620,28 @@ window.THREE = THREE;
             try { document.exitPointerLock(); } catch (e) {}
         }
         _updateInteractLabel(null);
-        if (_controls) { _controls.enabled = true; _controls.target.set(0, TBL_TOP, 0); _controls.update(); }
+        if (_controls) {
+            _controls.enabled = true;
+            // P5 (Feature9): restore the exact orbit framing the user had before pressing
+            // T — it was valid when saved, so it can never leave the camera inside a wall
+            // the way "wherever walking last put it" could.
+            if (_preWalkCam) {
+                _camera.position.copy(_preWalkCam.pos);
+                _controls.target.copy(_preWalkCam.target || new THREE.Vector3(0, TBL_TOP, 0));
+            } else {
+                // No saved pose (e.g. scene rebuilt mid-walk) — place the camera a safe
+                // distance from the table, clamped inside the room, instead of guessing.
+                var _fbTarget = new THREE.Vector3(0, TBL_TOP, 0);
+                var _fbDir = new THREE.Vector3(px - _fbTarget.x, 0, pz - _fbTarget.z);
+                if (_fbDir.lengthSq() < 1e-6) _fbDir.set(0, 0, 1); else _fbDir.normalize();
+                var _fbX = Math.max(-ROOM_W/2 + 0.6, Math.min(ROOM_W/2 - 0.6, _fbTarget.x + _fbDir.x * 6));
+                var _fbZ = Math.max(-ROOM_D/2 + 0.6, Math.min(ROOM_D/2 - 0.6, _fbTarget.z + _fbDir.z * 6));
+                _camera.position.set(_fbX, 4, _fbZ);
+                _controls.target.copy(_fbTarget);
+            }
+            _controls.update();
+        }
+        _preWalkCam = null;
         if (_walkBtn) {
             _walkBtn.textContent = '🚶';
             _walkBtn.title = 'Walk around in first/third person (' + _keyHint(_keyBinds().walk) + ')';
@@ -2494,6 +2657,7 @@ window.THREE = THREE;
             if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(px, pz, ryaw, 'idle');
             applyAvatarMove(_myCid(), px, pz, ryaw, 'idle');
         }
+        if (reason !== 'esc' && reason !== 'toggle' && reason !== 'sit') _showLeftWalkToast();
     }
 
     // Drag-to-look (active only in walk mode).
@@ -2528,7 +2692,7 @@ window.THREE = THREE;
         if (!_walk) return;
         var rt = e && e.relatedTarget;
         if (rt && _container && _container.contains(rt)) return;
-        _exitWalk();
+        _exitWalk('blur');
     }
 
     function _furnById(id) {
@@ -2600,6 +2764,7 @@ window.THREE = THREE;
         // Sliding collision: try full move, then each axis separately. If my CURRENT
         // spot already overlaps an obstacle (e.g. furniture dragged onto me), movement
         // is allowed (room bounds only) so I can walk back out instead of being stuck.
+        var px0 = _walk.wx, pz0 = _walk.wz;   // P4: pre-slide position, for the moved check below
         var nx = _walk.wx + dx, nz = _walk.wz + dz;
         if (!_walkCollidesAt(nx, nz))          { _walk.wx = nx; _walk.wz = nz; }
         else if (_walkCollidesAt(_walk.wx, _walk.wz)) {
@@ -2626,7 +2791,17 @@ window.THREE = THREE;
             var TD = 3.2, TH = 2.2;
             var camX = _walk.wx - Math.sin(_walk.yaw) * TD;
             var camZ = _walk.wz + Math.cos(_walk.yaw) * TD;
-            _camera.position.set(camX, TH, camZ);
+            // P5 (Feature9): clamp the follow camera inside the room so backing an avatar
+            // flush against a wall doesn't push the camera through it (a black frame,
+            // same failure as the orbit-exit case above). Lerp toward the clamped point so
+            // the camera glides rather than pops when it hits the clamp.
+            camX = Math.max(-ROOM_W/2 + 0.35, Math.min(ROOM_W/2 - 0.35, camX));
+            camZ = Math.max(-ROOM_D/2 + 0.35, Math.min(ROOM_D/2 - 0.35, camZ));
+            if (_walk.tpCamX == null) { _walk.tpCamX = camX; _walk.tpCamZ = camZ; }
+            var _tpLerp = Math.min(1, dt * 10);
+            _walk.tpCamX += (camX - _walk.tpCamX) * _tpLerp;
+            _walk.tpCamZ += (camZ - _walk.tpCamZ) * _tpLerp;
+            _camera.position.set(_walk.tpCamX, TH, _walk.tpCamZ);
             _camera.lookAt(_walk.wx, 1.3, _walk.wz);
         } else {
             _camera.position.set(_walk.wx, _walk.camY, _walk.wz);
@@ -2654,27 +2829,43 @@ window.THREE = THREE;
         }
 
         // Drive self-avatar pose (visible in third-person; also seen by others via roamer).
+        // P4 (Feature9): pose reflects actual displacement, not held-key intent — holding a
+        // movement key into an obstacle no longer animates a walking pose in place.
+        var moved = Math.abs(_walk.wx - px0) > 1e-4 || Math.abs(_walk.wz - pz0) > 1e-4;
         var myR = _roamers[_myCid()];
         if (myR && myR.robot) {
-            var moving = (fwd !== 0 || strafe !== 0);
             if (_walk.crouch) {
                 _poseRobotCrouch(myR.robot);
             } else if (!_walk.grounded) {
                 _poseRobotJump(myR.robot);
             } else {
-                myR.walkPhase = (myR.walkPhase || 0) + dt * (moving ? 4.2 : 0);
-                _poseRobotWalk(myR.robot, myR.walkPhase, moving);
+                myR.walkPhase = (myR.walkPhase || 0) + dt * (moved ? 4.2 : 0);
+                _poseRobotWalk(myR.robot, myR.walkPhase, moved);
             }
         }
 
-        // Broadcast avatar position so everyone sees me roam (throttled).
+        // Broadcast avatar position so everyone sees me roam (throttled to 10Hz while
+        // actually moving). P4: skip the broadcast when nothing meaningful changed since
+        // the last send — a blocked hold or standing still used to spam ~10 'walk'
+        // messages/sec and show peers marching in place. A 1s keepalive resend covers
+        // late packet loss.
         _roamSend += dt;
         if (_roamSend >= 0.1) {
             _roamSend = 0;
             var ryaw = _walkYawToRoamer(_walk.yaw);
-            if (window.RoomSceneNet && RoomSceneNet.avatarMove)
-                RoomSceneNet.avatarMove(_walk.wx, _walk.wz, ryaw, 'walk');
-            applyAvatarMove(_myCid(), _walk.wx, _walk.wz, ryaw, 'walk');
+            var pose = moved ? 'walk' : 'idle';
+            var yawDelta = Math.abs(ryaw - _walk.lastSentYaw);
+            if (yawDelta > Math.PI) yawDelta = 2 * Math.PI - yawDelta;
+            var posDelta = Math.abs(_walk.wx - _walk.lastSentX) + Math.abs(_walk.wz - _walk.lastSentZ);
+            var poseChanged = pose !== _walk.lastSentPose;
+            var stale = (performance.now() - _walk.lastSentT) >= 1000;
+            if (posDelta > 0.001 || yawDelta > 0.035 || poseChanged || stale) {
+                if (window.RoomSceneNet && RoomSceneNet.avatarMove)
+                    RoomSceneNet.avatarMove(_walk.wx, _walk.wz, ryaw, pose);
+                applyAvatarMove(_myCid(), _walk.wx, _walk.wz, ryaw, pose);
+                _walk.lastSentX = _walk.wx; _walk.lastSentZ = _walk.wz;
+                _walk.lastSentYaw = ryaw; _walk.lastSentPose = pose; _walk.lastSentT = performance.now();
+            }
         }
 
         // Refresh the "Press E to ..." prompt a few times a second (P9).
@@ -2717,6 +2908,14 @@ window.THREE = THREE;
         candidates.forEach(function (c) {
             var dist = Math.hypot(c.x - wx, c.z - wz);
             if (dist > c.range) return;
+            // P2 (Feature9): an unclaimed chair within 1.2m qualifies regardless of facing —
+            // users sidle up NEXT TO chairs rather than squaring up to them, and the ±40°
+            // cone below never fired for that approach. Chairs between 1.2m and the 1.9m
+            // range, and every other kind, still need the facing check.
+            if (c.kind === 'chair' && dist <= 1.2 && !_claimedChairs[c.idx]) {
+                if (dist < bestDist) { bestDist = dist; best = c; }
+                return;
+            }
             // Bearing uses the camera-yaw convention (forward = (sin yaw, -cos yaw)) —
             // same convention _walk.yaw uses regardless of the P2 roamer-yaw fix.
             var brg = Math.atan2(c.x - wx, -(c.z - wz));
@@ -2747,7 +2946,7 @@ window.THREE = THREE;
                     // Exit walk BEFORE claiming: _updateWalk's 100ms 'walk' broadcasts would
                     // otherwise recreate my roamer and overwrite the AvatarStop that
                     // applyClaim sends, leaving me claimed-but-roaming for everyone.
-                    _exitWalk();
+                    _exitWalk('sit');
                     _pendingChairIdx = r.idx; _confirmClaim();
                 }
                 return;
@@ -2918,6 +3117,44 @@ window.THREE = THREE;
         if (_selHandle) _selHandle.visible = false;
         if (_selBar) _selBar.style.display = 'none';
         _hoverCursor = ''; if (_renderer) _renderer.domElement.style.cursor = '';
+    }
+
+    // P10 (Feature9): toggle Edit-layout mode. OFF (default) = viewing/sitting, clicks never
+    // edit anything. ON = single-click selects immediately, drags move items — today's
+    // pre-P10 behaviour, now opt-in.
+    function _setEditMode(on) {
+        on = !!on;
+        if (on === _editMode) return;
+        _editMode = on;
+        if (!on) _deselectAll();
+        if (on && _walk) _exitWalk('toggle');
+        _updateEditModeUi();
+    }
+    function _updateEditModeUi() {
+        if (_editBtn) {
+            _editBtn.classList.toggle('active', _editMode);
+            _editBtn.title = _editMode ? 'Editing layout — click to stop' : 'Edit room layout — move chairs & furniture';
+        }
+        if (_furnHudBtn) {
+            _furnHudBtn.style.display = _editMode ? '' : 'none';
+            if (!_editMode) { var fh = document.getElementById('rs3d-furn-hud'); if (fh) fh.style.display = 'none'; }
+        }
+        if (!_container) return;
+        if (_editMode) {
+            if (!_editChip) {
+                var chip = document.createElement('div');
+                chip.id = 'rs3d-edit-chip';
+                chip.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:12;' +
+                    'background:rgba(34,197,94,0.16);color:#bbf7d0;border:1px solid rgba(34,197,94,0.4);' +
+                    'border-radius:8px;padding:4px 12px;font-size:0.72rem;font-weight:600;white-space:nowrap;pointer-events:none;';
+                chip.textContent = '✏️ Editing layout — drag to move · Esc to finish';
+                _container.appendChild(chip);
+                _editChip = chip;
+            }
+            _editChip.style.display = '';
+        } else if (_editChip) {
+            _editChip.style.display = 'none';
+        }
     }
     function _deleteSelected() {
         if (!_sel || _sel.kind !== 'furniture') return;
@@ -3216,6 +3453,22 @@ window.THREE = THREE;
     // robot avatar with separate upper arm, forearm, thigh, shin, and foot segments.
     var ROBOT_HIP_Y   = 0.70;   // hip height when standing (world)
     var ROBOT_HEAD_Y  = 1.19;   // head centre (world) — used for labels + rings
+
+    // P6 (Feature9): confirmed via live pixel readback — true-to-scale robots render
+    // correctly in the top-down orthographic view but as only 1-2 buffer pixels against
+    // the whole-room frustum (chairs/table read as icons at that size; the humanoid model
+    // doesn't). Exaggerate scale only in top view so bodies are actually legible.
+    var TOP_VIEW_ROBOT_SCALE = 3.2;
+    function _applyViewScale(robot) {
+        if (!robot) return;
+        robot.scale.setScalar(_view === 'top' ? TOP_VIEW_ROBOT_SCALE : 1);
+    }
+    // Re-applies the current view's robot scale to every seated/standing/roaming robot —
+    // called on setView() so toggling 2D/3D rescales robots created under the other view.
+    function _rescaleAllRobots() {
+        Object.keys(_robotMap).forEach(function (k) { _applyViewScale(_robotMap[k].robot); });
+        Object.keys(_roamers).forEach(function (k) { _applyViewScale(_roamers[k].robot); });
+    }
 
     function _makeRobot(color, voteState, seated, scene3d) {
         scene3d = scene3d || { hat: 'none', eyes: 'round' };
@@ -3630,6 +3883,7 @@ window.THREE = THREE;
         var vs = _voteState(p, rs);
         var robot = _makeRobot(p ? _parseColor(p) : 0x888888, vs, false, _parseScene3d(p));
         _scene.add(robot);
+        _applyViewScale(robot);
         var headY = ROBOT_HEAD_Y;
         var rc = VOTE_EMI[vs] || VOTE_EMI.none;
         var ring = new THREE.Mesh(new THREE.TorusGeometry(0.175, 0.020, 8, 28),
@@ -3994,7 +4248,6 @@ window.THREE = THREE;
         var r = _roamers[my];
         if (!r || !r.robot) return;
         r.path = null;
-        r.pose = 'walk';   // local walk animation (remote sees 'walk' via the broadcast below)
 
         var dx = strafe, dz = -fwd;   // screen-relative: right = +x, up = -z
         var len = Math.hypot(dx, dz);
@@ -4004,11 +4257,16 @@ window.THREE = THREE;
 
         // Sliding collision: try full move, then each axis separately. Same escape rule
         // as _updateWalk: if already overlapping an obstacle, move freely (clamp below).
+        // P4 (Feature9): the axis fallbacks only count as a move when that axis actually
+        // had intended motion — testing (nx, r.z) when dx===0 just re-tests the CURRENT
+        // spot, "succeeds" as a no-op, and used to let a straight-into-the-wall hold report
+        // as a successful walk every tick.
+        var px0 = r.x, pz0 = r.z;
         var nx = r.x + dx, nz = r.z + dz;
         if (!_routeBlockedAt(nx, nz))        { r.x = nx; r.z = nz; }
         else if (_routeBlockedAt(r.x, r.z))  { r.x = nx; r.z = nz; }
-        else if (!_routeBlockedAt(nx, r.z))  { r.x = nx; }
-        else if (!_routeBlockedAt(r.x, nz))  { r.z = nz; }
+        else if (dx !== 0 && !_routeBlockedAt(nx, r.z)) { r.x = nx; }
+        else if (dz !== 0 && !_routeBlockedAt(r.x, nz)) { r.z = nz; }
         var c = _clampRoom(r.x, r.z, 0.30);
         r.x = c.x; r.z = c.z;
         r.yaw = Math.atan2(dx, dz);   // robot facing convention (matches _startWalkTo)
@@ -4016,6 +4274,20 @@ window.THREE = THREE;
         r.tx = r.x; r.tz = r.z; r.tyaw = r.yaw;
 
         _iAmRoaming = true; _topSteerActive = true;
+
+        // P4: holding a key into an obstacle used to broadcast 'walk' at a frozen position
+        // ~10x/second — peers rendered the user marching in place. Send one 'idle' on the
+        // transition into fully-blocked, then go quiet until movement resumes.
+        var moved = (r.x !== px0 || r.z !== pz0);
+        if (!moved) {
+            if (r.pose !== 'idle') {
+                r.pose = 'idle';
+                if (window.RoomSceneNet && RoomSceneNet.avatarMove) RoomSceneNet.avatarMove(r.x, r.z, r.yaw, 'idle');
+                applyAvatarMove(my, r.x, r.z, r.yaw, 'idle');
+            }
+            return;
+        }
+        r.pose = 'walk';   // local walk animation (remote sees 'walk' via the broadcast below)
 
         // Broadcast my position so everyone sees me roam (throttled, ~10Hz).
         _roamSend += dt;
@@ -4267,6 +4539,7 @@ window.THREE = THREE;
                 ghost.position.set(pos.x, 0, pos.z);
                 ghost.rotation.y = angle;
                 _scene.add(ghost);
+                _applyViewScale(ghost);
                 _robotMap['ghost_' + i] = { robot: ghost, chair: null, ring: null, label: null, labelObj: null, seated: true, phase: i * 0.9 };
                 continue;
             }
@@ -4280,6 +4553,7 @@ window.THREE = THREE;
             robot.position.set(pos.x, 0, pos.z);
             robot.rotation.y = angle;
             _scene.add(robot);
+            _applyViewScale(robot);
 
             var headY = SEAT_H + 0.22 + 0.38 + 0.11;   // hips + neck_y + head_offset
             var rc    = VOTE_EMI[vs] || VOTE_EMI.none;
@@ -4318,6 +4592,15 @@ window.THREE = THREE;
             if (p.name && seatedIds.hasOwnProperty(p.name)) return false;
             return true;
         });
+        // P9.2 (Feature9): sort by a stable key every client shares (connectionId, falling
+        // back to name) before assigning slots — standing spots used to derive from
+        // whatever order _participants happened to be in on each client, which could
+        // transiently differ right after a join/claim and show the same people in
+        // different spots on different screens.
+        unseated.sort(function(a, b) {
+            var ka = a.connectionId || a.name || '', kb = b.connectionId || b.name || '';
+            return ka < kb ? -1 : ka > kb ? 1 : 0;
+        });
         var standPos = _standingPositions(unseated.length);
         unseated.forEach(function(p, si){
             var pos = standPos[si];
@@ -4330,6 +4613,7 @@ window.THREE = THREE;
             robot.position.set(pos.x, 0, pos.z);
             robot.rotation.y = Math.atan2(-pos.x, -pos.z + 0.1);
             _scene.add(robot);
+            _applyViewScale(robot);
 
             var headY = ROBOT_HEAD_Y;
             var rc    = VOTE_EMI[vs] || VOTE_EMI.none;
@@ -4444,6 +4728,11 @@ window.THREE = THREE;
         // inside the handler then blocks those page handlers from ever seeing the key.
         document.addEventListener('keydown', _onKeyDown, true);
         document.addEventListener('keyup',   _onKeyUp,   true);
+        // P7 (Feature9) belt-and-suspenders: Escape sometimes failed to close the open
+        // selection toolbar in testing — a competing capture-phase Escape handler
+        // elsewhere on the page may be winning the race. A second, bubble-phase listener
+        // guarantees deselect fires regardless of what already ran during capture.
+        document.addEventListener('keydown', _onKeyDownEscFallback);
         // Drag-to-look in walk mode (bubble phase; only acts when _walk is active).
         _renderer.domElement.addEventListener('pointerdown', _onLookDown);
         window.addEventListener('pointermove', _onLookMove);
@@ -4485,6 +4774,10 @@ window.THREE = THREE;
 
     function _onCanvasClick(event) {
         if (_walk) return;   // walk mode uses E-to-interact, not click-to-claim
+        // P10 (Feature9): in Edit-layout mode, clicks belong to selection/drag only — sit/
+        // stand/prop-trigger/whiteboard/screen/host-free/click-to-walk are all paused so
+        // arranging the room never accidentally fires one of those.
+        if (_editMode) return;
         // If a furniture drag just finished, suppress chair pick
         if (Input.suppressClick) { Input.suppressClick = false; return; }
         if (!_raycaster || !_camera) return;
@@ -4493,10 +4786,19 @@ window.THREE = THREE;
         var my = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
         _raycaster.setFromCamera(new THREE.Vector2(mx, my), _camera);
 
+        // Unclaimed-chair raycast, computed up front (F1/P1): a foreign avatar hit must
+        // not eat a click that's really aimed at a chair behind/beside it — standing-row
+        // robots cluster right next to the front chairs.
+        var testMeshes = _chairObjects
+            .filter(function(c){ var cl = _claimedChairs[c.idx]; return !cl || _claimIsStale(cl); })
+            .map(function(c){ return c.seatMesh; });
+        var chairHits = testMeshes.length ? _raycaster.intersectObjects(testMeshes, false) : [];
+
         // P1: a click on someone ELSE's robot body must not fall through to the chair
-        // or floor behind it. Clicking your own seated robot acts like clicking your
-        // own chair (double-click to stand up). Your own standing/roaming body never
-        // blocks your clicks — the click passes through to whatever is behind it.
+        // or floor behind it — UNLESS a chair is the closer/likelier target (see above).
+        // Clicking your own seated robot acts like clicking your own chair (double-click
+        // to stand up). Your own standing/roaming body never blocks your clicks — the
+        // click passes through to whatever is behind it.
         var av = _raycastAvatarAt();
         if (av) {
             if (av.mine) {
@@ -4506,12 +4808,19 @@ window.THREE = THREE;
                 }
                 // own roamer/standing robot: fall through
             } else {
-                if (av.name) {
-                    var ap = new THREE.Vector3();
-                    av.group.getWorldPosition(ap);
-                    _showHoverTip('🤖 ' + av.name, ap.x, _avatarTipY(av), ap.z);
+                var chairIsCloser = chairHits.length && (!av.dist || chairHits[0].distance <= av.dist + 0.6);
+                if (!chairIsCloser) {
+                    if (av.name) {
+                        var ap = new THREE.Vector3();
+                        av.group.getWorldPosition(ap);
+                        _showHoverTip('🤖 ' + av.name, ap.x, _avatarTipY(av), ap.z);
+                    }
+                    return;
                 }
-                return;
+                // Chair wins: fall through toward the chair-hit handling below. The
+                // intervening whiteboard/prop/screen/table checks are geometry-based and
+                // won't match (those objects don't overlap chairs), so this always reaches
+                // the chairHits check untouched.
             }
         }
 
@@ -4536,7 +4845,10 @@ window.THREE = THREE;
             if (_armDoubleClick('screen')) _openStoriesPanel();
             return;
         }
-        if (_tableGroup && _raycaster.intersectObject(_tableGroup, true).length) return;
+        // P1 follow-up (Step 0 diagnosis): the table's hitbox is generous enough to cover
+        // chairs tucked in close to it — chairs win the same way they win over foreign
+        // avatars, so this only absorbs the click when there's no unclaimed-chair hit.
+        if (_tableGroup && !chairHits.length && _raycaster.intersectObject(_tableGroup, true).length) return;
         if (!_chairObjects.length) return;
 
         // Double-click your own claimed chair to stand up (release seat).
@@ -4554,13 +4866,8 @@ window.THREE = THREE;
             }
         }
 
-        var testMeshes = _chairObjects
-            .filter(function(c){ var cl = _claimedChairs[c.idx]; return !cl || _claimIsStale(cl); })
-            .map(function(c){ return c.seatMesh; });
-
-        var hits = _raycaster.intersectObjects(testMeshes, false);
-        if (hits.length > 0) {
-            var hitMesh = hits[0].object;
+        if (chairHits.length > 0) {
+            var hitMesh = chairHits[0].object;
             var chairObj = null;
             for (var i = 0; i < _chairObjects.length; i++) {
                 if (_chairObjects[i].seatMesh === hitMesh) { chairObj = _chairObjects[i]; break; }
@@ -4928,6 +5235,7 @@ window.THREE = THREE;
         }
         document.removeEventListener('keydown', _onKeyDown, true);
         document.removeEventListener('keyup',   _onKeyUp,   true);
+        document.removeEventListener('keydown', _onKeyDownEscFallback);
         if (_renderer) _renderer.domElement.removeEventListener('pointerleave', _clearHover);
         window.removeEventListener('pointermove', _onLookMove);
         window.removeEventListener('pointerup',   _onLookUp);
@@ -4942,6 +5250,10 @@ window.THREE = THREE;
         if (_toolbar && _toolbar.parentNode) { _toolbar.parentNode.removeChild(_toolbar); _toolbar = null; }
         _walkBtn = null; _clickWalkBtn = null; _furnHudBtn = null;
         if (_furnHud && _furnHud.parentNode) { _furnHud.parentNode.removeChild(_furnHud); _furnHud = null; }
+        // P10 (Feature9): edit mode never persists across a scene rebuild/dispose.
+        _editMode = false; _editBtn = null;
+        if (_editChip && _editChip.parentNode) { _editChip.parentNode.removeChild(_editChip); }
+        _editChip = null;
         var hint = document.getElementById('rs3d-walk-hint'); if (hint && hint.parentNode) hint.parentNode.removeChild(hint);
         if (_miniCanvas && _miniCanvas.parentNode) { _miniCanvas.parentNode.removeChild(_miniCanvas); _miniCanvas = null; _miniCtx = null; }
         // Clean up animated GIF textures (dispose Three.js texture + remove hidden <img> from DOM).
@@ -4958,7 +5270,7 @@ window.THREE = THREE;
             v.tex.dispose();
         });
         _videoTextures = [];
-        _walk = null; _keys = {};
+        _walk = null; _keys = {}; _preWalkCam = null;
         if (Input.is('look')) Input.to('idle');
         if (_scene && _scene.environment) { _scene.environment.dispose(); }
         if (_renderer) {
@@ -4993,6 +5305,9 @@ window.THREE = THREE;
     // ── In-place scene refresh (preserves camera + renderer) ──
     function refreshScene(newConfig) {
         if (!_scene || !_renderer) return;
+        // P10 (Feature9): a full scene rebuild removes every object (including anything
+        // selected) — don't leave edit mode "on" pointing at nothing, or a stale chip up.
+        _setEditMode(false);
         // Merge new config
         if (newConfig) Object.assign(_cfg, newConfig);
         _applyRoomSize();
@@ -5162,6 +5477,7 @@ window.THREE = THREE;
         toggleFurniturePanel: toggleFurniturePanel,
         applyRemoteLayout: applyRemoteLayout,
         setView: setView,
+        setLayoutEdit: _setEditMode,
         flyToParticipant: flyToParticipant,
         // Test/debug helpers (__ prefix — not part of the public contract). Used by
         // automated UI checks to find scene objects on screen and inspect input state.
@@ -5203,6 +5519,18 @@ window.THREE = THREE;
                     cam: _camera ? { x: _camera.position.x, z: _camera.position.z } : null,
                     me: _myStartPos()
                 };
+            },
+            robotMap: function () {
+                return Object.keys(_robotMap).map(function (k) {
+                    var r = _robotMap[k];
+                    return {
+                        key: k, hasRobot: !!r.robot,
+                        visible: r.robot ? r.robot.visible : null,
+                        inScene: r.robot ? (r.robot.parent === _scene) : null,
+                        pos: r.robot ? r.robot.position.toArray() : null,
+                        seated: !!r.seated
+                    };
+                });
             }
         }
     };

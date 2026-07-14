@@ -437,6 +437,16 @@
         bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl).show();
     }
 
+    // P10 (Feature9): opening the Room Designer implies you're here to rearrange the
+    // room, so switch RS3D into Edit-layout mode automatically; closing it always ends
+    // edit mode (manual ✏️ toggling on the canvas stays independent of this).
+    (function () {
+        var rd = document.getElementById('roomDesignerOffcanvas');
+        if (!rd) return;
+        rd.addEventListener('shown.bs.offcanvas',  function () { if (window.RS3D && RS3D.setLayoutEdit) RS3D.setLayoutEdit(true); });
+        rd.addEventListener('hidden.bs.offcanvas', function () { if (window.RS3D && RS3D.setLayoutEdit) RS3D.setLayoutEdit(false); });
+    })();
+
     async function copyInviteLink() {
         const inviteUrl = `${window.location.origin}/room/${encodeURIComponent(ROOM_CONFIG.roomName)}`;
         try {

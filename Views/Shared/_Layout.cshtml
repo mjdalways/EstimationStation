@@ -1653,6 +1653,25 @@
 
                         <!-- Recent changes -->
                         <h6 class="fw-bold mb-2">📋 What's New</h6>
+                        <p class="mb-2"><strong>7/13/2026 (205)</strong></p>
+                        <ul class="mb-2">
+                            <li>✏️ <strong>Edit-layout mode (Feature 9, P10)</strong>: viewing and sitting is now the default — plain clicks/drags never rearrange the room. Toggle the new ✏️ button (or open Setup Room) to select/move chairs, furniture, decor, and the table; Esc backs out of it.</li>
+                            <li>🔌 <strong>Connection loss is now visible (Feature 9, P3)</strong>: a banner now shows when the connection drops or reconnects, reconnect retries forever with backoff instead of giving up, and actions taken while disconnected (vote, reveal, chair claim/release, chat) toast instead of silently failing.</li>
+                            <li>🚶 <strong>Stop marching in place (Feature 9, P4)</strong>: holding a movement key into a wall (or standing still in walk mode) no longer spams peers with a frozen "walking" pose ~10x/second — it now sends one idle update and goes quiet.</li>
+                            <li>📷 <strong>Camera never lands inside a wall (Feature 9, P5)</strong>: exiting walk mode now restores your exact pre-walk orbit view instead of leaving the camera wherever you stopped; the third-person follow camera also stays clear of walls.</li>
+                            <li>🪑 <strong>2D top-down avatar bodies (Feature 9, P6)</strong>: root-caused and verified live — robots were rendering at true scale (~1-2 pixels against the whole-room view, invisible), not actually missing. Now visually exaggerated in top-down so bodies show clearly under each name chip.</li>
+                            <li>🚶 <strong>Walk-mode exit feedback (Feature 9, P7)</strong>: leaving walk mode on an unexpected event (e.g. clicking a vote card) now shows a "Left walk mode" toast, the HUD hint matches reality, and Escape reliably closes an open selection toolbar.</li>
+                            <li>🎬 <strong>Quieter window-media errors (Feature 9, P8)</strong>: an unplayable or stale custom window video now warns once and falls back to a static image instead of erroring on every page load; a failure toast only shows when you just picked that media.</li>
+                            <li>🥊 <strong>Standing-row + host-modal polish (Feature 9, P9)</strong>: standing spots now use a stable sort so everyone sees the same layout after a claim/release; the host's first-join sound-prefs and settings-lock prompts now show one at a time instead of stacked.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/13/2026 (204)</strong></p>
+                        <ul class="mb-2">
+                            <li>⌨️ <strong>Walk-mode E now sits you (Feature 9, P2)</strong>: standing beside a free chair (not just facing it) now shows the "E sit" prompt and seats you — previously the facing cone made E miss almost every real approach.</li>
+                        </ul>
+                        <p class="mb-2"><strong>7/13/2026 (203)</strong></p>
+                        <ul class="mb-2">
+                            <li>🪑 <strong>Reliable sitting, take 1 (Feature 9, P1)</strong>: double-clicking a chair now sits you even when the click grazes another user's robot on the way there, and a chair click no longer flashes the "drag to move" toolbar mid double-click.</li>
+                        </ul>
                         <p class="mb-2"><strong>7/8/2026 (202)</strong></p>
                         <ul class="mb-2">
                             <li>🍞 <strong>Non-blocking "removed from room" notice (review C6)</strong>: getting kicked, timed out, or idle-removed now shows a toast instead of a blocking alert(), then returns you to the lobby a moment later.</li>
@@ -3001,6 +3020,11 @@
                                 return resp.json();
                             })
                             .then(function(e){
+                                // P8 (Feature9): flag this as an active user pick so a real
+                                // playback failure toasts; passive loads (page refresh, a
+                                // stale/removed media file) warn quietly instead.
+                                window._rsJustConfiguredWindowMedia = true;
+                                setTimeout(function(){ window._rsJustConfiguredWindowMedia = false; }, 4000);
                                 if (window.RoomScene) RoomScene.updateConfig({ windowMediaId: e.id, windowMediaMime: e.mime, windowView: 'custom', windowImage: null });
                                 var sel=document.getElementById('rs-window-view'); if(sel) sel.value='custom';
                                 _rsRefreshMediaLibrary();
@@ -3055,6 +3079,10 @@
                         if (!id) return;
                         var opt = sel.options[sel.selectedIndex];
                         var mime = (opt && opt.dataset.mime) || null;
+                        // P8 (Feature9): see _rsUploadWindowMedia — flags this rebuild as an
+                        // active pick so a real playback failure gets a toast.
+                        window._rsJustConfiguredWindowMedia = true;
+                        setTimeout(function(){ window._rsJustConfiguredWindowMedia = false; }, 4000);
                         if (window.RoomScene) RoomScene.updateConfig({ windowMediaId: id, windowMediaMime: mime, windowView: 'custom' });
                         var view=document.getElementById('rs-window-view'); if(view) view.value='custom';
                         var delBtn = document.getElementById('rs-window-media-del');
@@ -3300,7 +3328,7 @@
                 🚶 Walk controls <span class="rs-note">(3D room)</span> <span class="settings-section-chevron">▾</span>
             </div>
             <div id="room-walk-section" class="collapse">
-                <div class="rs-hint mt-2 mb-2">In <strong>3D</strong>, click <strong>🚶 Walk</strong> (or press its key) to walk around. Move with the arrow keys, <strong>Alt</strong> to jump, <strong>Ctrl</strong> to crouch, <strong>E</strong> facing a chair to sit / furniture to grab. Drag to look around. Esc to exit. To rebind, click an action then press the new key.</div>
+                <div class="rs-hint mt-2 mb-2">In <strong>3D</strong>, click <strong>🚶 Walk</strong> (or press its key) to walk around. Move with the arrow keys, <strong>Alt</strong> to jump, <strong>Ctrl</strong> to crouch, <strong>E</strong> facing a chair to sit / furniture to grab, <strong>V</strong> to swap first/third person. Drag to look around. Esc to exit. To rebind, click an action then press the new key.</div>
                 <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
                     <label class="form-label mb-0" style="font-size:.76rem;min-width:80px;">Camera mode</label>
                     <select class="form-select form-select-sm" style="max-width:190px;" id="rs-walk-cam-mode"
@@ -3329,7 +3357,7 @@
             </div>
             <script>
             (function(){
-                window._rsKeyActions = [['forward','Forward'],['back','Back'],['left','Left'],['right','Right'],['jump','Jump'],['crouch','Crouch'],['interact','Interact'],['walk','Toggle walk']];
+                window._rsKeyActions = [['forward','Forward'],['back','Back'],['left','Left'],['right','Right'],['jump','Jump'],['crouch','Crouch'],['interact','Interact'],['walk','Toggle walk'],['camToggle','1st/3rd person']];
                 // Keys that are reserved by the page and will conflict with walk bindings.
                 var _RS_PAGE_KEYS = { Space:'Reveal votes', Enter:'Reveal votes / confirm', KeyC:'(may conflict with page)', KeyV:'(may conflict)', Tab:'(browser)' };
                 window._rsKeyLabel = function(code){
@@ -3409,7 +3437,7 @@
                     _rsCapturing = { btn: btn, onKey: onKey, onBlur: onBlur, prevLabel: prevLabel };
                 };
                 window._rsResetKeyBinds = function(){
-                    RoomScene.updateConfig({ keyBindings:{ forward:'ArrowUp',back:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',jump:'AltLeft',crouch:'ControlLeft',interact:'KeyE',walk:'KeyT' } });
+                    RoomScene.updateConfig({ keyBindings:{ forward:'ArrowUp',back:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',jump:'AltLeft',crouch:'ControlLeft',interact:'KeyE',walk:'KeyT',camToggle:'KeyV' } });
                     window._rsRenderKeyBinds();
                 };
                 document.addEventListener('DOMContentLoaded', function(){

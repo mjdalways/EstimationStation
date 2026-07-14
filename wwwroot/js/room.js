@@ -49,14 +49,33 @@ let roomState = {
 };
 window.roomState = roomState;
 
+// P3 (Feature9): user-triggered actions used to fail silently (console-only) while the
+// SignalR connection was down/reconnecting — the user just saw nothing happen. Guard the
+// highest-impact paths (vote, reveal, chair claim/release, avatar move, chat) so they get
+// a toast instead. Throttled so a 10Hz caller (avatarMove) doesn't spam toasts.
+var _lastDisconnectedToastMs = 0;
+function _ifConnected(fn) {
+    if (connection && connection.state === signalR.HubConnectionState.Connected) { fn(); return true; }
+    var now = Date.now();
+    if (now - _lastDisconnectedToastMs > 4000) {
+        _lastDisconnectedToastMs = now;
+        _showToastAD('⚠️ Not connected — action not sent', 'warning');
+    }
+    return false;
+}
+
 // Room Scene → SignalR facade. room-scene-3d.js calls these to claim/release a chair
 // through the hub (race-safe, server-authoritative). Falls back to local-only when absent.
 window.RoomSceneNet = {
     claimChair: function (idx, color) {
-        if (connection) connection.invoke('ClaimChair', idx, color || null).catch(function(e){ console.error('ClaimChair failed', e); });
+        _ifConnected(function () {
+            connection.invoke('ClaimChair', idx, color || null).catch(function(e){ console.error('ClaimChair failed', e); });
+        });
     },
     releaseChair: function () {
-        if (connection) connection.invoke('ReleaseChair').catch(function(e){ console.error('ReleaseChair failed', e); });
+        _ifConnected(function () {
+            connection.invoke('ReleaseChair').catch(function(e){ console.error('ReleaseChair failed', e); });
+        });
     },
     setLayout: function (layoutJson) {
         if (connection) connection.invoke('SetRoomLayout', layoutJson).catch(function(e){ console.error('SetRoomLayout failed', e); });
@@ -68,7 +87,9 @@ window.RoomSceneNet = {
         if (connection) connection.invoke('SetDecorPositions', json).catch(function(e){ console.error('SetDecorPositions failed', e); });
     },
     avatarMove: function (x, z, yaw, pose) {
-        if (connection) connection.invoke('AvatarMove', x, z, yaw, pose).catch(function(){});
+        _ifConnected(function () {
+            connection.invoke('AvatarMove', x, z, yaw, pose).catch(function(){});
+        });
     },
     avatarStop: function () {
         if (connection) connection.invoke('AvatarStop').catch(function(){});
@@ -138,13 +159,57 @@ function _syncRoomScene() {
 // ============================================================
 // SignalR Connection
 // ============================================================
+// P3 (Feature9): fixed top-of-page banner surfacing connection state — previously a
+// server bounce left every tab looking normal (no banner, silently-failing clicks)
+// while SignalR quietly gave up retrying after ~40s.
+var _connBanner = null;
+// True once we've been reconnecting/closed long enough that the server may have restarted
+// (rooms are in-memory — a restart resets room state). Checked against the next RoomState
+// snapshot's participant count as a heuristic for "did the room just get wiped".
+var _connWasDown = false;
+var _pendingResyncCheck = false;
+function _ensureConnBanner() {
+    if (_connBanner) return _connBanner;
+    var el = document.createElement('div');
+    el.id = 'conn-banner';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2000;text-align:center;' +
+        'padding:6px 12px;font:600 0.85rem sans-serif;display:none;color:#fff;';
+    document.body.appendChild(el);
+    _connBanner = el;
+    return el;
+}
+function _showConnBanner(kind, html) {
+    var el = _ensureConnBanner();
+    el.innerHTML = html;
+    el.style.display = '';
+    el.style.background = kind === 'reconnecting' ? '#b45309' : kind === 'closed' ? '#b91c1c' : '#15803d';
+}
+function _hideConnBanner() { if (_connBanner) _connBanner.style.display = 'none'; }
+
 async function initSignalR() {
     connection = new signalR.HubConnectionBuilder()
         .withUrl('/pokerhub')
-        .withAutomaticReconnect()
+        .withAutomaticReconnect({
+            nextRetryDelayInMilliseconds: function (ctx) {
+                // 0s, 2s, 5s, 10s, then every 15s forever — never return null (give up).
+                var steps = [0, 2000, 5000, 10000];
+                return ctx.previousRetryCount < steps.length ? steps[ctx.previousRetryCount] : 15000;
+            }
+        })
         .build();
 
     registerHandlers();
+
+    connection.onreconnecting(function () {
+        _connWasDown = true;
+        document.body.classList.add('conn-lost');
+        _showConnBanner('reconnecting', '⚠ Connection lost — reconnecting…');
+    });
+    connection.onclose(function () {
+        _connWasDown = true;
+        document.body.classList.add('conn-lost');
+        _showConnBanner('closed', '✖ Disconnected — <button onclick="location.reload()" style="margin-left:8px;padding:2px 10px;border:none;border-radius:4px;cursor:pointer;">Reload</button>');
+    });
 
     try {
         await connection.start();
@@ -157,7 +222,9 @@ async function initSignalR() {
         _promptSoundPreferenceOnce();
     } catch (err) {
         console.error('SignalR connection failed:', err);
-        setTimeout(initSignalR, 3000);
+        document.body.classList.add('conn-lost');
+        _showConnBanner('reconnecting', '⚠ Connection lost — reconnecting…');
+        setTimeout(initSignalR, 5000);
     }
 }
 
@@ -166,6 +233,16 @@ async function initSignalR() {
 // ============================================================
 function registerHandlers() {
     connection.on('RoomState', (state) => {
+        // P3 (Feature9): rooms are in-memory server-side — a restart during an outage
+        // recreates an EMPTY room on rejoin. Heuristic: we just came back from a real
+        // outage and the fresh snapshot has only me where the room previously had others.
+        if (_pendingResyncCheck) {
+            _pendingResyncCheck = false;
+            var _newCount = (state.participants || []).length;
+            if (_newCount === 1 && roomState.participants.length > 1) {
+                _showToastAD('♻️ Room state was reset by the server', 'warning');
+            }
+        }
         roomState.participants = state.participants || [];
         roomState.stories = state.stories || [];
         roomState.votesRevealed = state.votesRevealed;
@@ -218,8 +295,11 @@ function registerHandlers() {
         _applyHostLockUI();
         // AD5 — Show setup prompt only on the very first join of a freshly created room
         // (server-tracked one-shot flag), never on later host logins.
+        // P9.3: sequenced behind the sound-preference prompt (see _seqMaybeShowHost)
+        // instead of showing both modals stacked.
         if (state.isHost && state.showSetupPrompt) {
-            setTimeout(_showHostSetupPrompt, 800);
+            _seqHostReady = true;
+            setTimeout(_seqMaybeShowHost, 800);
         }
 
         if (state.votesRevealed) {
@@ -623,6 +703,11 @@ function registerHandlers() {
         myConnectionId = connection.connectionId;
         if (window.ROOM_CONFIG) ROOM_CONFIG.connectionId = myConnectionId;
         const _rPin = sessionStorage.getItem('es_roomPin_' + ROOM_CONFIG.roomName) || null;
+        _pendingResyncCheck = _connWasDown;
+        _connWasDown = false;
+        document.body.classList.remove('conn-lost');
+        _showConnBanner('reconnected', '✓ Reconnected');
+        setTimeout(_hideConnBanner, 3000);
         connection.invoke('JoinRoom', ROOM_CONFIG.roomName, ROOM_CONFIG.playerName, isObserver, _rPin);
     });
 
@@ -1222,18 +1307,15 @@ async function castVote(val) {
     }
     if (selectedVote !== null) _qPlayVoteTick();  // Q1
 
-    try {
-        if (selectedVote !== null) {
-            await connection.invoke('CastVote', selectedVote);
-        } else {
-            // Unselect: reset vote for this user only
-            await connection.invoke('CastVote', null);
-        }
-    } catch(e) { console.error(e); }
+    _ifConnected(function () {
+        connection.invoke('CastVote', selectedVote).catch(function(e){ console.error(e); });
+    });
 }
 
 async function revealVotes() {
-    try { await connection.invoke('RevealVotes'); } catch(e) { console.error(e); }
+    _ifConnected(function () {
+        connection.invoke('RevealVotes').catch(function(e){ console.error(e); });
+    });
 }
 
 async function toggleGhostMode() {
@@ -1464,10 +1546,10 @@ async function sendChat() {
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
     if (!msg) return;
-    try {
-        await connection.invoke('SendChat', msg);
+    _ifConnected(function () {
+        connection.invoke('SendChat', msg).catch(function(e){ console.error(e); });
         input.value = '';
-    } catch(e) { console.error(e); }
+    });
 }
 
 async function startTimer(seconds) {
@@ -1735,10 +1817,23 @@ if (typeof startSeasonalAmbience === 'function') startSeasonalAmbience();
 // ============================================================
 // Sound Preference Prompt (N5) — shown once per page load on room join
 // ============================================================
+// P9.3 (Feature9): the host used to get the sound-preferences modal and the host
+// settings-lock modal stacked simultaneously on first join. Sequence them instead — sound
+// prefs first, host-lock chooser only once that's resolved (shown+dismissed, or skipped).
+var _seqSoundDone = false;
+var _seqHostReady = false;
+var _seqHostShown = false;
+function _seqMaybeShowHost() {
+    if (_seqHostShown || !_seqHostReady || !_seqSoundDone) return;
+    _seqHostShown = true;
+    _showHostSetupPrompt();
+}
+
 function _promptSoundPreferenceOnce() {
-    if (sessionStorage.getItem('es_soundAsked')) return;
+    function _soundDone() { _seqSoundDone = true; _seqMaybeShowHost(); }
+    if (sessionStorage.getItem('es_soundAsked')) { _soundDone(); return; }
     var muted = getAllSoundsOff();
-    if (muted) { sessionStorage.setItem('es_soundAsked','1'); return; }
+    if (muted) { sessionStorage.setItem('es_soundAsked','1'); _soundDone(); return; }
     var anyOn = false;
     if (typeof getTimerAudioSettings === 'function') {
         var ta = getTimerAudioSettings();
@@ -1748,16 +1843,22 @@ function _promptSoundPreferenceOnce() {
         var am = getAmbientSettings();
         if (am.source && am.source !== 'none') anyOn = true;
     }
-    if (!anyOn) return;
+    if (!anyOn) { _soundDone(); return; }
     sessionStorage.setItem('es_soundAsked', '1');
     // If user saved a default choice, apply it silently without showing the modal
     var defaultChoice = localStorage.getItem('es_soundDefaultChoice');
     if (defaultChoice && typeof _applySoundChoice === 'function') {
         _applySoundChoice(defaultChoice);
+        _soundDone();
         return;
     }
     var modalEl = document.getElementById('soundConfirmModal');
-    if (modalEl && typeof bootstrap !== 'undefined') bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    if (modalEl && typeof bootstrap !== 'undefined') {
+        modalEl.addEventListener('hidden.bs.modal', _soundDone, { once: true });
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    } else {
+        _soundDone();
+    }
 }
 
 // ============================================================

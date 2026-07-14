@@ -36,7 +36,7 @@
         // Walk controls (3D). Values are KeyboardEvent.code strings.
         // Defaults use arrow keys + Ctrl/Alt so they don't conflict with page shortcuts (Space=reveal, C=chat, etc.)
         keyBindings: { forward:'ArrowUp', back:'ArrowDown', left:'ArrowLeft', right:'ArrowRight',
-                       jump:'AltLeft', crouch:'ControlLeft', interact:'KeyE', walk:'KeyT' }
+                       jump:'AltLeft', crouch:'ControlLeft', interact:'KeyE', walk:'KeyT', camToggle:'KeyV' }
     };
 
     var state = {
@@ -51,7 +51,14 @@
 
     function loadConfig() {
         try {
-            var cfg = Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
+            var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            var cfg = Object.assign({}, DEFAULT_CONFIG, saved);
+            // keyBindings is a nested object — the shallow Object.assign above replaces it
+            // wholesale with whatever was saved, so a binding added after a user's config
+            // was last saved (e.g. camToggle) would otherwise resolve to undefined and show
+            // as unbound in the rebind UI. Fill in any missing action from the current
+            // defaults instead.
+            cfg.keyBindings = Object.assign({}, DEFAULT_CONFIG.keyBindings, saved.keyBindings || {});
             // Migrate the retired CSS-3D mode onto the WebGL room.
             if (cfg.mode === '3d') cfg.mode = '3d-gl';
             return cfg;
