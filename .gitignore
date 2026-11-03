@@ -60,3 +60,17 @@ impl/
 /Feature10_Fable5.md
 /Feature11_Fable5.md
 /App_Data
+
+# Added by sync-repos.ps1
+publish/
+node_modules/
+.env.*
+!.env.example
+*.db-shm
+*.db-wal
+App_Data/*.db
+App_Data/uploads/
+App_Data/keys/
+App_Data/backups/
+*.pfx
+secrets.json
