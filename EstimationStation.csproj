@@ -17,5 +17,22 @@
     <Content Remove="wwwroot\js\wgt-test.js" />
   </ItemGroup>
 
+  <!-- rooms\ holds local test rooms (the app's data folder). Never publish it: uploading would put test rooms on
+       the live site and could overwrite a real room with the same name. -->
+  <ItemGroup>
+    <Content Remove="rooms\**" />
+    <None Remove="rooms\**" />
+  </ItemGroup>
+
+  <!-- Word-list data (Re-Enable validity dictionary, NGSL common/defined words) loaded once
+       at startup by Services/WordListService.cs — must ship next to the app binary. -->
+  <ItemGroup>
+    <Content Include="Data\wordlists\*.txt;Data\wordlists\*.tsv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Privacy-friendly usage stats and the /admin/stats report, shared by all sites (..\Shared). -->
+    <ProjectReference Include="..\Shared\Mjdalways.SiteStats\Mjdalways.SiteStats.csproj" />
+  </ItemGroup>
 
 </Project>

@@ -60,6 +60,9 @@ public class RoomService
     public static string NormalizeName(string? roomName) =>
         string.Concat((roomName ?? "").Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')).ToLowerInvariant();
 
+    /// <summary>True when the (normalized) room already exists in memory or on disk.</summary>
+    public bool Exists(string roomName) => _rooms.ContainsKey(roomName) || _repo.GetRoom(roomName) != null;
+
     public Room GetOrCreateRoom(string roomName)
     {
         roomName = NormalizeName(roomName);

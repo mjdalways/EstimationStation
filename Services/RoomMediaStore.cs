@@ -23,6 +23,9 @@ public class RoomMediaStore
     };
 
     private readonly string _basePath;
+    private readonly long _maxAllRoomsBytes;
+    private long _allBytes;
+    private long _measuredAt;
     private readonly JsonSerializerOptions _jsonOpts = new() { WriteIndented = false };
     private readonly ConcurrentDictionary<string, object> _locks = new(StringComparer.OrdinalIgnoreCase);
 
@@ -31,6 +34,7 @@ public class RoomMediaStore
         var roomsPath = config["RoomStoragePath"] ?? Path.Combine(AppContext.BaseDirectory, "rooms");
         var root = Path.GetDirectoryName(Path.GetFullPath(roomsPath)) ?? AppContext.BaseDirectory;
         _basePath = Path.Combine(root, "_assets");
+        _maxAllRoomsBytes = config.GetValue("Limits:MediaMaxMegabytes", 5_120L) * 1024 * 1024;
         Directory.CreateDirectory(_basePath);
     }
 
@@ -53,6 +57,8 @@ public class RoomMediaStore
 
         var mime = ValidatedMime(file.ContentType, header, read);
         if (mime == null) return null;
+
+        if (!TryReserve(file.Length)) throw new MediaBudgetExceededException();
 
         var dir = RoomDir(room);
         Directory.CreateDirectory(dir);
@@ -93,6 +99,22 @@ public class RoomMediaStore
         }
 
         return entry;
+    }
+
+    // Caps the total size of all rooms' media so many rooms cannot fill the hosting plan.
+    // shortcut: folder size is re-measured every 2 minutes and tracked in memory in between.
+    private bool TryReserve(long incoming)
+    {
+        var now = Environment.TickCount64;
+        var measured = Interlocked.Read(ref _measuredAt);
+        if (measured == 0 || now - measured > 120_000)
+        {
+            Interlocked.Exchange(ref _allBytes, new DirectoryInfo(_basePath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length));
+            Interlocked.Exchange(ref _measuredAt, now);
+        }
+        if (Interlocked.Read(ref _allBytes) + incoming > _maxAllRoomsBytes) return false;
+        Interlocked.Add(ref _allBytes, incoming);
+        return true;
     }
 
     public IReadOnlyList<MediaEntry> List(string room)

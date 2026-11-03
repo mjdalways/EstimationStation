@@ -1,0 +1,217 @@
+@model EstimationStation.Models.RoomViewModel
+@{
+    ViewData["Title"] = $"Pre-vote — {Model.RoomName}";
+}
+
+@*
+    F11/P3 — the absentee pre-vote page.
+
+    Deliberately NOT a mode of the room. This page runs its own tiny SignalR connection and
+    never calls JoinRoom, so whoever is here does not appear in the participant list, does not
+    claim a chair, does not count toward the auto-reveal quorum and does not see anybody's
+    live votes. It can do exactly two things: PrevoteJoin (read the open stories and your own
+    existing pre-votes back) and CastProxyVote.
+*@
+
+<div class="prevote-page">
+    <div class="prevote-card">
+        <h4 class="mb-1">📮 Pre-vote</h4>
+        <div class="text-muted mb-3">
+            Leaving estimates for <strong>@Model.RoomName</strong> before the session.
+            Your values stay hidden until the room reveals that story.
+        </div>
+
+        <div id="prevoteIdentity" class="prevote-identity">
+            <label class="f11-field">
+                <span>Your name</span>
+                <input id="pvName" class="form-control form-control-sm" maxlength="50"
+                       value="@Model.PlayerName" placeholder="The name the team knows you by" />
+            </label>
+            <label class="f11-field" id="pvPinField" style="display:none;">
+                <span>Room PIN</span>
+                <input id="pvPin" class="form-control form-control-sm" maxlength="12" inputmode="numeric" />
+            </label>
+            <button class="btn btn-primary btn-sm" id="pvJoin">Load stories</button>
+            <div class="prevote-note">
+                Use the same name you use in the room — that is how your pre-vote is matched to you,
+                and how it is dropped automatically if you turn up live after all.
+            </div>
+        </div>
+
+        <div id="prevoteStatus" class="prevote-status"></div>
+        <div id="prevoteStories" class="prevote-stories"></div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    var ROOM = @Json.Serialize(Model.RoomName);
+
+    var _conn = null;
+    var _name = '';
+    var _pin = null;
+    var _state = null;
+    var _pendingStory = null;
+    var _pendingTimer = null;
+
+    var elName = document.getElementById('pvName');
+    var elPin = document.getElementById('pvPin');
+    var elPinField = document.getElementById('pvPinField');
+    var elJoin = document.getElementById('pvJoin');
+    var elStatus = document.getElementById('prevoteStatus');
+    var elStories = document.getElementById('prevoteStories');
+
+    function esc(s) {
+        return String(s === undefined || s === null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function status(msg, kind) {
+        elStatus.className = 'prevote-status' + (kind ? ' prevote-status-' + kind : '');
+        elStatus.textContent = msg || '';
+    }
+
+    function connect() {
+        if (_conn) return Promise.resolve();
+        _conn = new signalR.HubConnectionBuilder()
+            .withUrl('/pokerhub')
+            .withAutomaticReconnect()
+            .build();
+
+        _conn.on('PrevoteState', function (payload) {
+            _state = payload || null;
+            render();
+            status('');
+        });
+
+        _conn.on('ProxyVoteAccepted', function (storyId, vote) {
+            if (!_state) return;
+            if (vote === null || vote === undefined) delete _state.myVotes[storyId];
+            else _state.myVotes[storyId] = vote;
+            _pendingStory = null;
+            if (_pendingTimer) { clearTimeout(_pendingTimer); _pendingTimer = null; }
+            render();
+            status('✅ Saved', 'ok');
+        });
+
+        _conn.on('Error', function (code) {
+            if (code === 'PIN_REQUIRED') {
+                elPinField.style.display = '';
+                status('This room has a PIN. Enter it and try again.', 'warn');
+            } else if (code === 'NO_SUCH_ROOM') {
+                status('No room by that name is open right now. Ask whoever sent you the link.', 'warn');
+            } else if (code === 'INVALID_ROOM') {
+                status('That room name is not valid.', 'warn');
+            } else {
+                status(String(code || 'Something went wrong.'), 'warn');
+            }
+        });
+
+        // Late reconnects re-read state rather than assuming the room stood still.
+        _conn.onreconnected(function () { if (_name) join(); });
+
+        return _conn.start();
+    }
+
+    function join() {
+        _name = (elName.value || '').trim();
+        _pin = elPin && elPin.value ? elPin.value.trim() : null;
+        if (!_name) { status('Enter the name the team knows you by.', 'warn'); elName.focus(); return; }
+        status('Loading…');
+        connect()
+            .then(function () { return _conn.invoke('PrevoteJoin', ROOM, _name, _pin); })
+            .catch(function (e) {
+                console.error(e);
+                status('Could not reach the server. Check your connection and try again.', 'warn');
+            });
+    }
+
+    function cast(storyId, value) {
+        if (!_state) return;
+        _pendingStory = storyId;
+        render();
+
+        // CastProxyVote answers with ProxyVoteAccepted, but it also returns silently when it
+        // rate-limits (200 ms) or when the story has been completed since this page loaded.
+        // Without this the cards would stay greyed out forever waiting for a reply that the
+        // server has already decided not to send.
+        if (_pendingTimer) clearTimeout(_pendingTimer);
+        _pendingTimer = setTimeout(function () {
+            if (_pendingStory !== storyId) return;
+            _pendingStory = null;
+            render();
+        }, 3000);
+
+        _conn.invoke('CastProxyVote', ROOM, _name, _pin, storyId, value)
+            .catch(function (e) {
+                console.error(e);
+                _pendingStory = null;
+                render();
+                status('That did not save. Try again.', 'warn');
+            });
+    }
+
+    function render() {
+        if (!_state) { elStories.innerHTML = ''; return; }
+
+        var values = _state.estimateValues || [];
+        var mine = _state.myVotes || {};
+        var stories = _state.stories || [];
+
+        var head = '<div class="prevote-head">' +
+            '<strong>' + esc(_state.name) + '</strong> — ' + stories.length + ' open stor' + (stories.length === 1 ? 'y' : 'ies') +
+            (_state.countProxyVotes
+                ? '<span class="prevote-chip prevote-chip-on" title="The room is counting pre-votes in its statistics">Counted in the room’s stats</span>'
+                : '<span class="prevote-chip" title="The room shows pre-votes but leaves them out of averages and consensus">Shown, not counted</span>') +
+            '</div>';
+
+        if (!stories.length) {
+            elStories.innerHTML = head + '<div class="prevote-empty">There is nothing open to estimate yet.</div>';
+            return;
+        }
+
+        elStories.innerHTML = head + stories.map(function (s) {
+            var chosen = mine[s.id];
+            var busy = _pendingStory === s.id;
+            return '<div class="prevote-story' + (s.isCurrent ? ' prevote-story-current' : '') + '">' +
+                '<div class="prevote-story-head">' +
+                    (s.jiraKey
+                        ? '<a class="prevote-key" href="' + esc(s.jiraUrl || '#') + '" target="_blank" rel="noopener">' + esc(s.jiraKey) + '</a>'
+                        : '') +
+                    '<span class="prevote-title">' + esc(s.title) + '</span>' +
+                    (s.isCurrent ? '<span class="prevote-chip prevote-chip-on">On the table now</span>' : '') +
+                '</div>' +
+                (s.description ? '<div class="prevote-desc">' + esc(s.description) + '</div>' : '') +
+                '<div class="prevote-cards' + (busy ? ' prevote-cards-busy' : '') + '">' +
+                    values.map(function (v) {
+                        return '<button class="prevote-card-btn' + (chosen === v ? ' prevote-card-sel' : '') + '" ' +
+                            'data-story="' + esc(s.id) + '" data-value="' + esc(v) + '">' + esc(v) + '</button>';
+                    }).join('') +
+                    (chosen
+                        ? '<button class="prevote-clear" data-story="' + esc(s.id) + '" title="Remove my pre-vote">✕ clear</button>'
+                        : '') +
+                '</div>' +
+                '</div>';
+        }).join('');
+
+        Array.prototype.forEach.call(elStories.querySelectorAll('.prevote-card-btn'), function (b) {
+            b.addEventListener('click', function () { cast(b.getAttribute('data-story'), b.getAttribute('data-value')); });
+        });
+        Array.prototype.forEach.call(elStories.querySelectorAll('.prevote-clear'), function (b) {
+            b.addEventListener('click', function () { cast(b.getAttribute('data-story'), null); });
+        });
+    }
+
+    elJoin.addEventListener('click', join);
+    elName.addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
+    if (elPin) elPin.addEventListener('keydown', function (e) { if (e.key === 'Enter') join(); });
+
+    // A link that already carries a name gets straight to the cards.
+    if ((elName.value || '').trim()) join();
+}());
+</script>
+}

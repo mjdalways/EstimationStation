@@ -61,7 +61,9 @@ public class MediaController : ControllerBase
         if (!RoomExists(roomName, out var normalized)) return NotFound();
         if (file == null || file.Length == 0) return BadRequest();
 
-        var entry = await _store.SaveAsync(normalized, file);
+        EstimationStation.Models.MediaEntry? entry;
+        try { entry = await _store.SaveAsync(normalized, file); }
+        catch (MediaBudgetExceededException) { return StatusCode(StatusCodes.Status507InsufficientStorage, "Media storage is full right now."); }
         if (entry == null) return BadRequest("Unsupported or invalid file.");
         return Ok(entry);
     }

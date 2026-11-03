@@ -156,10 +156,28 @@
             <div id="vibeSummary" style="font-size:0.72rem;color:var(--text-secondary,#6c757d);margin-top:5px;min-height:1em;"></div>
         </div>
 
+        <!-- F11/P2 — Reference deck: already-estimated stories pinned as calibration anchors,
+             so "what does a 5 look like here" has an answer that isn't somebody's memory. -->
+        <div class="reference-deck" id="referenceDeck" style="display:none;">
+            <div class="reference-deck-head">
+                <button type="button" class="reference-deck-toggle" onclick="toggleReferenceDeck()">
+                    📏 Reference deck <span id="referenceDeckChevron">▾</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-host-only
+                        id="referenceDeckEditBtn" onclick="openReferenceDeckPicker()"
+                        title="Choose which estimated stories to pin as anchors">Pin anchors…</button>
+            </div>
+            <div id="referenceDeckList" class="reference-deck-list"></div>
+        </div>
+
         <!-- Voting Cards -->
         <div class="voting-section" id="votingSection">
             <h6 class="section-label">Your Vote</h6>
             <div id="cardContainer" class="card-container"></div>
+            <!-- F11/P3 — absentees who pre-cast on this story, as greyed "absent" cards. -->
+            <div id="proxyVotesStrip" class="proxy-votes-strip" style="display:none;"></div>
+            <!-- F11/P7 — estimate prediction pool: call the room's final number before reveal. -->
+            <div id="predictionPanel" class="prediction-panel" style="display:none;"></div>
             <!-- P1: keyboard shortcut legend (populated by JS) -->
             <div id="keyboard-legend" class="keyboard-legend" style="display:none;"></div>
             <!-- P2: emoji reaction bar (populated by JS) -->
@@ -195,6 +213,10 @@
                         onclick="showSessionAwards()" style="display:none;" title="Session Awards">🏆 Awards</button>
                 <button class="btn btn-sm btn-outline-info py-0 px-2" id="analytics-trigger-btn"
                         onclick="showAnalyticsModal()" style="display:none;" title="Session Analytics">📊 Analytics</button>
+                <!-- F11/P1 — recap + export, built from the server's session record so it works
+                     for late joiners and survives a refresh. -->
+                <button class="btn btn-sm btn-outline-primary py-0 px-2" id="recap-trigger-btn"
+                        onclick="window.SessionRecap &amp;&amp; SessionRecap.open()" title="Session recap and export">📋 Recap</button>
             </div>
             <div id="voteHistoryList" class="vote-history-list" style="display:none;"></div>
         </div>
@@ -222,6 +244,49 @@
             <button class="btn btn-outline-secondary btn-sm w-100 mb-2" onclick="openSettingsModal('about')" title="View all keyboard shortcuts">⌨️ Shortcuts Help <kbd class="btn-kb-hint">?</kbd></button>
         </div>
 
+        <div class="control-group" id="games-menu-section">
+            <h6 class="control-title games-menu-header" onclick="toggleGamesMenu()" title="Collapse / expand games menu">
+                <span>🎮 Games</span>
+                <span class="games-menu-toggle-icon" id="gamesMenuToggleIcon">▾</span>
+            </h6>
+            <div class="games-menu-grid" id="gamesMenuGrid">
+                <button type="button" class="rs-setup-btn" title="Play today's shared room Wordle"
+                        onclick="window.Wordle && Wordle.open()">🔤 Wordle</button>
+                <button type="button" class="rs-setup-btn" title="Solve today's shared room Crossword together"
+                        onclick="window.Crossword && Crossword.open()">🧩 Crossword</button>
+                <button type="button" class="rs-setup-btn" title="Guess today's shared room Hangman word together"
+                        onclick="window.Hangman && Hangman.open()">👤 Hangman</button>
+                <button type="button" class="rs-setup-btn" title="Find today's words together in the shared Word Search"
+                        onclick="window.WordSearch && WordSearch.open()">🔍 Word Search</button>
+                <button type="button" class="rs-setup-btn" title="Play today's Spelling Bee"
+                        onclick="window.SpellingBee && SpellingBee.open()">🐝 Spelling Bee</button>
+                <button type="button" class="rs-setup-btn" title="Unscramble today's Jumble"
+                        onclick="window.Jumble && Jumble.open()">🎲 Jumble</button>
+                <button type="button" class="rs-setup-btn" title="Solve today's shared room Acrostic together"
+                        onclick="window.Acrostic && Acrostic.open()">📋 Acrostic</button>
+                <button type="button" class="rs-setup-btn" title="Group today's 16 words into 4 hidden categories"
+                        onclick="window.Connections && Connections.open()">🔗 Connections</button>
+                <button type="button" class="rs-setup-btn" title="View game leaderboards and today's badges"
+                        onclick="window.Leaderboard && Leaderboard.open()">🏆 Leaderboard</button>
+            </div>
+        </div>
+
+        <!-- F11 — Ceremonies: the retro board and the standup round-robin. Separate from Games
+             because these are the meeting, not the diversion. -->
+        <div class="control-group" id="ceremonies-menu-section">
+            <h6 class="control-title">🗓️ Ceremonies</h6>
+            <div class="games-menu-grid">
+                <button type="button" class="rs-setup-btn" title="Open Retro Mode — phased sticky-note board, dot voting and actions"
+                        onclick="window.Retro && Retro.open()">🔁 Retro</button>
+                <button type="button" class="rs-setup-btn" title="Run a round-robin standup with a per-person clock"
+                        onclick="window.Standup && Standup.open()">🎤 Standup</button>
+                <button type="button" class="rs-setup-btn" title="Session recap, awards and export"
+                        onclick="window.SessionRecap && SessionRecap.open()">📋 Recap</button>
+                <button type="button" class="rs-setup-btn" title="Invite an absentee to pre-cast their estimates"
+                        onclick="copyPrevoteLink()">📮 Pre-vote link</button>
+            </div>
+        </div>
+
         <div class="control-group" id="room-settings-section">
             <h6 class="control-title">⚙️ Settings</h6>
             <div class="form-check mb-2" data-room-setting="autoReveal">
@@ -239,6 +304,18 @@
             <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="skipVoteCheck" onchange="toggleSkipVoteCard(this.checked)" />
                 <label class="form-check-label" for="skipVoteCheck">🚫 Skip card</label>
+            </div>
+            <!-- F11/P3: off by default on purpose — a pre-vote left last Tuesday should not
+                 quietly decide today's consensus unless the room says it may. -->
+            <div class="form-check mb-2" data-room-setting="countProxyVotes">
+                <input class="form-check-input" type="checkbox" id="countProxyVotesCheck" onchange="toggleCountProxyVotes(this.checked)" title="Absentee pre-votes count toward the average, range and consensus" />
+                <label class="form-check-label" for="countProxyVotesCheck" title="Absentee pre-votes count toward the average, range and consensus">📮 Count pre-votes <span class="badge-room-setting" title="Shared with all room participants">👥</span></label>
+            </div>
+            <!-- F11/P8: the room-wide off switch for the pet. The per-viewer hide lives in
+                 localStorage (pet.js) so one person can turn it off without the team losing it. -->
+            <div class="form-check mb-2" data-room-setting="petEnabled">
+                <input class="form-check-input" type="checkbox" id="petEnabledCheck" onchange="window.Pet && Pet.setEnabled(this.checked)" title="Show the team pet for everyone in this room" />
+                <label class="form-check-label" for="petEnabledCheck" title="Show the team pet for everyone in this room">🐾 Team pet <span class="badge-room-setting" title="Shared with all room participants">👥</span></label>
             </div>
             <!-- AD2: Host-only settings lock selector -->
             <div id="host-lock-section" data-host-only style="display:none;">
@@ -456,6 +533,67 @@
             prompt('Copy this invite link:', inviteUrl);
         }
     }
+
+    // F11/P3 — the absentee link. Deliberately a different page from the invite: someone
+    // pre-casting must not join the room, claim a chair or count toward the quorum.
+    //
+    // This opens a dialog rather than copying straight to the clipboard. Every other button
+    // in the Ceremonies row opens something, so a silent copy reads as a dead button — and
+    // navigator.clipboard.writeText rejects outright whenever the document is not focused,
+    // which left the old version falling back to a bare prompt() or, worse, nothing at all.
+    // The dialog also gives the host somewhere to see the URL, open it themselves to check
+    // it, and be reminded that a PIN-protected room needs the PIN passed on separately.
+    function copyPrevoteLink() {
+        const url = `${window.location.origin}/room/${encodeURIComponent(ROOM_CONFIG.roomName)}/prevote`;
+        const pinned = (typeof roomState !== 'undefined' && roomState && roomState.hasPin);
+
+        if (typeof _f11Modal !== 'function') {   // room.js not up yet — never leave it silent
+            prompt('Copy this pre-vote link:', url);
+            return;
+        }
+
+        const body =
+            '<p class="mb-2">Send this to anyone who can&#39;t make the session. They can leave estimates ' +
+            'for the open stories in advance — they won&#39;t appear in the room, won&#39;t take a chair and ' +
+            'won&#39;t hold up the reveal.</p>' +
+            '<div class="input-group input-group-sm mb-2">' +
+                '<input type="text" class="form-control" id="prevoteLinkInput" readonly value="' + url + '">' +
+                '<a class="btn btn-outline-secondary" href="' + url + '" target="_blank" rel="noopener">Open ↗</a>' +
+            '</div>' +
+            (pinned
+                ? '<div class="alert alert-warning py-2 px-2 mb-0 small">🔒 This room has a PIN. The pre-vote ' +
+                  'page will ask for it, so send the PIN separately — it is not in the link.</div>'
+                : '<div class="text-muted small">Their pre-votes turn up alongside everyone else&#39;s when that ' +
+                  'story is revealed. Whether they count toward the room&#39;s numbers is the ' +
+                  '<strong>📮 Count pre-votes</strong> setting.</div>');
+
+        const host = _f11Modal('📮 Pre-vote link', body, [{
+            label: 'Copy link', cls: 'btn-primary', onClick: function (h) {
+                const input = h.querySelector('#prevoteLinkInput');
+                const btn = h.querySelector('[data-f11-btn="0"]');
+                const done = function (ok) {
+                    if (!btn) return;
+                    btn.textContent = ok ? '✅ Copied' : '⚠️ Select and copy manually';
+                    btn.classList.toggle('btn-primary', ok);
+                    btn.classList.toggle('btn-warning', !ok);
+                };
+                // Select first: it is what makes Ctrl+C work when the async write is refused.
+                if (input) { input.focus(); input.select(); }
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(url).then(function () { done(true); },
+                                                            function () { done(false); });
+                } else {
+                    done(false);
+                }
+                return false;   // keep the dialog open so the confirmation is actually seen
+            }
+        }]);
+
+        host.addEventListener('shown.bs.modal', function () {
+            const input = host.querySelector('#prevoteLinkInput');
+            if (input) { input.focus(); input.select(); }
+        });
+    }
 </script>
 <script src="~/js/room-scene-store.js" asp-append-version="true"></script>
 <script src="~/js/room-scene.js" asp-append-version="true"></script>
@@ -487,4 +625,20 @@
     })();
 </script>
 <script src="~/js/whiteboard.js" asp-append-version="true"></script>
+<script src="~/js/game-settings.js" asp-append-version="true"></script>
+<script src="~/js/wordle.js" asp-append-version="true"></script>
+<script src="~/js/crossword.js" asp-append-version="true"></script>
+<script src="~/js/hangman.js" asp-append-version="true"></script>
+<script src="~/js/wordsearch.js" asp-append-version="true"></script>
+<script src="~/js/spellingbee.js" asp-append-version="true"></script>
+<script src="~/js/jumble.js" asp-append-version="true"></script>
+<script src="~/js/acrostic.js" asp-append-version="true"></script>
+<script src="~/js/connections.js" asp-append-version="true"></script>
+<script src="~/js/leaderboard.js" asp-append-version="true"></script>
+<!-- Feature 11 — Ceremony Suite. Room-level overlays; note that pet.js is deliberately NOT
+     here — it is registered in Views/Shared/_Layout.cshtml so the pet lives on the page
+     rather than in the room. -->
+<script src="~/js/session-recap.js" asp-append-version="true"></script>
+<script src="~/js/retro.js" asp-append-version="true"></script>
+<script src="~/js/standup.js" asp-append-version="true"></script>
 }

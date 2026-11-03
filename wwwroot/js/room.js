@@ -31,6 +31,14 @@ var _isMobile = window.innerWidth <= 600;
 window.addEventListener('resize', function() { _isMobile = window.innerWidth <= 600; });
 let _pendingIsObserver = false;
 let _roundStartMs    = Date.now();        // reset on VotesReset, used for relative timestamps
+// Today's game-leaderboard badges (name -> ["gold-hangman","crown",...]), from RoomState /
+// DailyBadgesUpdate — rendered as a small overlay on each participant's avatar.
+let _dailyBadgesCache = {};
+const _BADGE_ICON = { gold: '🥇', silver: '🥈', bronze: '🥉', crown: '👑' };
+function _applyDailyBadges(badges) {
+    _dailyBadgesCache = badges || {};
+    if (typeof renderParticipants === 'function') renderParticipants();
+}
 let roomState = {
     participants: [],
     stories: [],
@@ -45,9 +53,112 @@ let roomState = {
     isHost: false,
     hostConnectionId: null,
     // AD2 — Settings lock mode: none | ask | hostonly | hidden
-    settingsLockMode: 'none'
+    settingsLockMode: 'none',
+    // F11/P1 — the server's durable record of every reveal, newest LAST (append order).
+    // `history` above is the derived client view of this, newest first; see _rebuildHistory.
+    sessionRounds: [],
+    // F11/P2, P3, P7 — anchors, absentee pre-votes and the prediction pool.
+    referenceStoryIds: [],
+    proxyVotes: [],
+    countProxyVotes: false,
+    myPrediction: null,
+    predictionCount: 0,
+    predictionScores: []
 };
 window.roomState = roomState;
+
+// ============================================================
+// F11/P1 — session history
+//
+// The record is now the server's (Room.SessionRounds); this is the browser's view of it.
+// Two things live only in the browser and cannot be rebuilt from the server round:
+// `voteOrder` (who played first/last) and `flipCounts` (how often each person changed their
+// mind) — both are watched live in this tab and neither is worth a broadcast of its own.
+// They are kept in a side map keyed by round id and persisted in sessionStorage so an F5
+// does not lose the current session's Hall-of-Fame detail for the person who was watching.
+// Anything derived from them degrades to zero for rounds this tab never saw, which is the
+// honest answer rather than a fabricated one.
+// ============================================================
+var _roundExtrasKey = 'es_roundExtras_' + ((window.ROOM_CONFIG && ROOM_CONFIG.roomName) || '');
+var _roundExtras = {};
+try { _roundExtras = JSON.parse(sessionStorage.getItem(_roundExtrasKey) || '{}') || {}; } catch (e) { _roundExtras = {}; }
+
+function _saveRoundExtras() {
+    try { sessionStorage.setItem(_roundExtrasKey, JSON.stringify(_roundExtras)); } catch (e) {}
+}
+
+// Rounds record votes by Name (the app's stable per-room identity); awards.js and
+// analytics.js key by connectionId because that is what a live reveal hands them. Map a name
+// onto the connectionId it currently holds so the two views agree for anyone in the room, and
+// fall back to a stable synthetic id for people who have since left — `names` on the entry
+// keeps their display name resolvable either way.
+function _cidForName(name) {
+    var p = (roomState.participants || []).find(function (x) { return x.name === name; });
+    return (p && p.connectionId) ? p.connectionId : ('nm:' + name);
+}
+
+function _historyStatsFor(round, votesByCid) {
+    // Mirrors PokerHub.CalculateStats for the fields the client actually consumes. The
+    // outlier (`shameParticipantId`) is deliberately NOT reconstructed: it depended on who
+    // was in the room at reveal time, and guessing it a week later would put a name in the
+    // Hall of Fame's "wolf" column that the round never actually gave it.
+    var nums = [];
+    Object.keys(votesByCid).forEach(function (cid) {
+        var n = parseFloat(String(votesByCid[cid] || '').replace('½', '0.5'));
+        if (!isNaN(n)) nums.push(n);
+    });
+    if (nums.length === 0) {
+        return { average: null, min: null, max: null, isConsensus: false,
+                 majorityValue: null, outlierValue: null, shameParticipantName: null, shameParticipantId: null };
+    }
+    var sum = nums.reduce(function (a, b) { return a + b; }, 0);
+    return {
+        average: Math.round((sum / nums.length) * 10) / 10,
+        min: Math.min.apply(null, nums),
+        max: Math.max.apply(null, nums),
+        isConsensus: nums.every(function (n) { return n === nums[0]; }),
+        majorityValue: null, outlierValue: null,
+        shameParticipantName: null, shameParticipantId: null
+    };
+}
+
+function _historyEntryFor(round) {
+    var extras = _roundExtras[round.id] || {};
+    var votes = {}, names = {};
+    Object.keys(round.votes || {}).forEach(function (name) {
+        var cid = _cidForName(name);
+        votes[cid] = round.votes[name];
+        names[cid] = name;
+    });
+    return {
+        roundId: round.id,
+        story: round.storyTitle || 'Unnamed',
+        votes: votes,
+        names: names,
+        // The live reveal's own stats object when this tab saw it happen, otherwise derived.
+        stats: extras.stats || _historyStatsFor(round, votes),
+        voteOrder: (extras.voteOrder || []).slice(),
+        flipCounts: Object.assign({}, extras.flipCounts || {}),
+        proxyVoters: (round.proxyVoters || []).slice(),
+        confidences: round.confidences || {},
+        finalEstimate: round.finalEstimate || null,
+        wasUnanimous: !!round.wasUnanimous,
+        discussionSeconds: round.discussionSeconds || 0,
+        roundNumber: round.roundNumber || 1,
+        jiraKey: round.jiraKey || null,
+        revealedAtUtc: round.revealedAtUtc || null
+    };
+}
+
+// Set by the VotesRevealed handler, consumed by SessionRoundRecorded (which is the first
+// event that knows the round's id).
+var _pendingRoundExtras = null;
+
+// Newest first, matching what the reveal handler used to unshift.
+function _rebuildHistory() {
+    roomState.history = (roomState.sessionRounds || []).slice().reverse().map(_historyEntryFor);
+    if (typeof renderVoteHistory === 'function') renderVoteHistory();
+}
 
 // P3 (Feature9): user-triggered actions used to fail silently (console-only) while the
 // SignalR connection was down/reconnecting — the user just saw nothing happen. Guard the
@@ -147,6 +258,279 @@ window.WhiteboardNet = {
     },
     clear: function () {
         if (connection) connection.invoke('WhiteboardClear').catch(function(e){ console.error('WhiteboardClear failed', e); });
+    }
+};
+
+// Shared game-setup facade. Every in-room game uses the same "first participant of the day
+// locks the settings in for the room" mechanic, so they all configure through one hub method
+// with a flat { key: int } settings map (booleans as 0/1). See game-settings.js for the form
+// and PokerHub.GameConfigure for the server side.
+window.GameSettingsNet = {
+    configure: function (game, settings) {
+        if (connection) connection.invoke('GameConfigure', game, settings || {}).catch(function(e){ console.error('GameConfigure failed', e); });
+    }
+};
+
+// Wordle → SignalR facade. wordle.js calls these to submit guesses / reshuffle.
+// (Setup goes through GameSettingsNet.configure like every other game.)
+window.WordleNet = {
+    guess: function (word) {
+        if (connection) connection.invoke('WordleGuess', word).catch(function(e){ console.error('WordleGuess failed', e); });
+    },
+    newGame: function () {
+        if (connection) connection.invoke('WordleNewGame').catch(function(e){ console.error('WordleNewGame failed', e); });
+    }
+};
+
+// Crossword → SignalR facade. crossword.js calls these to fill cells / reshuffle.
+window.CrosswordNet = {
+    fill: function (row, col, letter) {
+        if (connection) connection.invoke('CrosswordFill', row, col, letter).catch(function(e){ console.error('CrosswordFill failed', e); });
+    },
+    newGame: function () {
+        if (connection) connection.invoke('CrosswordNewGame').catch(function(e){ console.error('CrosswordNewGame failed', e); });
+    },
+    setMode: function (mode) {
+        if (connection) connection.invoke('CrosswordSetMode', mode).catch(function(e){ console.error('CrosswordSetMode failed', e); });
+    }
+};
+
+// Hangman → SignalR facade. hangman.js calls these to guess letters / reshuffle.
+window.HangmanNet = {
+    guessLetter: function (letter) {
+        if (connection) connection.invoke('HangmanGuessLetter', letter).catch(function(e){ console.error('HangmanGuessLetter failed', e); });
+    },
+    newGame: function () {
+        if (connection) connection.invoke('HangmanNewGame').catch(function(e){ console.error('HangmanNewGame failed', e); });
+    },
+    setMode: function (mode) {
+        if (connection) connection.invoke('HangmanSetMode', mode).catch(function(e){ console.error('HangmanSetMode failed', e); });
+    }
+};
+
+// Word Search → SignalR facade. wordsearch.js calls these to submit found words / reshuffle.
+window.WordSearchNet = {
+    submit: function (word, startRow, startCol, endRow, endCol) {
+        if (connection) connection.invoke('WordSearchSubmit', word, startRow, startCol, endRow, endCol).catch(function(e){ console.error('WordSearchSubmit failed', e); });
+    },
+    newGame: function () {
+        if (connection) connection.invoke('WordSearchNewGame').catch(function(e){ console.error('WordSearchNewGame failed', e); });
+    },
+    setMode: function (mode) {
+        if (connection) connection.invoke('WordSearchSetMode', mode).catch(function(e){ console.error('WordSearchSetMode failed', e); });
+    }
+};
+
+// Spelling Bee → SignalR facade. spellingbee.js calls these to submit words / reshuffle.
+window.SpellingBeeNet = {
+    submit: function (word) {
+        if (connection) connection.invoke('SpellingBeeSubmit', word).catch(function(e){ console.error('SpellingBeeSubmit failed', e); });
+    },
+    newGame: function () {
+        if (connection) connection.invoke('SpellingBeeNewGame').catch(function(e){ console.error('SpellingBeeNewGame failed', e); });
+    },
+    setMode: function (mode) {
+        if (connection) connection.invoke('SpellingBeeSetMode', mode).catch(function(e){ console.error('SpellingBeeSetMode failed', e); });
+    }
+};
+
+// Jumble → SignalR facade. jumble.js calls these to guess words / the final answer / reshuffle.
+window.JumbleNet = {
+    guessWord: function (index, guess) {
+        if (connection) connection.invoke('JumbleGuessWord', index, guess).catch(function(e){ console.error('JumbleGuessWord failed', e); });
+    },
+    guessFinal: function (guess) {
+        if (connection) connection.invoke('JumbleGuessFinal', guess).catch(function(e){ console.error('JumbleGuessFinal failed', e); });
+    },
+    newGame: function () {
+        if (connection) connection.invoke('JumbleNewGame').catch(function(e){ console.error('JumbleNewGame failed', e); });
+    },
+    setMode: function (mode) {
+        if (connection) connection.invoke('JumbleSetMode', mode).catch(function(e){ console.error('JumbleSetMode failed', e); });
+    }
+};
+
+// Acrostic → SignalR facade. acrostic.js calls these to fill cells / reshuffle.
+window.AcrosticNet = {
+    fill: function (position, letter) {
+        if (connection) connection.invoke('AcrosticFill', position, letter).catch(function(e){ console.error('AcrosticFill failed', e); });
+    },
+    newGame: function () {
+        if (connection) connection.invoke('AcrosticNewGame').catch(function(e){ console.error('AcrosticNewGame failed', e); });
+    },
+    setMode: function (mode) {
+        if (connection) connection.invoke('AcrosticSetMode', mode).catch(function(e){ console.error('AcrosticSetMode failed', e); });
+    }
+};
+
+// Leaderboard → SignalR facade. leaderboard.js calls this to fetch a game/range view on demand.
+window.LeaderboardNet = {
+    get: function (game, range) {
+        if (connection) connection.invoke('GetLeaderboard', game, range).catch(function(e){ console.error('GetLeaderboard failed', e); });
+    }
+};
+
+// Connections → SignalR facade. connections.js calls these to submit a group / reshuffle.
+window.ConnectionsNet = {
+    submit: function (words) {
+        if (connection) connection.invoke('ConnectionsSubmit', words || []).catch(function(e){ console.error('ConnectionsSubmit failed', e); });
+    },
+    newGame: function () {
+        if (connection) connection.invoke('ConnectionsNewGame').catch(function(e){ console.error('ConnectionsNewGame failed', e); });
+    },
+    setMode: function (mode) {
+        if (connection) connection.invoke('ConnectionsSetMode', mode).catch(function(e){ console.error('ConnectionsSetMode failed', e); });
+    }
+};
+
+// ============================================================
+// Feature 11 — Ceremony Suite facades
+// One thin wrapper per hub surface, same shape as every other *Net above: the modules never
+// touch `connection` directly, so a rename or a guard lands in exactly one place.
+// ============================================================
+
+// P4 — Retro Mode. Every call is a mutation the server re-validates and re-broadcasts; the
+// module renders only what comes back, never its own optimistic copy (the Collect-phase
+// visibility rules are server-enforced and a local guess would leak them).
+window.RetroNet = {
+    start: function (title, sprintName, sprintGoal, format, anonymous, votesPerPerson) {
+        _ifConnected(function () {
+            connection.invoke('RetroStart', title || '', sprintName || '', sprintGoal || '',
+                format || 'default', !!anonymous, votesPerPerson || 3)
+                .catch(function(e){ console.error('RetroStart failed', e); });
+        });
+    },
+    openBoard: function (boardId) {
+        if (connection) connection.invoke('RetroOpenBoard', boardId || null).catch(function(e){ console.error('RetroOpenBoard failed', e); });
+    },
+    setPhase: function (phase) {
+        _ifConnected(function () {
+            connection.invoke('RetroSetPhase', phase).catch(function(e){ console.error('RetroSetPhase failed', e); });
+        });
+    },
+    setPaused: function (paused) {
+        if (connection) connection.invoke('RetroSetPaused', !!paused).catch(function(e){ console.error('RetroSetPaused failed', e); });
+    },
+    setVotesPerPerson: function (n) {
+        if (connection) connection.invoke('RetroSetVotesPerPerson', n).catch(function(e){ console.error('RetroSetVotesPerPerson failed', e); });
+    },
+    addNote: function (columnKey, text, colour) {
+        _ifConnected(function () {
+            connection.invoke('RetroAddNote', columnKey, text, colour || null).catch(function(e){ console.error('RetroAddNote failed', e); });
+        });
+    },
+    editNote: function (noteId, text, colour) {
+        if (connection) connection.invoke('RetroEditNote', noteId, text === undefined ? null : text, colour || null).catch(function(e){ console.error('RetroEditNote failed', e); });
+    },
+    // 60ms-throttled server-side; sends a delta back (RetroNoteMoved), not a full re-render.
+    moveNote: function (noteId, columnKey, x, y) {
+        if (connection) connection.invoke('RetroMoveNote', noteId, columnKey || null, x, y).catch(function(){});
+    },
+    deleteNote: function (noteId) {
+        if (connection) connection.invoke('RetroDeleteNote', noteId).catch(function(e){ console.error('RetroDeleteNote failed', e); });
+    },
+    groupNotes: function (noteId, targetId, title) {
+        if (connection) connection.invoke('RetroGroupNotes', noteId, targetId || null, title || null).catch(function(e){ console.error('RetroGroupNotes failed', e); });
+    },
+    vote: function (targetId, delta) {
+        _ifConnected(function () {
+            connection.invoke('RetroVote', targetId, delta).catch(function(e){ console.error('RetroVote failed', e); });
+        });
+    },
+    setTopic: function (topicId, markDiscussed) {
+        if (connection) connection.invoke('RetroSetTopic', topicId || null, !!markDiscussed).catch(function(e){ console.error('RetroSetTopic failed', e); });
+    },
+    linkNote: function (noteId, issueKey, roundId) {
+        if (connection) connection.invoke('RetroLinkNote', noteId, issueKey || null, roundId || null).catch(function(e){ console.error('RetroLinkNote failed', e); });
+    },
+    addAction: function (text, owner, dueDate, sourceNoteIds) {
+        _ifConnected(function () {
+            connection.invoke('RetroAddAction', text, owner || null, dueDate || null, sourceNoteIds || null)
+                .catch(function(e){ console.error('RetroAddAction failed', e); });
+        });
+    },
+    updateAction: function (actionId, text, owner, dueDate, status) {
+        if (connection) connection.invoke('RetroUpdateAction', actionId,
+            text === undefined ? null : text, owner === undefined ? null : owner,
+            dueDate === undefined ? null : dueDate, status || null)
+            .catch(function(e){ console.error('RetroUpdateAction failed', e); });
+    },
+    pushActionToJira: function (domain, email, token, projectKey, issueType, actionId) {
+        if (connection) connection.invoke('RetroPushActionToJira', domain, email, token, projectKey, issueType, actionId)
+            .catch(function(e){ console.error('RetroPushActionToJira failed', e); });
+    },
+    fetchSprint: function (domain, email, token, sprintId, storyPointsField) {
+        if (connection) connection.invoke('RetroFetchSprint', domain, email, token, sprintId, storyPointsField || null)
+            .catch(function(e){ console.error('RetroFetchSprint failed', e); });
+    },
+    close: function () {
+        if (connection) connection.invoke('RetroClose').catch(function(e){ console.error('RetroClose failed', e); });
+    }
+};
+
+// P5 — standup / round robin.
+window.StandupNet = {
+    start: function (order, secondsPerPerson) {
+        _ifConnected(function () {
+            connection.invoke('StandupStart', order || 'seating', secondsPerPerson || 90)
+                .catch(function(e){ console.error('StandupStart failed', e); });
+        });
+    },
+    advance: function (direction, skip) {
+        _ifConnected(function () {
+            connection.invoke('StandupAdvance', direction === undefined ? 1 : direction, !!skip)
+                .catch(function(e){ console.error('StandupAdvance failed', e); });
+        });
+    },
+    stop: function () {
+        if (connection) connection.invoke('StandupStop').catch(function(e){ console.error('StandupStop failed', e); });
+    },
+    setNote: function (yesterday, today, blockers) {
+        if (connection) connection.invoke('StandupSetNote', yesterday || null, today || null, blockers || null)
+            .catch(function(e){ console.error('StandupSetNote failed', e); });
+    },
+    blockerToRetro: function (text) {
+        if (connection) connection.invoke('StandupBlockerToRetro', text).catch(function(e){ console.error('StandupBlockerToRetro failed', e); });
+    }
+};
+
+// P2 — reference deck (calibration anchors). Host-gated server-side.
+window.ReferenceDeckNet = {
+    set: function (storyIds) {
+        if (connection) connection.invoke('SetReferenceStories', storyIds || []).catch(function(e){ console.error('SetReferenceStories failed', e); });
+    }
+};
+
+// P3 — proxy/absentee voting. Only the host-side toggle lives here; the pre-vote page itself
+// runs its own tiny connection (see Views/Room/Prevote.cshtml) because it deliberately never
+// joins the room.
+window.ProxyVoteNet = {
+    setCounted: function (enabled) {
+        if (connection) connection.invoke('SetCountProxyVotes', !!enabled).catch(function(e){ console.error('SetCountProxyVotes failed', e); });
+    }
+};
+
+// P7 — estimate prediction pool.
+window.PredictionNet = {
+    cast: function (value) {
+        _ifConnected(function () {
+            connection.invoke('CastPrediction', value === undefined ? null : value)
+                .catch(function(e){ console.error('CastPrediction failed', e); });
+        });
+    }
+};
+
+// P8 — team pet. Adoption and renaming are host-gated server-side; the enable switch is a
+// room setting, and the per-viewer hide is localStorage-only (see pet.js).
+window.PetNet = {
+    adopt: function (species, name) {
+        if (connection) connection.invoke('AdoptPet', species, name).catch(function(e){ console.error('AdoptPet failed', e); });
+    },
+    rename: function (name) {
+        if (connection) connection.invoke('RenamePet', name).catch(function(e){ console.error('RenamePet failed', e); });
+    },
+    setEnabled: function (enabled) {
+        if (connection) connection.invoke('SetPetEnabled', !!enabled).catch(function(e){ console.error('SetPetEnabled failed', e); });
     }
 };
 
@@ -329,7 +713,52 @@ function registerHandlers() {
             window._rs3dPendingState = state;
         }
         if (window.Whiteboard && Whiteboard.loadStrokes) Whiteboard.loadStrokes(state.whiteboardStrokes || []);
+        // The shared game setup form (game-settings.js) reads which games still need setting
+        // up, their locked-in values and their allowed ranges off window.roomState rather than
+        // off a state snapshot it never sees, so mirror those three maps here — before the
+        // per-game loadState calls below, which is what triggers the form to render.
+        roomState.gameNeedsSetup = state.gameNeedsSetup || {};
+        roomState.gameSettings = state.gameSettings || {};
+        roomState.gameLimits = state.gameLimits || {};
+        if (window.Wordle && Wordle.loadState) Wordle.loadState(state);
+        if (window.Crossword && Crossword.loadState) Crossword.loadState(state);
+        if (window.Hangman && Hangman.loadState) Hangman.loadState(state);
+        if (window.WordSearch && WordSearch.loadState) WordSearch.loadState(state);
+        if (window.SpellingBee && SpellingBee.loadState) SpellingBee.loadState(state);
+        if (window.Jumble && Jumble.loadState) Jumble.loadState(state);
+        if (window.Acrostic && Acrostic.loadState) Acrostic.loadState(state);
+        if (window.Connections && Connections.loadState) Connections.loadState(state);
+        if (window.Leaderboard && Leaderboard.loadState) Leaderboard.loadState(state);
+        _applyDailyBadges(state.dailyBadges || {});
         _applyRoomIcon(state.roomIcon || null);
+
+        // ---- Feature 11 -------------------------------------------------------------
+        // P1: the whole point — history now arrives with the state, so Hall of Fame and
+        // Analytics are visible to late joiners and survive an F5 instead of being dead
+        // code for everyone who didn't watch every reveal in this tab.
+        roomState.sessionRounds = state.sessionRounds || [];
+        _rebuildHistory();
+
+        roomState.referenceStoryIds = state.referenceStoryIds || [];
+        roomState.proxyVotes        = state.proxyVotes || [];
+        roomState.countProxyVotes   = state.countProxyVotes === true;
+        roomState.myPrediction      = state.myPrediction || null;
+        roomState.predictionCount   = state.predictionCount || 0;
+        roomState.predictionScores  = state.predictionScores || [];
+        roomState.retroLimits       = state.retroLimits || {};
+        roomState.retroFormats      = state.retroFormats || [];
+        roomState.standupLimits     = state.standupLimits || {};
+        try {
+            _renderReferenceDeck();
+            _renderProxyVotes();
+            _renderPredictionPanel();
+            _syncCountProxyVotesToggle();
+        } catch (e) { console.error('F11 render failed:', e); }
+
+        if (window.Retro   && Retro.loadState)   Retro.loadState(state);
+        if (window.Standup && Standup.loadState) Standup.loadState(state);
+        if (window.Pet     && Pet.loadState)     Pet.loadState(state);
+        if (window.SessionRecap && SessionRecap.loadState) SessionRecap.loadState(state);
     });
 
     connection.on('ParticipantJoined', (p) => {
@@ -448,22 +877,25 @@ function registerHandlers() {
         _counterSpellOutlierId = (stats && stats.shameParticipantId) || null;
         _renderCounterSpellButton(stats);
 
-        // Record in history (no cap — keep full session)
-        const storyTitle = roomState.currentStoryId
-            ? (roomState.stories.find(s => s.id === roomState.currentStoryId)?.title || 'Unnamed')
-            : 'Unnamed';
-        roomState.history.unshift({
-            story: storyTitle, votes, stats,
+        // F11/P1 — history is no longer built here. The server records the round and sends
+        // SessionRoundRecorded right behind this event; all that is browser-only is the
+        // live-watched detail (vote order, flip counts, the authoritative stats object),
+        // which is parked here and filed against the round id when it lands.
+        _pendingRoundExtras = {
+            stats: stats || null,
             voteOrder:  _roundVoteOrder.slice(),
             flipCounts: Object.assign({}, _roundFlipCounts)
-        });
-        renderVoteHistory();
+        };
         if (typeof saveVelocityForSession === 'function') saveVelocityForSession();
+        _renderPredictionPanel();   // F11/P7 — calls are locked; the panel hides itself
+        _renderProxyVotes();        // F11/P3 — pre-cast values become visible with the rest
         _qTryDesktopNotify(stats);  // Q2
     });
 
     connection.on('VotesHidden', () => {
         roomState.votesRevealed = false;
+        _renderPredictionPanel();
+        _renderProxyVotes();
         document.getElementById('revealBtn').style.display = 'block';
         document.getElementById('hideBtn').style.display = 'none';
         document.getElementById('statsBar').style.display = 'none';
@@ -495,6 +927,10 @@ function registerHandlers() {
         renderVibeDisplay({});
         renderCards();
         renderParticipants();
+        // F11/P7 — a fresh round collects fresh calls; the server already cleared them.
+        roomState.myPrediction = null;
+        roomState.predictionCount = 0;
+        _renderPredictionPanel();
     });
 
     connection.on('GhostModeToggled', (enabled, togglerName) => {
@@ -553,6 +989,13 @@ function registerHandlers() {
         renderStories();
         renderCards();
         acStartStoryTimer(storyId);  // AC1: start per-story timer
+        // F11 — the pre-vote strip and the prediction pool are both per-story; the proxy
+        // values for the new story ride in on the next RoomState/ProxyVotesUpdated.
+        roomState.proxyVotes = [];
+        roomState.myPrediction = null;
+        roomState.predictionCount = 0;
+        _renderProxyVotes();
+        _renderPredictionPanel();
     });
 
     connection.on('StoryDeleted', (storyId) => {
@@ -574,6 +1017,10 @@ function registerHandlers() {
     connection.on('StoryCompleted', (storyId, estimate) => {
         const s = roomState.stories.find(s => s.id === storyId);
         if (s) { s.isCompleted = true; s.finalEstimate = estimate; renderStories(); }
+        // F11/P2 — a story that just landed unanimously on an unpinned value is the anchor
+        // the deck is missing; offer it once, to the host only.
+        _renderReferenceDeck();
+        if (s && roomState.history[0] && roomState.history[0].wasUnanimous) _maybeSuggestAnchor(s);
         _updateSprintDashboard();
         // If all stories are now complete, save this session's velocity
         const allDone = roomState.stories.length > 0
@@ -696,8 +1143,224 @@ function registerHandlers() {
     connection.on('WhiteboardCleared', () => {
         if (window.Whiteboard && Whiteboard.onClear) Whiteboard.onClear();
     });
+    // Wordle sync
+    connection.on('WordleGuessResult', (word, feedback, solved, failed, attempts, maxGuesses) => {
+        if (window.Wordle && Wordle.onGuessResult) Wordle.onGuessResult(word, feedback, solved, failed, attempts, maxGuesses);
+    });
+    connection.on('WordleGuessRejected', (guess) => {
+        if (window.Wordle && Wordle.onGuessRejected) Wordle.onGuessRejected(guess);
+    });
+    connection.on('WordleStatusUpdate', (update) => {
+        if (window.Wordle && Wordle.onStatusUpdate) Wordle.onStatusUpdate(update);
+    });
+    // Somebody in the room just locked in today's settings for one of the games. Cache them on
+    // roomState (so any setup form still on screen stops offering to configure it) and let the
+    // game's own module switch from its setup panel to the puzzle. The game's *Reset event
+    // follows immediately with the new puzzle's shape.
+    connection.on('GameConfigured', (game, settings) => {
+        if (window.GameSettings && GameSettings.applyConfigured) GameSettings.applyConfigured(game, settings);
+        var mod = {
+            wordle: window.Wordle, crossword: window.Crossword, hangman: window.Hangman,
+            wordsearch: window.WordSearch, spellingbee: window.SpellingBee,
+            jumble: window.Jumble, acrostic: window.Acrostic, connections: window.Connections
+        }[game];
+        if (mod && mod.onConfigured) mod.onConfigured(settings);
+    });
+    connection.on('WordleReset', (wordLength) => {
+        if (window.Wordle && Wordle.onReset) Wordle.onReset(wordLength);
+    });
+    // Crossword sync
+    connection.on('CrosswordCellFilled', (row, col, letter, correct) => {
+        if (window.Crossword && Crossword.onCellFilled) Crossword.onCellFilled(row, col, letter, correct);
+    });
+    connection.on('CrosswordSolved', () => {
+        if (window.Crossword && Crossword.onSolved) Crossword.onSolved();
+    });
+    connection.on('CrosswordReset', (puzzleId, layout) => {
+        if (window.Crossword && Crossword.onReset) Crossword.onReset(puzzleId, layout);
+    });
+    connection.on('CrosswordModeChanged', (mode) => {
+        if (window.Crossword && Crossword.onModeChanged) Crossword.onModeChanged(mode);
+    });
+    // Hangman sync
+    connection.on('HangmanLetterGuessed', (letter, correct, wrongCount, solved, failed, guesserName, masked) => {
+        if (window.Hangman && Hangman.onLetterGuessed) Hangman.onLetterGuessed(letter, correct, wrongCount, solved, failed, guesserName, masked);
+    });
+    connection.on('HangmanReset', (wordLength, clue, maxWrong) => {
+        if (window.Hangman && Hangman.onReset) Hangman.onReset(wordLength, clue, maxWrong);
+    });
+    connection.on('HangmanModeChanged', (mode) => {
+        if (window.Hangman && Hangman.onModeChanged) Hangman.onModeChanged(mode);
+    });
+    // Word Search sync
+    connection.on('WordSearchWordFound', (word, startRow, startCol, endRow, endCol, foundByName) => {
+        if (window.WordSearch && WordSearch.onWordFound) WordSearch.onWordFound(word, startRow, startCol, endRow, endCol, foundByName);
+    });
+    connection.on('WordSearchReset', (puzzleId, gridRows, words) => {
+        if (window.WordSearch && WordSearch.onReset) WordSearch.onReset(puzzleId, gridRows, words);
+    });
+    connection.on('WordSearchModeChanged', (mode) => {
+        if (window.WordSearch && WordSearch.onModeChanged) WordSearch.onModeChanged(mode);
+    });
+    // Spelling Bee sync
+    connection.on('SpellingBeeSubmitResult', (valid, word, scoreGain, isPangram, alreadyFound) => {
+        if (window.SpellingBee && SpellingBee.onSubmitResult) SpellingBee.onSubmitResult(valid, word, scoreGain, isPangram, alreadyFound);
+    });
+    connection.on('SpellingBeeStatusUpdate', (update) => {
+        if (window.SpellingBee && SpellingBee.onStatusUpdate) SpellingBee.onStatusUpdate(update);
+    });
+    connection.on('SpellingBeeReset', (puzzleId, letters) => {
+        if (window.SpellingBee && SpellingBee.onReset) SpellingBee.onReset(puzzleId, letters);
+    });
+    connection.on('SpellingBeeModeChanged', (mode) => {
+        if (window.SpellingBee && SpellingBee.onModeChanged) SpellingBee.onModeChanged(mode);
+    });
+    connection.on('SpellingBeeSharedFound', (word, scoreGain, isPangram, foundByName, totalScore, wordCount) => {
+        if (window.SpellingBee && SpellingBee.onSharedFound) SpellingBee.onSharedFound(word, scoreGain, isPangram, foundByName, totalScore, wordCount);
+    });
+    // Jumble sync
+    connection.on('JumbleWordGuessResult', (index, correct, word, markedIndex) => {
+        if (window.Jumble && Jumble.onWordGuessResult) Jumble.onWordGuessResult(index, correct, word, markedIndex);
+    });
+    connection.on('JumbleFinalGuessResult', (correct) => {
+        if (window.Jumble && Jumble.onFinalGuessResult) Jumble.onFinalGuessResult(correct);
+    });
+    connection.on('JumbleStatusUpdate', (update) => {
+        if (window.Jumble && Jumble.onStatusUpdate) Jumble.onStatusUpdate(update);
+    });
+    connection.on('JumbleReset', (scrambled, markedIndex) => {
+        if (window.Jumble && Jumble.onReset) Jumble.onReset(scrambled, markedIndex);
+    });
+    connection.on('JumbleModeChanged', (mode) => {
+        if (window.Jumble && Jumble.onModeChanged) Jumble.onModeChanged(mode);
+    });
+    // Acrostic sync
+    connection.on('AcrosticCellFilled', (position, letter, correct) => {
+        if (window.Acrostic && Acrostic.onCellFilled) Acrostic.onCellFilled(position, letter, correct);
+    });
+    connection.on('AcrosticSolved', () => {
+        if (window.Acrostic && Acrostic.onSolved) Acrostic.onSolved();
+    });
+    connection.on('AcrosticReset', (puzzleId, layout) => {
+        if (window.Acrostic && Acrostic.onReset) Acrostic.onReset(puzzleId, layout);
+    });
+    connection.on('AcrosticModeChanged', (mode) => {
+        if (window.Acrostic && Acrostic.onModeChanged) Acrostic.onModeChanged(mode);
+    });
+    // Leaderboard sync
+    connection.on('LeaderboardResult', (game, range, ranked) => {
+        if (window.Leaderboard && Leaderboard.onResult) Leaderboard.onResult(game, range, ranked);
+    });
+    connection.on('DailyBadgesUpdate', (badges) => {
+        _applyDailyBadges(badges || {});
+        if (window.Leaderboard && Leaderboard.onBadgesUpdate) Leaderboard.onBadgesUpdate(badges);
+    });
     // AP1: room icon
     connection.on('RoomIconChanged', (icon) => { _applyRoomIcon(icon); });
+
+    // Connections (the eighth game)
+    connection.on('ConnectionsResult', (name, payload) => {
+        if (window.Connections && Connections.onResult) Connections.onResult(name, payload);
+    });
+    connection.on('ConnectionsStatusUpdate', (status) => {
+        if (window.Connections && Connections.onStatusUpdate) Connections.onStatusUpdate(status);
+    });
+    connection.on('ConnectionsReset', (puzzleId, words, mistakesAllowed) => {
+        if (window.Connections && Connections.onReset) Connections.onReset(puzzleId, words, mistakesAllowed);
+    });
+    connection.on('ConnectionsModeChanged', (mode) => {
+        if (window.Connections && Connections.onModeChanged) Connections.onModeChanged(mode);
+    });
+
+    // ============================================================
+    // Feature 11 — Ceremony Suite
+    // ============================================================
+
+    // P1 — the durable round record. Arrives immediately after VotesRevealed, carrying the
+    // id the browser-only extras (vote order, flip counts) get filed under.
+    connection.on('SessionRoundRecorded', (round) => {
+        if (!round) return;
+        if (_pendingRoundExtras) {
+            _roundExtras[round.id] = _pendingRoundExtras;
+            _pendingRoundExtras = null;
+            _saveRoundExtras();
+        }
+        roomState.sessionRounds = (roomState.sessionRounds || []).filter(r => r.id !== round.id);
+        roomState.sessionRounds.push(round);
+        _rebuildHistory();
+        if (window.SessionRecap && SessionRecap.refresh) SessionRecap.refresh();
+    });
+
+    // P2 — calibration anchors
+    connection.on('ReferenceStoriesUpdated', (ids) => {
+        roomState.referenceStoryIds = ids || [];
+        _renderReferenceDeck();
+    });
+
+    // P3 — absentee pre-votes for the story on the table
+    connection.on('ProxyVotesUpdated', (storyId, proxies) => {
+        if (storyId !== roomState.currentStoryId) return;
+        roomState.proxyVotes = proxies || [];
+        _renderProxyVotes();
+        renderParticipants();
+    });
+    connection.on('CountProxyVotesUpdated', (enabled) => {
+        roomState.countProxyVotes = enabled === true;
+        _syncCountProxyVotesToggle();
+        _renderProxyVotes();
+    });
+
+    // P4 — retro. The board is rendered per-viewer server-side (Collect hides other people's
+    // notes, Vote hides other people's dots), so this is a whole-board push, not a delta —
+    // except RetroNoteMoved, which is a genuine delta because a drag fires continuously.
+    connection.on('RetroUpdated', (board, archive) => {
+        if (window.Retro && Retro.onUpdated) Retro.onUpdated(board, archive);
+        if (window.Pet && Pet.react) Pet.react('retro');
+    });
+    connection.on('RetroPhaseChanged', (phase) => {
+        if (window.Retro && Retro.onPhaseChanged) Retro.onPhaseChanged(phase);
+    });
+    connection.on('RetroNoteMoved', (delta) => {
+        if (window.Retro && Retro.onNoteMoved) Retro.onNoteMoved(delta);
+    });
+    connection.on('RetroJiraResult', (actionId, ok, message, key, url) => {
+        if (window.Retro && Retro.onJiraResult) Retro.onJiraResult(actionId, ok, message, key, url);
+    });
+
+    // P5 — standup
+    connection.on('StandupUpdated', (payload) => {
+        if (window.Standup && Standup.onUpdated) Standup.onUpdated(payload);
+    });
+    connection.on('StandupFinished', () => {
+        if (window.Standup && Standup.onFinished) Standup.onFinished();
+    });
+
+    // P7 — prediction pool. The count is all anybody sees before the reveal; who called what
+    // stays server-side until PredictionsResolved, for the same anchoring reason votes do.
+    connection.on('PredictionAccepted', (value) => {
+        roomState.myPrediction = value || null;
+        _renderPredictionPanel();
+    });
+    connection.on('PredictionCountUpdated', (count) => {
+        roomState.predictionCount = count || 0;
+        _renderPredictionPanel();
+    });
+    connection.on('PredictionsResolved', (result) => {
+        if (!result) return;
+        roomState.myPrediction = null;
+        roomState.predictionCount = 0;
+        roomState.predictionScores = result.scores || [];
+        _showPredictionResult(result);
+        _renderPredictionPanel();
+    });
+
+    // P8 — team pet
+    connection.on('PetUpdated', (pet, note) => {
+        if (window.Pet && Pet.onUpdated) Pet.onUpdated(pet, note);
+    });
+    connection.on('PetEnabledUpdated', (enabled, pet) => {
+        if (window.Pet && Pet.onEnabledUpdated) Pet.onEnabledUpdated(enabled, pet);
+    });
 
     connection.onreconnected(() => {
         myConnectionId = connection.connectionId;
@@ -857,6 +1520,17 @@ function renderParticipants() {
             else if (p.hasVoted)   avatarEl.classList.add('av-voted');
             else                   avatarEl.classList.add('av-not-voted');
             if (isMe)              avatarEl.classList.add('av-me');
+            const myBadges = _dailyBadgesCache[p.name];
+            if (myBadges && myBadges.length) {
+                const badgeWrap = document.createElement('span');
+                badgeWrap.className = 'av-badges';
+                badgeWrap.style.cssText = 'position:absolute;top:-4px;right:-4px;font-size:0.7rem;line-height:1;' +
+                    'display:flex;gap:1px;pointer-events:none;';
+                badgeWrap.title = myBadges.join(', ');
+                badgeWrap.textContent = myBadges.map(b => _BADGE_ICON[b.split('-')[0]] || '').join('');
+                avatarEl.style.position = avatarEl.style.position || 'relative';
+                avatarEl.appendChild(badgeWrap);
+            }
             div.prepend(avatarEl);
         }
 
@@ -1697,6 +2371,236 @@ function toggleVoteHistory() {
     const isHidden = list.style.display === 'none';
     list.style.display = isHidden ? '' : 'none';
     if (chevron) chevron.textContent = isHidden ? '▴' : '▾';
+}
+
+// ============================================================
+// F11/P2 — Reference deck (calibration anchors)
+//
+// Estimate drift between sessions is caused by nobody remembering what last month's 5 felt
+// like. The anchors are just story ids on the room, resolved against the story list here.
+// ============================================================
+function _renderReferenceDeck() {
+    var wrap = document.getElementById('referenceDeck');
+    var list = document.getElementById('referenceDeckList');
+    if (!wrap || !list) return;
+
+    var ids = roomState.referenceStoryIds || [];
+    var anchors = ids.map(function (id) {
+        return (roomState.stories || []).find(function (s) { return s.id === id; });
+    }).filter(Boolean);
+
+    // Nothing pinned and nothing pinnable: stay out of the way entirely.
+    var pinnable = (roomState.stories || []).some(function (s) { return s.isCompleted && s.finalEstimate; });
+    if (anchors.length === 0 && !(roomState.isHost && pinnable)) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+
+    if (anchors.length === 0) {
+        list.innerHTML = '<div class="reference-deck-empty">No anchors pinned yet — pin a few estimated stories so the room has something to calibrate against.</div>';
+        return;
+    }
+
+    list.innerHTML = '';
+    anchors.forEach(function (s) {
+        var card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'reference-anchor';
+        card.title = s.notes ? 'Click to read the notes' : s.title;
+        card.innerHTML =
+            '<span class="reference-anchor-value">' + escHtml(s.finalEstimate || '?') + '</span>' +
+            '<span class="reference-anchor-title">' + escHtml(s.title || 'Untitled') + '</span>';
+        card.onclick = function () { _showReferenceAnchor(s); };
+        list.appendChild(card);
+    });
+}
+
+function _showReferenceAnchor(story) {
+    var body = '<div class="mb-2"><span class="badge bg-primary">' + escHtml(story.finalEstimate || '?') + '</span></div>' +
+        '<div class="fw-semibold mb-2">' + escHtml(story.title || 'Untitled') + '</div>' +
+        (story.notes ? '<div class="small" style="white-space:pre-wrap;">' + escHtml(story.notes) + '</div>'
+                     : '<div class="small text-muted">No notes on this story.</div>');
+    _f11Modal('Reference anchor', body);
+}
+
+function toggleReferenceDeck() {
+    var list = document.getElementById('referenceDeckList');
+    var chevron = document.getElementById('referenceDeckChevron');
+    if (!list) return;
+    var hidden = list.style.display === 'none';
+    list.style.display = hidden ? '' : 'none';
+    if (chevron) chevron.textContent = hidden ? '▴' : '▾';
+}
+
+function openReferenceDeckPicker() {
+    var done = (roomState.stories || []).filter(function (s) { return s.isCompleted && s.finalEstimate; });
+    if (done.length === 0) {
+        _showToastAD('Nothing to pin yet — complete a story with a final estimate first', 'warning');
+        return;
+    }
+    var picked = roomState.referenceStoryIds || [];
+    var rows = done.map(function (s) {
+        var checked = picked.indexOf(s.id) >= 0 ? ' checked' : '';
+        return '<label class="d-flex align-items-center gap-2 py-1">' +
+            '<input type="checkbox" class="form-check-input mt-0 ref-pick" value="' + escHtml(s.id) + '"' + checked + ' />' +
+            '<span class="badge bg-secondary">' + escHtml(s.finalEstimate) + '</span>' +
+            '<span class="flex-grow-1 text-truncate">' + escHtml(s.title || 'Untitled') + '</span></label>';
+    }).join('');
+
+    var modal = _f11Modal('Pin calibration anchors',
+        '<p class="small text-muted">Pick up to 5. One per distinct value works best — the point is a ladder, not a list.</p>' +
+        '<div style="max-height:50vh;overflow:auto;">' + rows + '</div>',
+        [{ label: 'Save anchors', cls: 'btn-primary', onClick: function (m) {
+            var chosen = Array.prototype.slice.call(m.querySelectorAll('.ref-pick:checked')).map(function (c) { return c.value; });
+            if (chosen.length > 5) {
+                _showToastAD('At most 5 anchors — the extras were dropped', 'warning');
+                chosen = chosen.slice(0, 5);
+            }
+            ReferenceDeckNet.set(chosen);
+            return true;
+        }}]);
+    return modal;
+}
+
+// Auto-suggest: a story that lands unanimously on a value nothing is pinned at is exactly the
+// anchor the room is missing. Host-only and one nudge per value, so it never nags.
+var _refSuggested = {};
+function _maybeSuggestAnchor(story) {
+    if (!roomState.isHost || !story || !story.finalEstimate) return;
+    if ((roomState.referenceStoryIds || []).length >= 5) return;
+    var value = String(story.finalEstimate);
+    if (_refSuggested[value]) return;
+    var already = (roomState.referenceStoryIds || []).some(function (id) {
+        var s = (roomState.stories || []).find(function (x) { return x.id === id; });
+        return s && String(s.finalEstimate) === value;
+    });
+    if (already) return;
+    _refSuggested[value] = true;
+    _f11Modal('Pin this as the reference ' + escHtml(value) + '?',
+        '<p>“' + escHtml(story.title || 'Untitled') + '” came in at <strong>' + escHtml(value) + '</strong> and nothing is pinned at that value yet.</p>' +
+        '<p class="small text-muted mb-0">Anchors show under the card deck so the next session has something concrete to compare against.</p>',
+        [{ label: 'Pin it', cls: 'btn-primary', onClick: function () {
+            ReferenceDeckNet.set((roomState.referenceStoryIds || []).concat([story.id]));
+            return true;
+        }}]);
+}
+
+// ============================================================
+// F11/P3 — Absentee pre-votes
+//
+// Shown as greyed "absent" cards beside the live participants. Values stay hidden until the
+// reveal exactly like live votes; whether they move the room's numbers is the host's call
+// (countProxyVotes) and is enforced server-side, not here.
+// ============================================================
+function _renderProxyVotes() {
+    var strip = document.getElementById('proxyVotesStrip');
+    if (!strip) return;
+    // Server shape: [{ name, vote, hasVoted }], with `vote` null until the reveal.
+    var proxies = roomState.proxyVotes || [];
+    if (!Array.isArray(proxies) || proxies.length === 0) { strip.style.display = 'none'; strip.innerHTML = ''; return; }
+    strip.style.display = '';
+
+    var counted = roomState.countProxyVotes
+        ? 'counting toward the average'
+        : 'shown but not counted';
+    strip.innerHTML = '<div class="proxy-votes-label">📮 Pre-cast by people who aren’t here — ' + counted + '</div>';
+    var row = document.createElement('div');
+    row.className = 'proxy-votes-row';
+    proxies.slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); }).forEach(function (pv) {
+        var value = pv.vote;
+        var card = document.createElement('div');
+        card.className = 'proxy-vote-card' + (roomState.countProxyVotes ? ' counted' : '');
+        card.title = pv.name + (value == null ? ' — pre-cast, hidden until reveal' : ' — pre-cast ' + value);
+        card.innerHTML = '<span class="proxy-vote-value">' + (value == null ? '🂠' : escHtml(value)) + '</span>' +
+                         '<span class="proxy-vote-name">' + escHtml(pv.name) + '</span>';
+        row.appendChild(card);
+    });
+    strip.appendChild(row);
+}
+
+function _syncCountProxyVotesToggle() {
+    var chk = document.getElementById('countProxyVotesCheck');
+    if (chk) chk.checked = roomState.countProxyVotes === true;
+}
+
+function toggleCountProxyVotes(enabled) {
+    ProxyVoteNet.setCounted(enabled);
+}
+
+// ============================================================
+// F11/P7 — Estimate prediction pool
+//
+// Call the number the room will land on before the reveal. Only the headcount is public
+// before resolution — publishing who called what would anchor exactly the way showing live
+// votes would.
+// ============================================================
+function _renderPredictionPanel() {
+    var panel = document.getElementById('predictionPanel');
+    if (!panel) return;
+    if (!roomState.currentStoryId || roomState.votesRevealed) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+
+    var values = (currentEstimateValues || []).filter(function (v) { return v !== '☕'; });
+    var mine = roomState.myPrediction;
+    var head = '<div class="prediction-head">🔮 Call it — what will the room land on? ' +
+        '<span class="prediction-count">' + roomState.predictionCount + ' call' +
+        (roomState.predictionCount === 1 ? '' : 's') + ' in</span></div>';
+
+    var cards = values.map(function (v) {
+        return '<button type="button" class="prediction-card' + (mine === v ? ' selected' : '') + '" ' +
+               'data-prediction="' + escHtml(v) + '">' + escHtml(v) + '</button>';
+    }).join('');
+
+    panel.innerHTML = head + '<div class="prediction-row">' + cards +
+        (mine ? '<button type="button" class="prediction-clear" data-prediction="">clear</button>' : '') + '</div>';
+
+    panel.querySelectorAll('[data-prediction]').forEach(function (btn) {
+        btn.onclick = function () {
+            var v = btn.getAttribute('data-prediction');
+            PredictionNet.cast(v === '' ? null : v);
+        };
+    });
+}
+
+function _showPredictionResult(result) {
+    if (!result || !result.entries || result.entries.length === 0) return;
+    var correct = result.entries.filter(function (e) { return e.correct; });
+    var line = correct.length === 0
+        ? 'Nobody called ' + escHtml(result.finalEstimate || '?') + '.'
+        : correct.map(function (e) { return escHtml(e.name); }).join(', ') +
+          ' called ' + escHtml(result.finalEstimate || '?') + '.';
+    appendChat('System', '🔮 ' + line.replace(/<[^>]*>/g, ''), null);
+    if (correct.length > 0 && window.Pet && Pet.react) Pet.react('prediction');
+}
+
+// ============================================================
+// Small shared modal used by the F11 in-room prompts. The games each build their own
+// full-screen overlay; these are one-question dialogs and a Bootstrap modal is the right
+// size of tool. Returns the element so a caller can read its inputs.
+// ============================================================
+function _f11Modal(title, bodyHtml, buttons) {
+    var host = document.createElement('div');
+    host.className = 'modal fade';
+    host.tabIndex = -1;
+    var btnHtml = (buttons || []).map(function (b, i) {
+        return '<button type="button" class="btn ' + (b.cls || 'btn-secondary') + '" data-f11-btn="' + i + '">' +
+               escHtml(b.label) + '</button>';
+    }).join('');
+    host.innerHTML =
+        '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+        '<div class="modal-header"><h5 class="modal-title">' + escHtml(title) + '</h5>' +
+        '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>' +
+        '<div class="modal-body">' + bodyHtml + '</div>' +
+        '<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>' +
+        btnHtml + '</div></div></div>';
+    document.body.appendChild(host);
+    var inst = new bootstrap.Modal(host);
+    (buttons || []).forEach(function (b, i) {
+        host.querySelector('[data-f11-btn="' + i + '"]').onclick = function () {
+            if (b.onClick(host) !== false) inst.hide();
+        };
+    });
+    host.addEventListener('hidden.bs.modal', function () { host.remove(); });
+    inst.show();
+    return host;
 }
 
 // ============================================================
@@ -2996,6 +3900,24 @@ function toggleControlsPanel() {
 }
 (function() {
     if (localStorage.getItem('es_controlsPanelCollapsed') === '1') _setControlsCollapsed(true);
+})();
+
+// ============================================================
+// Games menu collapse/expand (persisted)
+// ============================================================
+function _setGamesMenuCollapsed(collapsed) {
+    var section = document.getElementById('games-menu-section');
+    if (section) section.classList.toggle('collapsed', collapsed);
+}
+function toggleGamesMenu() {
+    var section = document.getElementById('games-menu-section');
+    var collapsed = section ? !section.classList.contains('collapsed') : true;
+    _setGamesMenuCollapsed(collapsed);
+    localStorage.setItem('es_gamesMenuCollapsed', collapsed ? '1' : '0');
+}
+window.toggleGamesMenu = toggleGamesMenu;
+(function() {
+    if (localStorage.getItem('es_gamesMenuCollapsed') === '1') _setGamesMenuCollapsed(true);
 })();
 
 // ============================================================

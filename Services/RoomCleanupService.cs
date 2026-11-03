@@ -17,7 +17,11 @@ public class RoomCleanupService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(_interval, stoppingToken);
+            // Task.Delay throws rather than returning early when the host stops, so catch it
+            // here and leave the loop cleanly — same shape as ParticipantSweepService.
+            try { await Task.Delay(_interval, stoppingToken); }
+            catch (OperationCanceledException) { break; }
+
             try
             {
                 using var scope = _services.CreateScope();
